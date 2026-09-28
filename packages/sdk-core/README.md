@@ -128,7 +128,7 @@ Every rejection from `issue`/`verify` is an `OtpApiError`:
 class OtpApiError extends Error {
   code: OtpApiErrorCode;   // see below
   status: number;          // HTTP status, 0 when no response was received
-  requestId?: string;      // x-request-id / request-id / cf-ray, when readable
+  requestId?: string;      // X-Request-Id (else request-id / cf-ray), when readable
   data?: unknown;          // e.g. { code: "INSUFFICIENT_CREDIT" } for 402
   retryAfterMs?: number;   // from Retry-After or the error body
   retryable: boolean;      // TOO_MANY_REQUESTS, INTERNAL_SERVER_ERROR, SERVICE_UNAVAILABLE, TIMEOUT, NETWORK_ERROR
@@ -210,8 +210,14 @@ protection. See the [issue -> verify UX guide](../../docs/issue-verify-ux.md).
 - **Origins:** `pk_` keys require an `Origin` header that exactly matches one
   of the key's `allowedOrigins` (scheme + host + port, no wildcards). Calls from
   servers or tools without a matching `Origin` get `FORBIDDEN`.
-- **Request ids in browsers:** response headers are only readable when the API
-  exposes them via CORS, so `requestId` may be undefined in browsers.
+- **Request ids in browsers:** the API exposes `X-Request-Id` and
+  `Retry-After` to allowed origins, so `requestId`/`retryAfterMs` work in
+  browsers. They are undefined when no response was readable.
+- **`NETWORK_ERROR` in the browser but works with curl:** the page origin is
+  not in the `pk_` key's `allowedOrigins`. For unlisted origins the API sends
+  no CORS headers, so the browser blocks the response and the SDK can only
+  report `NETWORK_ERROR` (status 0, no `requestId`; the message carries a
+  hint in browsers). Fix the allowlist entry: exact scheme + host + port.
 - **CommonJS:** the CJS build `require()`s the ESM-only `@orpc/*` packages,
   which needs Node.js >= 20.19 (or 22.12+). ESM consumers are unaffected.
 - **Timeouts:** the default is 10 seconds per request (`DEFAULT_TIMEOUT_MS`).

@@ -23,11 +23,33 @@ variables, Workers secrets, a secret manager).
   not match `https://www.example.com` or `http://example.com`). There are no
   wildcards; list each deployment origin (and `http://localhost:<port>` for
   local development, preferably on a separate key).
-- A missing or unlisted `Origin` is rejected with `403 FORBIDDEN`. That is also
-  why a `pk_` key does not work from a server or `curl` unless it sends a
-  matching `Origin`.
+- A request without a matching `Origin` is rejected with `403 FORBIDDEN`. That
+  is also why a `pk_` key does not work from a server or `curl` unless it
+  sends a matching `Origin`.
+- **In browsers, an unlisted origin looks like a network error.** For an
+  `Origin` outside the allowlist the API does not send CORS headers, so the
+  browser blocks the response and the SDK reports `NETWORK_ERROR` (no status,
+  no `requestId`) instead of `403`. See the troubleshooting entry below.
+- For allowed origins the API exposes `X-Request-Id` and `Retry-After` via
+  `Access-Control-Expose-Headers`, so `error.requestId` and
+  `error.retryAfterMs` are available in browsers too.
 - `@k-otp/sdk-server` only accepts keys that start with `sk_` (it refuses
   `pk_` keys and anything unprefixed); use `sk_` on servers.
+
+### Troubleshooting: `NETWORK_ERROR` in the browser, but it works with curl
+
+For a `pk_` key called from a browser `Origin` that is **not** in the key's
+`allowedOrigins`, the API answers without CORS headers. The browser then
+blocks the response and reports a generic network/CORS failure, so the SDK
+can only surface `NETWORK_ERROR` with `status: 0` and no `requestId` (in
+browsers the message also carries a hint about the allowlist). The same key
+works from curl or a server because those do not enforce CORS.
+
+Check the key's allowed origins: they must match the page origin exactly,
+scheme + host + port (`http://localhost:5173` is not `http://127.0.0.1:5173`
+or `http://localhost:3000`; `https://example.com` is not
+`https://www.example.com`), without a path or trailing slash. The browser
+devtools console shows the blocked CORS request.
 
 Because a `pk_` key is visible to anyone, anyone can use it from a page on an
 allowed origin. Protect browser-direct flows with your own abuse controls

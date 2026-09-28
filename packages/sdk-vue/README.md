@@ -144,6 +144,17 @@ run resolve with `{ skipped: "cooldown" | "busy" | "no-issue" |
   `403 FORBIDDEN`.
 - **CommonJS** consumers need Node.js >= 20.19 (see sdk-core).
 
+## Troubleshooting
+
+- **`NETWORK_ERROR` in the browser, but the same key works with curl:** the
+  page origin is not in the `pk_` key's `allowedOrigins`. For unlisted
+  origins the API sends no CORS headers, so the browser blocks the response
+  and the SDK can only report `NETWORK_ERROR` (status 0, no `requestId`).
+  Add the origin exactly: scheme + host + port (`http://localhost:5173` is
+  not `http://127.0.0.1:5173`), no path or trailing slash.
+- **`error.requestId`** comes from the `X-Request-Id` response header;
+  include it when contacting support.
+
 ## Versioning and migration
 
 All `@k-otp/sdk-*` packages are released in lockstep; this package depends on

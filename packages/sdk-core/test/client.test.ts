@@ -237,6 +237,29 @@ describe("timeouts, aborts and network failures", () => {
     expect(error.status).toBe(0);
     expect(error.retryable).toBe(true);
     expect(error.cause).toBeInstanceOf(TypeError);
+    expect(error.message).toBe("K-OTP API request failed: Failed to fetch");
+  });
+
+  test("in browsers, NETWORK_ERROR hints at the pk_ origin allowlist (CORS)", async () => {
+    const g = globalThis as Record<string, unknown>;
+    g.window = g;
+    g.document = {};
+    try {
+      const client = createOtpClient({
+        apiKey: "pk_test",
+        fetch: (async () => {
+          throw new TypeError("Failed to fetch");
+        }) as unknown as typeof fetch,
+      });
+      const error = await rejection(client.issue(issueInput));
+      expect(error.code).toBe("NETWORK_ERROR");
+      expect(error.status).toBe(0);
+      expect(error.requestId).toBeUndefined();
+      expect(error.message).toContain("allowedOrigins");
+    } finally {
+      delete g.window;
+      delete g.document;
+    }
   });
 });
 

@@ -68,6 +68,10 @@ Static site:
 - [Examples](./examples) (vanilla/CDN, React, Vue, Svelte, Node server)
 - [Errors, retries and idempotency](./docs/errors-and-retries.md)
 - [Security: key types and the Origin allowlist](./docs/security.md)
+- Troubleshooting: `NETWORK_ERROR` in the browser but the same key works with
+  curl? The page origin is missing from the `pk_` key's `allowedOrigins`
+  (exact scheme + host + port); see
+  [errors and retries](./docs/errors-and-retries.md#network_error-in-the-browser-but-the-same-call-works-with-curl).
 - [Releasing](./docs/releasing.md)
 - API reference: [`sdk-core`](./packages/sdk-core/README.md), [`sdk-server`](./packages/sdk-server/README.md), [`sdk-react`](./packages/sdk-react/README.md), [`sdk-vue`](./packages/sdk-vue/README.md), [`sdk-svelte`](./packages/sdk-svelte/README.md)
 

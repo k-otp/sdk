@@ -9,7 +9,7 @@ All SDK methods reject with `OtpApiError`:
 | `code` | Normalized code (table below). |
 | `status` | HTTP status, or `0` when no HTTP response was received (timeout, network, abort). |
 | `message` | Server message, or a descriptive client message. |
-| `requestId` | `x-request-id`, `request-id` or `cf-ray` response header, when readable. Include it in support requests. |
+| `requestId` | `X-Request-Id` response header (sent on every API response, exposed to allowed browser origins), else `request-id` / `cf-ray`. Include it in support requests. |
 | `data` | Error payload. For 402: `{ code: "INSUFFICIENT_CREDIT" \| "OVERDRAFT_LIMIT_EXCEEDED" }`. |
 | `retryAfterMs` | From a `Retry-After` header (seconds or HTTP date) or `data.retryAfterMs` / `data.retryAfter`, when present. |
 | `retryable` | `true` for the codes marked below. |
@@ -27,12 +27,23 @@ All SDK methods reject with `OtpApiError`:
 | `INTERNAL_SERVER_ERROR` | 500, other 5xx | yes | Unexpected server error. |
 | `SERVICE_UNAVAILABLE` | 502, 503, 504 | yes | Dependency or gateway unavailable, or an earlier attempt with the same idempotency key is still being resolved. |
 | `TIMEOUT` | 0 (or 408) | yes | No response within `timeoutMs`. |
-| `NETWORK_ERROR` | 0 | yes | DNS/TLS/connection failure, CORS rejection in browsers. |
+| `NETWORK_ERROR` | 0 | yes | DNS/TLS/connection failure, or a CORS rejection in browsers, most often a `pk_` key used from an origin that is not in its `allowedOrigins` (see below). |
 | `ABORTED` | 0 | no | Your `AbortSignal` fired. |
 | `UNKNOWN` | any | no | Anything else (unexpected status, malformed success body). |
 
 Configuration mistakes (missing `apiKey`, a key without the `sk_` prefix in
 `sdk-server`, an `sk_` key in a browser, no `fetch`) throw `TypeError` instead.
+
+## `NETWORK_ERROR` in the browser, but the same call works with curl
+
+That is almost always the `pk_` key's Origin allowlist. For a browser
+`Origin` not listed in `allowedOrigins`, the API sends no CORS headers, the
+browser blocks the response and the SDK can only report `NETWORK_ERROR`
+(`status: 0`, no `requestId`; in browsers the message includes a hint). Add
+the page origin to the key exactly: scheme + host + port, no path, no
+trailing slash (`http://localhost:5173` differs from `http://127.0.0.1:5173`
+and from `https://localhost:5173`). Details:
+[security](./security.md#troubleshooting-network_error-in-the-browser-but-it-works-with-curl).
 
 ## Idempotency for `issue`
 

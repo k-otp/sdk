@@ -287,6 +287,18 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
   return { client, call };
 };
 
+/**
+ * Browsers report a CORS rejection as a plain network failure. The API sends
+ * no CORS headers when a pk_ key is used from an origin outside its
+ * allowedOrigins, so that is the most common cause in browsers.
+ */
+export const BROWSER_NETWORK_HINT: string =
+  " (In a browser this is also how a CORS rejection looks: if it works with curl, check that this page's origin is listed exactly - scheme, host and port - in the pk_ key's allowedOrigins.)";
+
+const inBrowser = (): boolean =>
+  typeof (globalThis as { window?: unknown }).window !== "undefined" &&
+  typeof (globalThis as { document?: unknown }).document !== "undefined";
+
 const normalizeTransportError = (
   error: unknown,
   state: {
@@ -343,7 +355,7 @@ const normalizeTransportError = (
       status: 0,
       message: `K-OTP API request failed: ${
         error instanceof Error ? error.message : String(error)
-      }`,
+      }${inBrowser() ? BROWSER_NETWORK_HINT : ""}`,
       cause: error,
     });
   }
