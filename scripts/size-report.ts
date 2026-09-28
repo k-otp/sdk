@@ -24,7 +24,8 @@ const coreDir = path.join(root, "packages/sdk-core");
 /** Budgets in bytes (min+gzip). Raise deliberately, with a reason. */
 const BUDGETS = {
   esm: 13 * 1024,
-  iife: 13 * 1024,
+  // Includes the headless flow (KOtp.createOtpFlow) since 0.1.0.
+  iife: 14 * 1024,
   // Adapter code only (sdk-core and the framework are external).
   adapter: 2 * 1024,
   // What an app ships for OTP with an adapter (sdk-core included, framework external).
@@ -132,7 +133,7 @@ try {
         await bundle(adapterEntry, dir, [
           ...framework,
           "@k-otp/sdk-core",
-          "@k-otp/sdk-core/internal",
+          "@k-otp/sdk-core/headless",
         ]),
         BUDGETS.adapter,
       ],

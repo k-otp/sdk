@@ -3,8 +3,10 @@
 How to build the "send code / enter code" screen so that it is pleasant,
 safe to retry and never double-sends an SMS. The adapters' flow helpers
 (`useOtpFlow` in React and Vue, `createFlow()` / `createOtpFlowStore` in
-Svelte) implement every rule below; with `@k-otp/sdk-core` or
-`@k-otp/sdk-server` you apply them yourself.
+Svelte, and `createOtpFlow` from `@k-otp/sdk-core/headless` or
+`KOtp.createOtpFlow` for plain JavaScript) implement every rule below; with
+the bare `issue`/`verify` calls or `@k-otp/sdk-server` you apply them
+yourself.
 
 ## The states
 
@@ -54,7 +56,7 @@ code: `verify` on the old `issueId` then returns `reasonCode: "REPLACED"`.
 ## Resend and cooldown
 
 - Start a **local cooldown** after each successful send
-  (`resendCooldownMs`, e.g. 30-60 s). It prevents accidental double taps
+  (`resendCooldownMs`, default 30 s in the flow helpers; `0` disables it). It prevents accidental double taps
   and abuse, and matches what users expect from SMS codes.
 - A **server cooldown** wins when it is longer: on `429 TOO_MANY_REQUESTS`
   (and on 503 with `Retry-After`), `error.retryAfterMs` tells you how long to
@@ -113,5 +115,6 @@ It is not the end user's fault:
 - React: [`docs/react.md`](./react.md)
 - Vue: [`docs/vue.md`](./vue.md)
 - Svelte: [`docs/svelte.md`](./svelte.md)
-- Plain JavaScript / CDN: [`examples/vanilla-cdn`](../examples/vanilla-cdn)
-  implements the same rules by hand.
+- Plain JavaScript / CDN: `createOtpFlow` from `@k-otp/sdk-core/headless`
+  (`KOtp.createOtpFlow` in the script bundle), see
+  [`examples/vanilla-cdn`](../examples/vanilla-cdn).

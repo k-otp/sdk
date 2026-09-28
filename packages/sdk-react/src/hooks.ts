@@ -14,7 +14,7 @@ import {
   type OtpOperationController,
   type OtpOperationState,
   type OtpRunResult,
-} from "@k-otp/sdk-core/internal";
+} from "@k-otp/sdk-core/headless";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { type OtpClientLike, useOtpClient } from "./context";
 

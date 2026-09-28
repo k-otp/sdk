@@ -10,7 +10,7 @@ components, SSR and React Server Components setups (the hooks module is marked
   idempotency key handling
 - No Suspense required, no global state, SSR-safe (no `window` access at
   import or render)
-- Same semantics and normalized `OtpApiError` as the Vue and Svelte adapters
+- Built on the public [`@k-otp/sdk-core/headless`](../sdk-core#headless-flow-k-otpsdk-coreheadless) flow; same semantics and normalized `OtpApiError` as the Vue and Svelte adapters
 
 ## Install
 
@@ -118,7 +118,7 @@ Wraps issue + verify with the rules from the
 
 | Option | Default | |
 | --- | --- | --- |
-| `resendCooldownMs` | `0` | Local cooldown after a successful send. |
+| `resendCooldownMs` | `30000` | Local cooldown after a successful send; `0` disables it. |
 | `idempotencyKeyPrefix` | | Prefix for generated keys. |
 | `createIdempotencyKey` | `createIdempotencyKey(prefix)` | Custom key factory. |
 | `client` | provider | |

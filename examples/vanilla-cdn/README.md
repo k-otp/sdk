@@ -43,8 +43,9 @@ a separate key) and your production origin such as
 `https://www.example.com`. Other origins get `403 FORBIDDEN`. Never put an
 `sk_` key in a page: the SDK refuses it in browsers, and anyone could read it.
 
-The page shows the same rules as the framework adapters, by hand: one
-idempotency key per send attempt, reused while the outcome is unknown
-(retryable errors), a resend cooldown (local 30 s or `error.retryAfterMs`),
-and `verify` results with `reasonCode` handled as normal outcomes. See the
+The page drives the UI with `KOtp.createOtpFlow` (the public
+`@k-otp/sdk-core/headless` flow that the framework adapters also use): one
+idempotency key per send attempt, reused while the outcome is unknown, a
+30 s resend cooldown (or the server's `retryAfterMs`), and `verify` results
+with `reasonCode` handled as normal outcomes. See the
 [issue -> verify UX guide](../../docs/issue-verify-ux.md).

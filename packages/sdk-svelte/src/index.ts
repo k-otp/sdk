@@ -13,16 +13,17 @@ export {
   type VerifyReasonCode,
   type VerifyResult,
 } from "@k-otp/sdk-core";
-export type {
-  OtpFlowOptions,
-  OtpFlowResult,
-  OtpFlowSendInput,
-  OtpFlowSkipReason,
-  OtpFlowState,
-  OtpOperationState,
-  OtpOperationStatus,
-  OtpRunResult,
-} from "@k-otp/sdk-core/internal";
+export {
+  DEFAULT_RESEND_COOLDOWN_MS,
+  type OtpFlowOptions,
+  type OtpFlowResult,
+  type OtpFlowSendInput,
+  type OtpFlowSkipReason,
+  type OtpFlowState,
+  type OtpOperationState,
+  type OtpOperationStatus,
+  type OtpRunResult,
+} from "@k-otp/sdk-core/headless";
 export { getOtpContext, setOtpContext } from "./context";
 export {
   type OtpFormActionReturn,

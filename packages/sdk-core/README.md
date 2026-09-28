@@ -157,13 +157,51 @@ createOtpClient({
 Hooks run synchronously; exceptions thrown by hooks are swallowed. They are not
 called for client-side validation failures (no request is made).
 
+### Headless flow: `@k-otp/sdk-core/headless`
+
+The state machine behind the React, Vue and Svelte adapters, for plain
+JavaScript or any other framework. Also available in the CDN bundle as
+`KOtp.createOtpFlow` / `KOtp.createOtpOperation`.
+
+```ts
+import { createOtpClient } from "@k-otp/sdk-core";
+import { createOtpFlow } from "@k-otp/sdk-core/headless";
+
+const flow = createOtpFlow(createOtpClient({ apiKey: "pk_live_..." }), {
+  // resendCooldownMs: 30_000 (default; 0 disables), idempotencyKeyPrefix, createIdempotencyKey
+});
+const unsubscribe = flow.subscribe(() => render(flow.getState()));
+
+await flow.send({ phoneNumber, purpose: "signup" }); // { data } | { error } | { skipped }
+await flow.verify(code);
+flow.getState(); // issueId, verified, reasonCode, error, canSend, canVerify,
+                 // cooldownRemainingMs (ticks ~1/s while subscribed), idempotencyKey, ...
+```
+
+- One idempotency key per send attempt; the same key is reused when `send`
+  is called again with the same input after an ambiguous failure (`TIMEOUT`,
+  `NETWORK_ERROR`, 5xx, 429, `ABORTED`) and dropped after a success, a
+  definitive error or changed input.
+- Cooldown: `resendCooldownMs` (default `DEFAULT_RESEND_COOLDOWN_MS`, 30 s)
+  after each successful send, and the server's `retryAfterMs` on 429/503.
+- Actions never reject for API errors; blocked actions resolve with
+  `{ skipped: "cooldown" | "busy" | "no-issue" | "no-previous-send" }`.
+- `verified: false` with `EXPIRED`, `MAX_ATTEMPTS`, `REPLACED`, `NOT_FOUND`
+  or `ALREADY_VERIFIED` is terminal for that code (`canVerify` becomes false).
+- `reset()` clears the flow but keeps the cooldown; `abort()` cancels
+  in-flight requests (e.g. when your view is torn down).
+
+`createOtpOperation(execute)` is the single-operation building block
+(`getState`, `subscribe`, `run`, `reset`, `abort`) with stale-response
+protection. See the [issue -> verify UX guide](../../docs/issue-verify-ux.md).
+
 ### Advanced entry points
 
 - `@k-otp/sdk-core/contract` - the oRPC contract (`otpPublicContract`,
   `otpServerContract`) and every generated OpenAPI type, for building your own
   oRPC `OpenAPILink` client.
-- `@k-otp/sdk-core/internal` - building blocks for the other `@k-otp/sdk-*`
-  packages. **Not covered by SemVer.**
+- `@k-otp/sdk-core/internal` - transport building blocks for
+  `@k-otp/sdk-server`. **Not covered by SemVer.**
 
 ## Runtime notes
 

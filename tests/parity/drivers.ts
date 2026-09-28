@@ -19,7 +19,7 @@ import type {
   OtpFlowState,
   OtpOperationState,
   OtpRunResult,
-} from "@k-otp/sdk-core/internal";
+} from "@k-otp/sdk-core/headless";
 import {
   OtpProvider,
   useOtpFlow,

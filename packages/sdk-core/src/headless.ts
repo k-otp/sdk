@@ -1,11 +1,13 @@
 /**
- * Framework-agnostic operation state shared by the React, Vue and Svelte
- * adapters, so every adapter has identical semantics (loading/error/data,
- * stale-response protection, abort, idempotency key reuse, resend cooldown).
+ * `@k-otp/sdk-core/headless`: framework-agnostic operation state and the
+ * issue -> verify flow (loading/error/data, stale-response protection, abort,
+ * idempotency key reuse, resend cooldown). The React, Vue and Svelte adapters
+ * are thin wrappers around it, and plain-JS apps can use it directly (the
+ * CDN bundle exposes it as `KOtp.createOtpFlow` / `KOtp.createOtpOperation`).
+ * Covered by SemVer.
  *
- * Exposed through `@k-otp/sdk-core/internal` (not covered by SemVer). Nothing
- * here runs at import time or touches `window`; timers only start after an
- * action while someone is subscribed.
+ * Nothing here runs at import time or touches `window`; timers only start
+ * after an action while someone is subscribed.
  */
 import { isOtpApiError, type OtpApiError } from "./errors";
 import { createIdempotencyKey } from "./idempotency";
@@ -215,8 +217,8 @@ export type OtpFlowSendInput = Omit<IssueInput, "idempotencyKey">;
 export type OtpFlowOptions = {
   /**
    * Local cooldown after a successful send, in ms, before `send`/`resend`
-   * may issue again. Default `0`. A server `retryAfterMs` (429/503) always
-   * applies as well.
+   * may issue again. Default `30000` (30 s); `0` disables it. A server
+   * `retryAfterMs` (429/503) always applies as well.
    */
   resendCooldownMs?: number;
   /** Prefix for generated idempotency keys (`createIdempotencyKey(prefix)`). */
@@ -286,6 +288,9 @@ export type OtpFlowController = {
   abort: () => void;
 };
 
+/** Default local resend cooldown of `createOtpFlow` (30 seconds). */
+export const DEFAULT_RESEND_COOLDOWN_MS = 30_000;
+
 /** Outcome may have reached the server: retry with the same key. */
 const AMBIGUOUS_CODES: ReadonlySet<string> = new Set([
   "TOO_MANY_REQUESTS",
@@ -326,7 +331,10 @@ export const createOtpFlow = (
   options: OtpFlowOptions = {},
 ): OtpFlowController => {
   const now = options.now ?? Date.now;
-  const localCooldownMs = Math.max(0, options.resendCooldownMs ?? 0);
+  const localCooldownMs = Math.max(
+    0,
+    options.resendCooldownMs ?? DEFAULT_RESEND_COOLDOWN_MS,
+  );
   const newKey =
     options.createIdempotencyKey ??
     (() => createIdempotencyKey(options.idempotencyKeyPrefix));

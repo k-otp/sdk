@@ -103,7 +103,36 @@ assert.throws(
   () => vm.runInContext(`KOtp.createOtpClient({ apiKey: "sk_live" })`, context),
   /Refusing to use an sk_ secret key/,
 );
-console.log("ok - iife (window.KOtp)");
+const flowResult = await vm.runInContext(
+  `KOtp.createOtpFlow(KOtp.createOtpClient({ apiKey: "pk_smoke" }), {
+    createIdempotencyKey: () => "smoke-1",
+  }).send({ phoneNumber: "01012345678", purpose: "smoke" })`,
+  context,
+);
+assert.equal(flowResult.data.issueId, issueOutput.issueId);
+console.log("ok - iife (window.KOtp, KOtp.createOtpFlow)");
+
+for (const [label, mod] of [
+  [
+    "headless esm",
+    await import(pathToFileURL(dist("sdk-core", "headless.js")).href),
+  ],
+  ["headless cjs", require(dist("sdk-core", "headless.cjs"))],
+]) {
+  const flow = mod.createOtpFlow(
+    esmCore.createOtpClient({ apiKey: "pk_smoke", fetch }),
+    {
+      createIdempotencyKey: () => "smoke-1",
+    },
+  );
+  const sent = await flow.send({
+    phoneNumber: "01012345678",
+    purpose: "smoke",
+  });
+  assert.deepEqual(sent.data, issueOutput, label);
+  assert.equal(flow.getState().cooldownRemainingMs > 0, true, label);
+  console.log(`ok - ${label}`);
+}
 
 // Adapters.
 const adapterInput = { ...input };

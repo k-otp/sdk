@@ -24,6 +24,7 @@
     "paths": {
       "@k-otp/sdk-core": ["./packages/sdk-core/src/index.ts"],
       "@k-otp/sdk-core/contract": ["./packages/sdk-core/src/contract.ts"],
+      "@k-otp/sdk-core/headless": ["./packages/sdk-core/src/headless.ts"],
       "@k-otp/sdk-core/internal": ["./packages/sdk-core/src/internal.ts"],
       "@k-otp/sdk-react": ["./packages/sdk-react/src/index.ts"],
       "@k-otp/sdk-vue": ["./packages/sdk-vue/src/index.ts"],

@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import {
+  createOtpFlow,
+  createOtpOperation,
+  DEFAULT_RESEND_COOLDOWN_MS,
+} from "../src/headless";
 import { createOtpClient, OtpApiError } from "../src/index";
-import { createOtpFlow, createOtpOperation } from "../src/internal";
 import {
   errorEnvelope,
   hangUntilAborted,
@@ -147,6 +151,7 @@ describe("createOtpFlow", () => {
     let n = 0;
     const flow = createOtpFlow(createOtpClient({ apiKey: "pk_test", fetch }), {
       createIdempotencyKey: () => `key-${++n}`,
+      resendCooldownMs: 0,
       ...options,
     });
     const keys = () =>
@@ -247,6 +252,20 @@ describe("createOtpFlow", () => {
       phoneNumber: "01012345678",
     });
     expect(keys()).toEqual(["key-1", "key-1"]);
+  });
+
+  test("defaults to a 30 s resend cooldown", async () => {
+    let clock = 0;
+    const { fetch } = mockFetch(() => json(200, issueOutput));
+    const flow = createOtpFlow(createOtpClient({ apiKey: "pk_test", fetch }), {
+      now: () => clock,
+    });
+    await flow.send(sendInput);
+    expect(DEFAULT_RESEND_COOLDOWN_MS).toBe(30_000);
+    expect(flow.getState().cooldownRemainingMs).toBe(30_000);
+    expect((await flow.resend()).skipped).toBe("cooldown");
+    clock = 30_000;
+    expect(flow.getState().canSend).toBe(true);
   });
 
   test("applies the local cooldown after a successful send", async () => {

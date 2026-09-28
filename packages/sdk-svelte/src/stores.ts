@@ -17,7 +17,7 @@ import {
   type OtpIssueVerifyClient,
   type OtpOperationState,
   type OtpRunResult,
-} from "@k-otp/sdk-core/internal";
+} from "@k-otp/sdk-core/headless";
 import { derived, type Readable, readable } from "svelte/store";
 
 /** Any client with `issue`/`verify` (an `OtpClient` from `createOtpClient`). */

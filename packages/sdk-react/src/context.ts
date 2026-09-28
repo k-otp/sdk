@@ -3,7 +3,7 @@ import {
   type OtpClient,
   type OtpClientOptions,
 } from "@k-otp/sdk-core";
-import type { OtpIssueVerifyClient } from "@k-otp/sdk-core/internal";
+import type { OtpIssueVerifyClient } from "@k-otp/sdk-core/headless";
 import {
   type Context,
   createContext,

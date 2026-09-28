@@ -10,7 +10,7 @@ API, built on [`@k-otp/sdk-core`](../sdk-core).
   idempotency key handling
 - SSR-safe (per-app `provide`/`inject`, no globals, no `window` access at
   import); requests are aborted when the component unmounts
-- Same semantics and normalized `OtpApiError` as the React and Svelte adapters
+- Built on the public [`@k-otp/sdk-core/headless`](../sdk-core#headless-flow-k-otpsdk-coreheadless) flow; same semantics and normalized `OtpApiError` as the React and Svelte adapters
 
 ## Install
 
@@ -118,7 +118,7 @@ Templates only unwrap top-level refs, so destructure what you bind:
 
 ### `useOtpFlow(options?)`
 
-Options: `resendCooldownMs` (default `0`), `idempotencyKeyPrefix`,
+Options: `resendCooldownMs` (default `30000`; `0` disables it), `idempotencyKeyPrefix`,
 `createIdempotencyKey`, `client`. Returns computed refs `issueId`,
 `expiresAt`, `attemptsRemaining`, `verified`, `reasonCode`, `loading`,
 `sending`, `verifying`, `error`, `idempotencyKey`, `cooldownRemainingMs`,

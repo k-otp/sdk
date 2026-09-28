@@ -12,10 +12,12 @@ Public, MIT-licensed SDKs for the K-OTP Korean OTP API (`https://api.k-otp.dev/v
   Also builds `dist/k-otp.iife(.min).js` exposing `window.KOtp`.
 - `packages/sdk-server` (`@k-otp/sdk-server`): all public `/v1` operations with
   `sk_` keys only (any key not starting with `sk_` is a `TypeError`); depends
-  on sdk-core (`/contract`, `/internal` entry points).
+  on sdk-core (`/contract`, `/internal` entry points; `/internal` is not
+  SemVer-covered and only for sdk-server).
 - `packages/sdk-react|vue|svelte`: thin framework adapters over the headless
   `createOtpOperation` / `createOtpFlow` controllers in
-  `packages/sdk-core/src/headless.ts` (exported from `/internal`). Put shared
+  `packages/sdk-core/src/headless.ts` (public, SemVer-covered
+  `@k-otp/sdk-core/headless`, also in the IIFE via `src/iife.ts`). Put shared
   behavior there, never in one adapter, so the adapters stay identical.
   sdk-core is a pinned `dependency`, the framework a `peerDependency`
   (framework dev packages live in the root `devDependencies`).

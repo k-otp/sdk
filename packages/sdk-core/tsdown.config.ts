@@ -14,6 +14,7 @@ export default defineConfig([
     entry: {
       index: "src/index.ts",
       contract: "src/contract.ts",
+      headless: "src/headless.ts",
       internal: "src/internal.ts",
     },
     format: ["esm", "cjs"],
@@ -23,7 +24,7 @@ export default defineConfig([
   // CDN bundle for <script> tags: exposes `window.KOtp`, bundles oRPC.
   {
     ...shared,
-    entry: { "k-otp": "src/index.ts" },
+    entry: { "k-otp": "src/iife.ts" },
     format: "iife",
     globalName: "KOtp",
     platform: "browser",
@@ -36,7 +37,7 @@ export default defineConfig([
   },
   {
     ...shared,
-    entry: { "k-otp": "src/index.ts" },
+    entry: { "k-otp": "src/iife.ts" },
     format: "iife",
     globalName: "KOtp",
     platform: "browser",

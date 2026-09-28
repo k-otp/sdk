@@ -15,7 +15,7 @@ import {
   type OtpFlowState,
   type OtpOperationStatus,
   type OtpRunResult,
-} from "@k-otp/sdk-core/internal";
+} from "@k-otp/sdk-core/headless";
 import {
   type ComputedRef,
   computed,

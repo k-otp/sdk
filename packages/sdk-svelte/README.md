@@ -11,7 +11,7 @@ with Svelte 4 and Svelte 5 (runes components can use `$store` too), no
   flow with resend cooldown and idempotency key handling
 - `setOtpContext` / `getOtpContext` for SSR-safe sharing through context
 - `otpForm`: optional `use:` action for form wiring
-- Same semantics and normalized `OtpApiError` as the React and Vue adapters
+- Built on the public [`@k-otp/sdk-core/headless`](../sdk-core#headless-flow-k-otpsdk-coreheadless) flow; same semantics and normalized `OtpApiError` as the React and Vue adapters
 
 ## Install
 
@@ -82,7 +82,7 @@ A `Readable<OtpFlowState>` (`issueId`, `expiresAt`, `attemptsRemaining`,
 `verified`, `reasonCode`, `error`, `isLoading`, `issueState`, `verifyState`,
 `idempotencyKey`, `cooldownRemainingMs`, `cooldownUntil`, `canSend`,
 `canVerify`) with `send(input)`, `resend()`, `verify(code)`, `reset()` and
-`abort()`. Options: `resendCooldownMs` (default `0`),
+`abort()`. Options: `resendCooldownMs` (default `30000`; `0` disables it),
 `idempotencyKeyPrefix`, `createIdempotencyKey`.
 
 The flow reuses the idempotency key when `send` is called again with the same
