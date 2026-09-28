@@ -37,7 +37,6 @@
       // A pk_ PUBLIC key. Its allowedOrigins must list this page's exact origin
       // (e.g. http://localhost:5173 while developing). Never use an sk_ key here.
       const PUBLIC_KEY = "";
-      const _RESEND_COOLDOWN_MS = 30000;
 
       // Without a key, answer from a tiny in-page mock (the code is 123456).
       const mockFetch = async (input, init) => {
@@ -60,8 +59,9 @@
 
       // The same headless flow the React/Vue/Svelte adapters use: one
       // idempotency key per send attempt (reused after ambiguous failures),
-      // a 30 s resend cooldown (plus the server's retryAfterMs) and verify state.
-      const flow = KOtp.createOtpFlow(client, { resendCooldownMs: 30000, idempotencyKeyPrefix: "signup" });
+      // the default 30 s resend cooldown (plus the server's retryAfterMs) and
+      // verify state.
+      const flow = KOtp.createOtpFlow(client, { idempotencyKeyPrefix: "signup" });
 
       const sendForm = document.getElementById("send");
       const verifyForm = document.getElementById("verify");
@@ -69,28 +69,58 @@
       const sendButton = sendForm.querySelector("button");
       const verifyButton = verifyForm.querySelector("button");
 
-      const describeError = (error) =>
-        error.code === "PAYMENT_REQUIRED" ? "Sending is temporarily unavailable."
-        : error.code === "TOO_MANY_REQUESTS" ? `Too many attempts. Try again in ${Math.ceil((error.retryAfterMs ?? 0) / 1000)}s.`
-        : error.code === "FORBIDDEN" ? "This origin is not allowed for the public key."
-        : error.retryable ? "Could not confirm the code was sent. Retrying is safe."
-        : `Request failed (${error.code}).`;
+      // Shared by both operations.
+      const describeCommonError = (error) => {
+        switch (error.code) {
+          case "TOO_MANY_REQUESTS":
+            return `Too many attempts. Try again in ${Math.ceil((error.retryAfterMs ?? 0) / 1000)}s.`;
+          case "FORBIDDEN":
+            return "This origin is not allowed for the public key.";
+          default:
+            return undefined;
+        }
+      };
+      const describeSendError = (error) => {
+        if (error.code === "PAYMENT_REQUIRED") return "Sending is temporarily unavailable.";
+        if (error.retryable) return "Could not confirm the code was sent. Retrying is safe.";
+        return describeCommonError(error) ?? `Could not send the code (${error.code}).`;
+      };
+      const describeVerifyError = (error) => {
+        if (error.retryable) return "Could not check the code. Please try again.";
+        return describeCommonError(error) ?? `Could not check the code (${error.code}).`;
+      };
+
+      const sendLabel = (s, seconds) => {
+        if (s.issueState.isLoading) return "Sending...";
+        if (seconds > 0) return `Resend in ${seconds}s`;
+        if (s.idempotencyKey) return "Retry";
+        return s.issueId ? "Resend code" : "Send code";
+      };
+
+      const statusText = (s) => {
+        if (s.verified) return "Verified!";
+        // `s.error` is the latest error of either operation: word it per operation.
+        if (s.error && s.error === s.verifyState.error) return describeVerifyError(s.error);
+        if (s.error) return describeSendError(s.error);
+        if (s.reasonCode === "MISMATCH") return `Wrong code, ${s.attemptsRemaining} attempts left.`;
+        if (s.reasonCode) return `This code can no longer be used (${s.reasonCode}). Request a new one.`;
+        return s.issueId ? "Code sent." : "";
+      };
 
       const render = () => {
         const s = flow.getState();
         const seconds = Math.ceil(s.cooldownRemainingMs / 1000);
         sendButton.disabled = !s.canSend;
-        sendButton.textContent = s.issueState.isLoading ? "Sending..."
-          : seconds > 0 ? `Resend in ${seconds}s`
-          : s.idempotencyKey ? "Retry"
-          : s.issueId ? "Resend code" : "Send code";
+        sendButton.textContent = sendLabel(s, seconds);
         verifyForm.hidden = !s.issueId;
         verifyButton.disabled = !s.canVerify;
-        status.textContent = s.verified ? "Verified!"
-          : s.error ? describeError(s.error)
-          : s.reasonCode === "MISMATCH" ? `Wrong code, ${s.attemptsRemaining} attempts left.`
-          : s.reasonCode ? `This code can no longer be used (${s.reasonCode}). Request a new one.`
-          : s.issueId ? "Code sent." : "";
+        status.textContent = statusText(s);
+      };
+
+      // API failures resolve into the state; only configuration mistakes
+      // (e.g. a malformed key) reject, so show those too.
+      const reportFailure = (error) => {
+        status.textContent = `Could not start the request (${error?.message ?? error}).`;
       };
       flow.subscribe(render);
       render();
@@ -98,11 +128,11 @@
       sendForm.addEventListener("submit", (event) => {
         event.preventDefault();
         const phoneNumber = String(new FormData(sendForm).get("phoneNumber"));
-        flow.send({ phoneNumber, purpose: "signup" });
+        flow.send({ phoneNumber, purpose: "signup" }).catch(reportFailure);
       });
       verifyForm.addEventListener("submit", (event) => {
         event.preventDefault();
-        flow.verify(String(new FormData(verifyForm).get("code")));
+        flow.verify(String(new FormData(verifyForm).get("code"))).catch(reportFailure);
       });
     </script>
   </body>

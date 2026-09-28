@@ -3,7 +3,10 @@
  * correct code is always 123456. Not part of the SDK.
  */
 const MOCK_CODE = "123456";
-const issues = new Map<string, { attempts: number; expiresAt: string }>();
+const issues = new Map<
+  string,
+  { attempts: number; expiresAt: string; verifiedAt?: string }
+>();
 
 const reply = (body: unknown, status = 200): Response =>
   Response.json(body, { status });
@@ -43,14 +46,27 @@ export const mockFetch: typeof fetch = async (input, init) => {
         expiresAt: new Date().toISOString(),
       });
     }
-    const verified = body.code === MOCK_CODE;
-    if (!verified) issue.attempts -= 1;
+    // Like the real API: a consumed, expired or locked code never verifies.
+    const rejected = (reasonCode: string) =>
+      reply({
+        issueId: body.issueId,
+        verified: false,
+        reasonCode,
+        attemptsRemaining: issue.attempts,
+        expiresAt: issue.expiresAt,
+      });
+    if (issue.verifiedAt) return rejected("ALREADY_VERIFIED");
+    if (Date.parse(issue.expiresAt) <= Date.now()) return rejected("EXPIRED");
+    if (issue.attempts <= 0) return rejected("MAX_ATTEMPTS");
+    if (body.code !== MOCK_CODE) {
+      issue.attempts -= 1;
+      return rejected(issue.attempts > 0 ? "MISMATCH" : "MAX_ATTEMPTS");
+    }
+    issue.verifiedAt = new Date().toISOString();
     return reply({
       issueId: body.issueId,
-      verified,
-      ...(verified
-        ? { verifiedAt: new Date().toISOString() }
-        : { reasonCode: issue.attempts > 0 ? "MISMATCH" : "MAX_ATTEMPTS" }),
+      verified: true,
+      verifiedAt: issue.verifiedAt,
       attemptsRemaining: issue.attempts,
       expiresAt: issue.expiresAt,
     });

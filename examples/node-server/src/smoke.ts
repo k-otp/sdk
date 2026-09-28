@@ -6,8 +6,25 @@ import { createOtpServerClient } from "@k-otp/sdk-server";
 import { createHandler } from "./app.ts";
 import { mockFetch } from "./mock-fetch.ts";
 
+// Records the idempotency key of every issue request; `failNextIssue` makes
+// the next one fail like a dropped connection (an ambiguous outcome).
+const issueKeys: string[] = [];
+let failNextIssue = false;
+const apiFetch: typeof fetch = async (input, init) => {
+  const request = new Request(input, init);
+  if (new URL(request.url).pathname.endsWith("/issue")) {
+    const body = (await request.clone().json()) as { idempotencyKey: string };
+    issueKeys.push(body.idempotencyKey);
+    if (failNextIssue) {
+      failNextIssue = false;
+      throw new TypeError("fetch failed");
+    }
+  }
+  return mockFetch(request);
+};
+
 const server = createServer(
-  createHandler(createOtpServerClient({ apiKey: "sk_mock", fetch: mockFetch })),
+  createHandler(createOtpServerClient({ apiKey: "sk_mock", fetch: apiFetch })),
 );
 await new Promise<void>((resolve) => server.listen(0, resolve));
 const base = `http://localhost:${(server.address() as AddressInfo).port}`;
@@ -16,7 +33,7 @@ const post = async (path: string, body: unknown) => {
   const res = await fetch(base + path, {
     method: "POST",
     headers: { "content-type": "application/json", cookie },
-    body: JSON.stringify(body),
+    body: typeof body === "string" ? body : JSON.stringify(body),
   });
   cookie = res.headers.get("set-cookie")?.split(";")[0] ?? cookie;
   return {
@@ -26,14 +43,25 @@ const post = async (path: string, body: unknown) => {
 };
 
 try {
+  assert.equal((await post("/api/otp/send", "{not json")).status, 400);
   assert.equal(
     (await post("/api/otp/send", { phoneNumber: "abc" })).status,
     400,
+  );
+
+  // An ambiguous failure keeps the key; the retry of the same send reuses it.
+  failNextIssue = true;
+  assert.equal(
+    (await post("/api/otp/send", { phoneNumber: "010-1234-5678" })).status,
+    503,
   );
   assert.equal(
     (await post("/api/otp/send", { phoneNumber: "010-1234-5678" })).status,
     200,
   );
+  assert.equal(issueKeys.length, 2);
+  assert.equal(issueKeys[1], issueKeys[0]);
+
   const wrong = await post("/api/otp/verify", { code: "000000" });
   assert.deepEqual(wrong.body, {
     verified: false,
@@ -42,7 +70,19 @@ try {
   });
   const right = await post("/api/otp/verify", { code: "123456" });
   assert.equal(right.body.verified, true);
-  console.log("ok - node-server send/verify (mock)");
+  // A double submit stays verified (the API would say ALREADY_VERIFIED).
+  const again = await post("/api/otp/verify", { code: "123456" });
+  assert.equal(again.body.verified, true);
+
+  // A new send after success is a new attempt with a new key.
+  assert.equal(
+    (await post("/api/otp/send", { phoneNumber: "010-1234-5678" })).status,
+    200,
+  );
+  assert.notEqual(issueKeys.at(-1), issueKeys[0]);
+  console.log("ok - node-server send/verify (mock, ambiguous retry)");
 } finally {
   server.close();
+  // Keep-alive sockets of fetch would otherwise hold the process open.
+  server.closeAllConnections();
 }

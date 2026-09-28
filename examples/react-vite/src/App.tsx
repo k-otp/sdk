@@ -19,6 +19,20 @@ const describeError = (code: string, retryAfterMs?: number): string => {
   }
 };
 
+const sendLabel = (
+  otp: {
+    issueState: { isLoading: boolean };
+    idempotencyKey: string | undefined;
+    issueId: string | undefined;
+  },
+  seconds: number,
+): string => {
+  if (otp.issueState.isLoading) return "Sending...";
+  if (seconds > 0) return `Resend in ${seconds}s`;
+  if (otp.idempotencyKey) return "Retry";
+  return otp.issueId ? "Resend code" : "Send code";
+};
+
 export function App({ mock }: { mock: boolean }) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [code, setCode] = useState("");
@@ -65,15 +79,7 @@ export function App({ mock }: { mock: boolean }) {
           />
         </label>
         <button type="submit" disabled={!otp.canSend}>
-          {otp.issueState.isLoading
-            ? "Sending..."
-            : seconds > 0
-              ? `Resend in ${seconds}s`
-              : otp.idempotencyKey
-                ? "Retry"
-                : otp.issueId
-                  ? "Resend code"
-                  : "Send code"}
+          {sendLabel(otp, seconds)}
         </button>
       </form>
 

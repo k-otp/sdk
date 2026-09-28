@@ -7,7 +7,8 @@
  *
  * Pending state (phone number, idempotency key, issueId) lives in a server
  * side session keyed by an HttpOnly cookie. A real app would use its session
- * store / database; the in-memory Map is only for the example.
+ * store / database; the in-memory Map (with a TTL and a size cap) is only for
+ * the example.
  */
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -24,7 +25,15 @@ type PendingOtp = {
   idempotencyKey: string;
   issueId?: string;
   verified?: boolean;
+  /** Epoch ms after which the entry is dropped. */
+  expiresAt: number;
 };
+
+/** Pending sends and codes live at most this long (OTP expiry + margin). */
+const SESSION_TTL_MS = 10 * 60_000;
+const MAX_SESSIONS = 10_000;
+
+class InvalidBodyError extends Error {}
 
 /** Errors after which the send may or may not have happened. */
 const AMBIGUOUS = new Set([
@@ -37,15 +46,21 @@ const AMBIGUOUS = new Set([
 
 const PHONE = /^01\d{8,9}$/;
 
+/** Parses a small JSON body; throws InvalidBodyError for client mistakes. */
 const readJson = async (
   req: IncomingMessage,
 ): Promise<Record<string, unknown>> => {
   let raw = "";
   for await (const chunk of req) {
     raw += chunk;
-    if (raw.length > 10_000) throw new Error("body too large");
+    if (raw.length > 10_000) throw new InvalidBodyError("body too large");
   }
-  const parsed: unknown = raw ? JSON.parse(raw) : {};
+  let parsed: unknown;
+  try {
+    parsed = raw ? JSON.parse(raw) : {};
+  } catch {
+    throw new InvalidBodyError("invalid JSON");
+  }
   return parsed && typeof parsed === "object"
     ? (parsed as Record<string, unknown>)
     : {};
@@ -111,8 +126,15 @@ const PAGE = `<!doctype html>
 <script>
   const out = document.getElementById("out");
   const post = async (path, body) => {
-    const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    out.textContent = res.status + " " + JSON.stringify(await res.json(), null, 2);
+    try {
+      const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const text = await res.text();
+      let shown = text;
+      try { shown = JSON.stringify(JSON.parse(text), null, 2); } catch {}
+      out.textContent = res.status + " " + shown;
+    } catch (error) {
+      out.textContent = "Request failed: " + (error && error.message ? error.message : error);
+    }
   };
   for (const form of document.forms) {
     form.addEventListener("submit", (e) => {
@@ -125,6 +147,25 @@ const PAGE = `<!doctype html>
 
 export const createHandler = (otp: OtpServerClient) => {
   const sessions = new Map<string, PendingOtp>();
+
+  /** Returns a live session entry, dropping expired ones. */
+  const getPending = (sid: string): PendingOtp | undefined => {
+    const pending = sessions.get(sid);
+    if (pending && pending.expiresAt <= Date.now()) {
+      sessions.delete(sid);
+      return undefined;
+    }
+    return pending;
+  };
+
+  const savePending = (sid: string, pending: PendingOtp): void => {
+    sessions.delete(sid); // re-insert: the Map stays ordered by last write
+    if (sessions.size >= MAX_SESSIONS) {
+      const oldest = sessions.keys().next().value;
+      if (oldest !== undefined) sessions.delete(oldest);
+    }
+    sessions.set(sid, pending);
+  };
 
   const sessionId = (req: IncomingMessage, res: ServerResponse): string => {
     const match = /(?:^|;\s*)sid=([\w-]+)/.exec(req.headers.cookie ?? "");
@@ -143,21 +184,34 @@ export const createHandler = (otp: OtpServerClient) => {
       }
       if (req.method !== "POST") return send(res, 404, { error: "NOT_FOUND" });
       const sid = sessionId(req, res);
-      const body = await readJson(req);
+      let body: Record<string, unknown>;
+      try {
+        body = await readJson(req);
+      } catch (error) {
+        if (error instanceof InvalidBodyError) {
+          return send(res, 400, { error: "INVALID_BODY" });
+        }
+        throw error;
+      }
 
       if (req.url === "/api/otp/send") {
         const phoneNumber = String(body.phoneNumber ?? "").replace(/-/g, "");
         if (!PHONE.test(phoneNumber))
           return send(res, 400, { error: "INVALID_PHONE" });
         // Your own abuse controls (CAPTCHA, per-user/IP limits) belong here.
-        const previous = sessions.get(sid);
+        const previous = getPending(sid);
         // Reuse the key only to retry the SAME unresolved send; otherwise
         // this is a new attempt with a new key.
         const pending: PendingOtp =
           previous && !previous.issueId && previous.phoneNumber === phoneNumber
             ? previous
-            : { phoneNumber, idempotencyKey: createIdempotencyKey("signup") };
-        sessions.set(sid, pending); // persist before calling issue
+            : {
+                phoneNumber,
+                idempotencyKey: createIdempotencyKey("signup"),
+                expiresAt: 0,
+              };
+        pending.expiresAt = Date.now() + SESSION_TTL_MS;
+        savePending(sid, pending); // persist before calling issue
         try {
           const result = await otp.issue({
             phoneNumber,
@@ -178,9 +232,12 @@ export const createHandler = (otp: OtpServerClient) => {
       }
 
       if (req.url === "/api/otp/verify") {
-        const pending = sessions.get(sid);
+        const pending = getPending(sid);
         if (!pending?.issueId)
           return send(res, 409, { error: "NO_PENDING_CODE" });
+        // A repeated submit after success: the API would now answer
+        // ALREADY_VERIFIED, so answer from the session instead.
+        if (pending.verified) return send(res, 200, { verified: true });
         const code = String(body.code ?? "").trim();
         try {
           const result = await otp.verify({ issueId: pending.issueId, code });
