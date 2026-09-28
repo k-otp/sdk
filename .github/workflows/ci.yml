@@ -148,3 +148,34 @@ jobs:
 
       - name: Typecheck, build and smoke-test examples
         run: bun run check:examples
+
+  adapter-compat:
+    name: Adapters on React ${{ matrix.react }} / Svelte ${{ matrix.svelte }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        react: ["18", "19"]
+        svelte: ["4", "5"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Pin framework versions
+        run: bun run scripts/set-framework-versions.ts --react "${{ matrix.react }}" --svelte "${{ matrix.svelte }}"
+
+      - name: Install dependencies
+        # The catalog was changed on purpose, so the lockfile cannot be frozen.
+        run: bun install
+
+      - name: Adapter and parity tests
+        env:
+          EXPECT_REACT_MAJOR: ${{ matrix.react }}
+          EXPECT_SVELTE_MAJOR: ${{ matrix.svelte }}
+        run: bun run --cwd tests test

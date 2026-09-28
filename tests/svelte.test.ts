@@ -7,7 +7,7 @@ import {
   createOtpStores,
   otpForm,
 } from "@k-otp/sdk-svelte";
-import { compile } from "svelte/compiler";
+import { compile, VERSION } from "svelte/compiler";
 import { get } from "svelte/store";
 import {
   issueOutput,
@@ -103,10 +103,16 @@ describe("Svelte components (SSR)", () => {
     if (dir) await rm(dir, { recursive: true, force: true });
   });
 
-  /** Compiles a component for the server and imports it. */
+  const svelte4 = VERSION.startsWith("4.");
+
+  /** Compiles a component for the server and imports it (Svelte 4 or 5). */
   const load = async (name: string, source: string) => {
     dir ??= await mkdtemp(path.join(import.meta.dir, ".svelte-tmp-"));
-    const { js } = compile(source, { generate: "server", filename: name });
+    const options = {
+      filename: name,
+      generate: svelte4 ? "ssr" : "server",
+    } as unknown as Parameters<typeof compile>[1];
+    const { js } = compile(source, options);
     const file = path.join(dir, `${name}.js`);
     await writeFile(file, js.code);
     return file;
@@ -132,9 +138,18 @@ describe("Svelte components (SSR)", () => {
       </script>
       <Child />`,
     );
-    const { render } = await import("svelte/server");
     const Parent = (await import(parent)).default;
-    const { body } = render(Parent);
+    let body: string;
+    if (svelte4) {
+      // Svelte 4 SSR components expose a static render().
+      body = (Parent as { render: () => { html: string } }).render().html;
+    } else {
+      const server = "svelte/server";
+      const { render } = (await import(server)) as {
+        render: (component: unknown) => { body: string };
+      };
+      body = render(Parent).body;
+    }
     expect(body).toContain("idle/false");
     expect(calls).toHaveLength(0);
   });

@@ -24,6 +24,7 @@ bun run check
 | `bun run check:pack` | Packs each package like the release and validates the tarball. |
 | `bun run smoke:dist` | Loads the built ESM/CJS/IIFE output with Node.js. |
 | `bun run size` | Browser bundle size report with budgets (core, IIFE, each adapter alone and with core). |
+| `bun run scripts/set-framework-versions.ts --react 18 --svelte 4 && bun install && bun run --cwd tests test` | Runs the adapter tests on React 18 / Svelte 4 like the CI `adapter-compat` matrix (revert `package.json` and `bun.lock` afterwards). |
 | `bun run check:examples` | Typecheck, build and smoke-test every example against the built packages. |
 | `bun run gen:types` | Regenerates `packages/sdk-core/src/generated/openapi.ts` from `spec/openapi.json`. |
 | `bun run sync:openapi [--from <api checkout \| file \| url>]` | Refreshes `spec/openapi.json`. |
