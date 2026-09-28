@@ -4,8 +4,8 @@ Thanks for helping improve the K-OTP SDKs.
 
 ## Setup
 
-Requirements: [Bun](https://bun.sh) 1.4.2 (see `packageManager`), Node.js >= 22
-for the dist smoke test, and Go available on `PATH` the first time `ttsc`
+Requirements: [Bun](https://bun.sh) 1.4.2 (see `packageManager`), Node.js >= 22.18
+for the dist smoke test and the node-server example (see `engines`), and Go available on `PATH` the first time `ttsc`
 builds its lint plugin (cached under `node_modules/.cache/ttsc`).
 
 ```bash
