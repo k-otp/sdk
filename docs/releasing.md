@@ -27,7 +27,7 @@ PR up to date and logs a warning instead of publishing.
 
 ## One-time owner setup
 
-1. **GitHub repository** `k-otp/k-otp-sdk` (public). In *Settings -> Actions ->
+1. **GitHub repository** `k-otp/sdk` (public). In *Settings -> Actions ->
    General*, allow GitHub Actions to create and approve pull requests (needed
    for the release PR).
 2. **npm scope.** Make sure the `@k-otp` npm organization exists and you are an
@@ -54,7 +54,7 @@ PR up to date and logs a warning instead of publishing.
    *Settings -> Trusted publishing*:
    - Publisher: GitHub Actions
    - Organization or user: `k-otp`
-   - Repository: `k-otp-sdk`
+   - Repository: `sdk` (i.e. `k-otp/sdk`)
    - Workflow filename: `release.yml`
    - Environment: leave empty (or add one and reference it in the workflow)
 5. Optionally, in each package's npm settings, require two-factor

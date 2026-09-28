@@ -1,6 +1,7 @@
 # AGENTS.md
 
-Guide for coding agents working in `k-otp-sdk`.
+Guide for coding agents working in the `k-otp/sdk` repository
+(https://github.com/k-otp/sdk).
 
 ## What this repo is
 

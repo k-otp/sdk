@@ -14,14 +14,14 @@
   ],
   "license": "MIT",
   "author": "1990Company",
-  "homepage": "https://github.com/k-otp/k-otp-sdk/tree/main/packages/sdk-core#readme",
+  "homepage": "https://github.com/k-otp/sdk/tree/main/packages/sdk-core#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/k-otp/k-otp-sdk.git",
+    "url": "git+https://github.com/k-otp/sdk.git",
     "directory": "packages/sdk-core"
   },
   "bugs": {
-    "url": "https://github.com/k-otp/k-otp-sdk/issues"
+    "url": "https://github.com/k-otp/sdk/issues"
   },
   "type": "module",
   "sideEffects": false,

@@ -1,11 +1,11 @@
-# Sampo configuration for k-otp-sdk
+# Sampo configuration for github.com/k-otp/sdk
 version = 1
 
 [git]
 default_branch = "main"
 
 [github]
-repository = "k-otp/k-otp-sdk"
+repository = "k-otp/sdk"
 
 [packages]
 # Ignore any package that can't be published (e.g. "private": true).

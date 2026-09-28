@@ -15,14 +15,14 @@
   ],
   "license": "MIT",
   "author": "1990Company",
-  "homepage": "https://github.com/k-otp/k-otp-sdk/tree/main/packages/sdk-vue#readme",
+  "homepage": "https://github.com/k-otp/sdk/tree/main/packages/sdk-vue#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/k-otp/k-otp-sdk.git",
+    "url": "git+https://github.com/k-otp/sdk.git",
     "directory": "packages/sdk-vue"
   },
   "bugs": {
-    "url": "https://github.com/k-otp/k-otp-sdk/issues"
+    "url": "https://github.com/k-otp/sdk/issues"
   },
   "type": "module",
   "sideEffects": false,

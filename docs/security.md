@@ -63,4 +63,4 @@ putting personal data in `purpose`, `metadata` or idempotency keys.
 ## Reporting vulnerabilities
 
 Please report security issues privately via GitHub Security Advisories on
-`k-otp/k-otp-sdk` ("Report a vulnerability") instead of opening a public issue.
+`k-otp/sdk` ("Report a vulnerability") instead of opening a public issue.
