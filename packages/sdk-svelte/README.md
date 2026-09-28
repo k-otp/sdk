@@ -95,8 +95,9 @@ resolve with `{ skipped: "cooldown" | "busy" | "no-issue" | "no-previous-send" |
 ### `setOtpContext(storesOrClientOrOptions)` / `getOtpContext()`
 
 Call `setOtpContext` during component initialization (e.g. the root layout)
-to share one set of stores with descendants; in-flight calls are aborted when
-that component is destroyed. `getOtpContext` returns them (and throws a
+to share one set of stores with descendants. Stores it creates (from a client
+or options) are aborted when that component is destroyed; stores you pass in
+keep the lifetime you manage. `getOtpContext` returns them (and throws a
 `TypeError` when none were set).
 
 ### `use:otpForm={(data, form) => ...}`
