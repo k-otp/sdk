@@ -10,14 +10,21 @@ KakaoTalk AlimTalk.
 | --- | --- |
 | [`@k-otp/sdk-core`](./packages/sdk-core) | `issue` / `verify` from browsers (`pk_` key), SSR and edge. Framework-agnostic, also available as a `<script>` bundle (`window.KOtp`). |
 | [`@k-otp/sdk-server`](./packages/sdk-server) | Every public `/v1` operation (status, history, ledger, balance, templates) from Node.js, Bun, Deno or Workers with an `sk_` key. |
+| [`@k-otp/sdk-react`](./packages/sdk-react) | React 18/19 hooks: `OtpProvider`, `useOtpIssue`, `useOtpVerify`, `useOtpFlow` (resend cooldown + idempotency keys). |
+| [`@k-otp/sdk-vue`](./packages/sdk-vue) | Vue 3 plugin and composables: `createOtpPlugin`, `useOtp`, `useOtpFlow`. |
+| [`@k-otp/sdk-svelte`](./packages/sdk-svelte) | Svelte 4/5 stores: `createOtpStores`, flow store, `use:otpForm`. |
 
-React, Vue and Svelte adapters built on `sdk-core` are coming next.
+The adapters are thin layers over `sdk-core` (under 1 kB gzip each) with
+identical semantics and the same normalized `OtpApiError`. Each depends on the
+exact same `sdk-core` version (lockstep releases) and takes its framework as a
+peer dependency.
 
 ## Quick start
 
 ```bash
 npm install @k-otp/sdk-server   # backend
-npm install @k-otp/sdk-core     # browser / SSR
+npm install @k-otp/sdk-core     # browser / SSR, framework-agnostic
+npm install @k-otp/sdk-react    # or @k-otp/sdk-vue, @k-otp/sdk-svelte
 ```
 
 ```ts
@@ -29,6 +36,18 @@ const idempotencyKey = createIdempotencyKey("signup"); // persist & reuse on ret
 const { issueId } = await otp.issue({ phoneNumber: "01012345678", purpose: "signup", idempotencyKey });
 
 const { verified, reasonCode } = await otp.verify({ issueId, code: "123456" });
+```
+
+React (the Vue and Svelte adapters mirror this API):
+
+```tsx
+import { OtpProvider, useOtpFlow } from "@k-otp/sdk-react";
+
+<OtpProvider options={{ apiKey: "pk_live_..." }}>{/* exact Origin allowlist */}</OtpProvider>;
+
+const otp = useOtpFlow({ resendCooldownMs: 30_000 });
+await otp.send({ phoneNumber, purpose: "signup" }); // key managed + reused on ambiguous retries
+await otp.verify(code);                              // otp.verified, otp.reasonCode, otp.error
 ```
 
 Static site:
@@ -44,10 +63,13 @@ Static site:
 ## Documentation
 
 - [Getting started](./docs/getting-started.md)
+- [Issue -> verify UX (cooldown, resend, retries, 402/429)](./docs/issue-verify-ux.md)
+- Framework guides: [React](./docs/react.md), [Vue](./docs/vue.md), [Svelte](./docs/svelte.md)
+- [Examples](./examples) (vanilla/CDN, React, Vue, Svelte, Node server)
 - [Errors, retries and idempotency](./docs/errors-and-retries.md)
 - [Security: key types and the Origin allowlist](./docs/security.md)
 - [Releasing](./docs/releasing.md)
-- API reference: [`sdk-core`](./packages/sdk-core/README.md), [`sdk-server`](./packages/sdk-server/README.md)
+- API reference: [`sdk-core`](./packages/sdk-core/README.md), [`sdk-server`](./packages/sdk-server/README.md), [`sdk-react`](./packages/sdk-react/README.md), [`sdk-vue`](./packages/sdk-vue/README.md), [`sdk-svelte`](./packages/sdk-svelte/README.md)
 
 ## How the SDK stays in sync with the API
 
@@ -61,7 +83,7 @@ fails CI when either disagrees with the spec. Refresh the spec with
 
 ```bash
 bun install
-bun run check   # typecheck, lint, test, build, pack check, dist smoke, size
+bun run check   # typecheck, lint, test, build, pack check, dist smoke, size, examples
 ```
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md).

@@ -11,11 +11,22 @@ Public, MIT-licensed SDKs for the K-OTP Korean OTP API (`https://api.k-otp.dev/v
   client (browser `pk_` keys, SSR, edge). oRPC `OpenAPILink` over REST `/v1`.
   Also builds `dist/k-otp.iife(.min).js` exposing `window.KOtp`.
 - `packages/sdk-server` (`@k-otp/sdk-server`): all public `/v1` operations with
-  `sk_` keys; depends on sdk-core (`/contract`, `/internal` entry points).
+  `sk_` keys only (any key not starting with `sk_` is a `TypeError`); depends
+  on sdk-core (`/contract`, `/internal` entry points).
+- `packages/sdk-react|vue|svelte`: thin framework adapters over the headless
+  `createOtpOperation` / `createOtpFlow` controllers in
+  `packages/sdk-core/src/headless.ts` (exported from `/internal`). Put shared
+  behavior there, never in one adapter, so the adapters stay identical.
+  sdk-core is a pinned `dependency`, the framework a `peerDependency`
+  (framework dev packages live in the root `devDependencies`).
+- `tests/`: private workspace running under happy-dom: adapter tests and the
+  cross-adapter parity suite (`tests/parity`), which must pass for every
+  behavior change.
+- `examples/*`: private, runnable apps (`workspace:*`, mock API without
+  keys), checked by `bun run check:examples` against the built packages.
 - `spec/openapi.json`: vendored public OpenAPI document (source of truth).
 - `scripts/`: type generator, spec sync, typecheck runner, pack/size/smoke
   checks, `publish-oidc.sh`.
-- `examples/*`, future `packages/sdk-react|vue|svelte`: next phase.
 
 ## Hard rules
 
@@ -33,6 +44,9 @@ Public, MIT-licensed SDKs for the K-OTP Korean OTP API (`https://api.k-otp.dev/v
 - Every SDK method rejects with `OtpApiError`; config mistakes throw
   `TypeError`. `issue` must keep validating the idempotency key before any
   request and send it as header + body.
+- Adapters: no top-level `window` access, no module-level state, no mutation
+  of protocol semantics. `run`/flow actions resolve `{ data } | { error }`
+  (never reject for API errors). Keep `"use client"` on sdk-react.
 
 ## Toolchain
 
@@ -54,6 +68,7 @@ bun run build
 bun run check:pack
 bun run smoke:dist
 bun run size
+bun run check:examples # typecheck/build/smoke examples (after build)
 bun run check          # all of the above
 bun run gen:types      # after changing spec/openapi.json
 bun run sync:openapi --from ../api.k-otp.dev   # refresh the spec

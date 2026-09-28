@@ -10,7 +10,10 @@ SSR frameworks, and edge runtimes.
 - ESM, CommonJS and a `<script>` bundle exposing `window.KOtp`
 
 Server code that needs status, history, balance or templates should use
-[`@k-otp/sdk-server`](../sdk-server) with an `sk_` secret key.
+[`@k-otp/sdk-server`](../sdk-server) with an `sk_` secret key. React, Vue and
+Svelte apps can use the adapters [`@k-otp/sdk-react`](../sdk-react),
+[`@k-otp/sdk-vue`](../sdk-vue) and [`@k-otp/sdk-svelte`](../sdk-svelte), which
+add loading/error state and an issue -> verify flow on top of this package.
 
 ## Install
 

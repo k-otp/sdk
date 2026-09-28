@@ -62,6 +62,10 @@ SMS and debit twice. Retrying with the same key is always safe:
 The SDK sends the key as both the `Idempotency-Key` header and the body
 `idempotencyKey` field; the API requires them to match.
 
+For the user-facing side (buttons, cooldowns, messages) see
+[issue -> verify UX](./issue-verify-ux.md). The adapters' flow helpers apply
+these idempotency rules automatically.
+
 ## Retry recipe
 
 The SDK does not retry automatically, so you stay in control of user-visible

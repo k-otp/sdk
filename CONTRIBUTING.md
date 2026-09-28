@@ -19,11 +19,12 @@ bun run check
 | --- | --- |
 | `bun run typecheck` | ttsc (TypeScript 7) over every package, tests and scripts, with `@ttsc/lint` type-aware rules. |
 | `bun run lint` / `lint:fix` | Biome lint + format check / autofix. |
-| `bun run test` | Unit tests (`bun test`), including the OpenAPI drift test. |
+| `bun run test` | Package unit tests (`bun test packages`, including the OpenAPI drift test), then the adapter + parity tests in `tests/` (happy-dom). |
 | `bun run build` | tsdown: ESM + CJS + `.d.ts`/`.d.cts`, plus the sdk-core IIFE bundle. |
 | `bun run check:pack` | Packs each package like the release and validates the tarball. |
 | `bun run smoke:dist` | Loads the built ESM/CJS/IIFE output with Node.js. |
-| `bun run size` | Browser bundle size report with budgets. |
+| `bun run size` | Browser bundle size report with budgets (core, IIFE, each adapter alone and with core). |
+| `bun run check:examples` | Typecheck, build and smoke-test every example against the built packages. |
 | `bun run gen:types` | Regenerates `packages/sdk-core/src/generated/openapi.ts` from `spec/openapi.json`. |
 | `bun run sync:openapi [--from <api checkout \| file \| url>]` | Refreshes `spec/openapi.json`. |
 | `bun run check` | Everything above (except the generators). |
@@ -46,7 +47,10 @@ operations) are out of scope for this public SDK.
   tsdown emit declarations with oxc).
 - No top-level side effects and no `window`/`document` access at import time.
 - `@k-otp/sdk-core` must not depend on any UI framework. Adapters may only use
-  framework peer dependencies.
+  framework peer dependencies, depend on `@k-otp/sdk-core` (`workspace:*`,
+  packed as the exact lockstep version) and wrap the shared headless
+  controllers so that behavior stays identical; the parity suite in
+  `tests/parity` enforces it.
 - Every rejected promise from an SDK method is an `OtpApiError`; configuration
   errors throw `TypeError`.
 - Generated files (`src/generated/**`) are never edited by hand.

@@ -1,14 +1,25 @@
 # Getting started
 
 K-OTP issues 6-digit one-time passwords over SMS or KakaoTalk AlimTalk and
-verifies them. This repository ships two packages:
+verifies them. This repository ships these packages:
 
 | Package | Where | Key | Operations |
 | --- | --- | --- | --- |
 | [`@k-otp/sdk-core`](../packages/sdk-core) | Browser, SSR, edge, server | `pk_` (browser) or `sk_` (server) | `issue`, `verify` |
 | [`@k-otp/sdk-server`](../packages/sdk-server) | Node.js, Bun, Deno, Workers | `sk_` only | everything in `/v1` |
+| [`@k-otp/sdk-react`](../packages/sdk-react) | React 18/19 (client components) | `pk_` | `issue`, `verify`, flow |
+| [`@k-otp/sdk-vue`](../packages/sdk-vue) | Vue >= 3.3 | `pk_` | `issue`, `verify`, flow |
+| [`@k-otp/sdk-svelte`](../packages/sdk-svelte) | Svelte 4/5 | `pk_` | `issue`, `verify`, flow |
 
-Framework adapters (React, Vue, Svelte) are planned on top of `sdk-core`.
+The adapters depend on `@k-otp/sdk-core` as a regular dependency pinned to
+the exact same version (all packages are released in lockstep, so one
+install brings the matching core and there is no peer range to get wrong)
+and re-export its common helpers and types. The framework itself is a peer
+dependency, so installing one adapter never pulls in another framework.
+
+Framework guides: [React](./react.md), [Vue](./vue.md), [Svelte](./svelte.md).
+UX rules for the "send code / enter code" screen:
+[issue -> verify UX](./issue-verify-ux.md). Runnable apps: [examples](../examples).
 
 ## 1. Get keys
 

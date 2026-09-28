@@ -9,14 +9,19 @@ SMS 또는 카카오 알림톡으로 일회용 인증번호를 발급(issue)하�
 | --- | --- |
 | [`@k-otp/sdk-core`](./packages/sdk-core) | 브라우저(`pk_` 키)·SSR·엣지에서 `issue` / `verify`. 프레임워크 무관, `<script>` 번들(`window.KOtp`) 제공. |
 | [`@k-otp/sdk-server`](./packages/sdk-server) | Node.js, Bun, Deno, Workers에서 `sk_` 키로 모든 공개 `/v1` 기능(상태, 발급 이력, 원장, 잔액, 템플릿) 호출. |
+| [`@k-otp/sdk-react`](./packages/sdk-react) | React 18/19 훅: `OtpProvider`, `useOtpIssue`, `useOtpVerify`, `useOtpFlow`(재발송 쿨다운 + 멱등키 관리). |
+| [`@k-otp/sdk-vue`](./packages/sdk-vue) | Vue 3 플러그인·컴포저블: `createOtpPlugin`, `useOtp`, `useOtpFlow`. |
+| [`@k-otp/sdk-svelte`](./packages/sdk-svelte) | Svelte 4/5 스토어: `createOtpStores`, 플로우 스토어, `use:otpForm`. |
 
-`sdk-core` 기반의 React, Vue, Svelte 어댑터는 다음 단계에서 제공됩니다.
+어댑터는 `sdk-core` 위의 얇은 계층(각각 gzip 1 kB 미만)이며 동작과 정규화된 `OtpApiError`가 모두
+동일합니다. 각 어댑터는 같은 버전의 `sdk-core`에 의존하고(락스텝 릴리스), 프레임워크는 peer dependency입니다.
 
 ## 빠른 시작
 
 ```bash
 npm install @k-otp/sdk-server   # 백엔드
-npm install @k-otp/sdk-core     # 브라우저 / SSR
+npm install @k-otp/sdk-core     # 브라우저 / SSR, 프레임워크 무관
+npm install @k-otp/sdk-react    # 또는 @k-otp/sdk-vue, @k-otp/sdk-svelte
 ```
 
 ```ts
@@ -51,16 +56,22 @@ const { verified, reasonCode } = await otp.verify({ issueId, code: "123456" });
   문자가 중복 발송되고 이중 차감될 수 있습니다. 같은 키에 다른 내용을 보내면 `409 CONFLICT`입니다.
 - 잘못된 코드는 예외가 아니라 `verified: false` + `reasonCode`(`MISMATCH`, `MAX_ATTEMPTS`,
   `EXPIRED`, `ALREADY_VERIFIED`, `REPLACED`, `NOT_FOUND`)로 반환됩니다.
+- 어댑터의 `useOtpFlow`/플로우 스토어는 발송 시도마다 멱등키를 만들고, 모호한 실패(타임아웃, 네트워크,
+  5xx, 429) 후 같은 입력으로 다시 보내면 같은 키를 재사용합니다. 429의 `retryAfterMs`와 로컬
+  `resendCooldownMs`로 재발송 쿨다운을 관리합니다.
 - 그 밖의 실패는 모두 `OtpApiError`(`code`, `status`, `requestId`, `data`, `retryAfterMs`,
   `retryable`)로 정규화됩니다. 잔액 부족은 `PAYMENT_REQUIRED`(402, `data.code`)입니다.
 
 ## 문서
 
 - [시작하기](./docs/getting-started.md)
+- [발급 -> 검증 UX(쿨다운, 재발송, 재시도, 402/429)](./docs/issue-verify-ux.md)
+- 프레임워크 가이드: [React](./docs/react.md), [Vue](./docs/vue.md), [Svelte](./docs/svelte.md)
+- [예제](./examples) (vanilla/CDN, React, Vue, Svelte, Node 서버)
 - [오류, 재시도, 멱등성](./docs/errors-and-retries.md)
 - [보안: 키 종류와 Origin 허용 목록](./docs/security.md)
 - [릴리스](./docs/releasing.md)
-- API 레퍼런스: [`sdk-core`](./packages/sdk-core/README.md), [`sdk-server`](./packages/sdk-server/README.md)
+- API 레퍼런스: [`sdk-core`](./packages/sdk-core/README.md), [`sdk-server`](./packages/sdk-server/README.md), [`sdk-react`](./packages/sdk-react/README.md), [`sdk-vue`](./packages/sdk-vue/README.md), [`sdk-svelte`](./packages/sdk-svelte/README.md)
 
 상세 문서는 현재 영어로 제공됩니다.
 
