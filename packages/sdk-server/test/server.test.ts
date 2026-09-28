@@ -345,6 +345,24 @@ describe("pagination", () => {
     expect(isOtpApiError(error)).toBe(true);
   });
 
+  test("a server echoing the starting cursor fails before a duplicate page", async () => {
+    let fetched = 0;
+    const pages = paginatePages(
+      async () => {
+        fetched++;
+        return { items: [1], nextCursor: "start" };
+      },
+      { cursor: "start" } as { cursor?: string },
+    );
+    const error = await (async () => {
+      for await (const _ of pages) {
+        // drain
+      }
+    })().catch((e: unknown) => e);
+    expect(isOtpApiError(error)).toBe(true);
+    expect(fetched).toBe(1);
+  });
+
   test("errors propagate out of the iterator", async () => {
     const { fetch } = mockFetch(() => errorEnvelope(403, "FORBIDDEN", "scope"));
     const client = createOtpServerClient({ apiKey: "sk_test_1", fetch });

@@ -20,8 +20,10 @@ export async function* paginatePages<
   input: TInput,
   options: PaginateOptions = {},
 ): AsyncGenerator<OtpPage<TItem>, void, undefined> {
-  const seen = new Set<string>();
   let cursor = input.cursor;
+  // Seeded with the starting cursor, so a server echoing it back is caught
+  // before a duplicate page is fetched.
+  const seen = new Set<string>(cursor ? [cursor] : []);
   for (
     let page = 0;
     options.maxPages === undefined || page < options.maxPages;
