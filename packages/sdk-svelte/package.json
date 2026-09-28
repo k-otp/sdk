@@ -1,0 +1,65 @@
+{
+  "name": "@k-otp/sdk-svelte",
+  "version": "0.0.0",
+  "description": "Svelte stores for the K-OTP (Korean OTP API) SDK: createOtpStores, an issue-to-verify flow store and a form action helper. Works with Svelte 4 and 5.",
+  "keywords": [
+    "k-otp",
+    "otp",
+    "one-time-password",
+    "sms",
+    "alimtalk",
+    "korea",
+    "verification",
+    "svelte",
+    "stores"
+  ],
+  "license": "MIT",
+  "author": "1990Company",
+  "homepage": "https://github.com/k-otp/k-otp-sdk/tree/main/packages/sdk-svelte#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/k-otp/k-otp-sdk.git",
+    "directory": "packages/sdk-svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/k-otp/k-otp-sdk/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsdown",
+    "typecheck": "ttsc --noEmit -p tsconfig.json",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@k-otp/sdk-core": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": ">=4"
+  },
+  "devDependencies": {
+    "svelte": "catalog:"
+  }
+}

@@ -12,6 +12,9 @@ const projects = [
   "packages/sdk-core/tsconfig.test.json",
   "packages/sdk-server/tsconfig.json",
   "packages/sdk-server/tsconfig.test.json",
+  "packages/sdk-react/tsconfig.json",
+  "packages/sdk-vue/tsconfig.json",
+  "packages/sdk-svelte/tsconfig.json",
   "scripts/tsconfig.json",
 ];
 
