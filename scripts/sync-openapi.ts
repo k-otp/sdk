@@ -22,34 +22,65 @@ const CHECKOUT_SPEC_PATH = "pages/api/public/openapi/openapi.api.json";
 const root = path.resolve(import.meta.dir, "..");
 const target = path.join(root, "spec/openapi.json");
 
+/** Fails with one friendly line instead of a stack trace. */
+const die = (message: string): never => {
+  console.error(`sync:openapi: ${message}`);
+  process.exit(1);
+};
+
+/** Value of `--name <value>`; a missing value is an error, never a default. */
 const readArg = (name: string): string | undefined => {
   const index = process.argv.indexOf(name);
-  return index >= 0 ? process.argv[index + 1] : undefined;
+  if (index < 0) return undefined;
+  const value = process.argv[index + 1];
+  if (!value || value.startsWith("--")) die(`${name} needs a value`);
+  return value;
 };
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 const load = async (source: string): Promise<string> => {
   if (/^https?:\/\//.test(source)) {
     const response = await fetch(source, {
       headers: { accept: "application/json" },
-    });
-    if (!response.ok) {
-      throw new Error(`GET ${source} failed: HTTP ${response.status}`);
-    }
+    }).catch((error: unknown) => die(`GET ${source} failed: ${error}`));
+    if (!response.ok) die(`GET ${source} failed: HTTP ${response.status}`);
     return response.text();
   }
   const resolved = path.resolve(source);
-  const info = await stat(resolved);
+  const info = await stat(resolved).catch(() =>
+    die(`--from ${source}: ${resolved} does not exist`),
+  );
   const file = info.isDirectory()
     ? path.join(resolved, CHECKOUT_SPEC_PATH)
     : resolved;
+  if (!(await Bun.file(file).exists())) {
+    die(
+      `--from ${source}: ${file} not found (is ${resolved} an api.k-otp.dev checkout?)`,
+    );
+  }
   return Bun.file(file).text();
 };
 
 const source = readArg("--from") ?? DEFAULT_SOURCE;
-const next = JSON.parse(await load(source)) as OpenApiDocument;
-if (typeof next.openapi !== "string" || typeof next.paths !== "object") {
-  throw new Error(`${source} is not an OpenAPI document`);
+const raw = await load(source);
+let parsed: unknown;
+try {
+  parsed = JSON.parse(raw);
+} catch (error) {
+  die(`${source} did not return JSON (${error})`);
 }
+if (
+  !isRecord(parsed) ||
+  typeof parsed.openapi !== "string" ||
+  !isRecord(parsed.paths) ||
+  !isRecord(parsed.info) ||
+  typeof parsed.info.version !== "string"
+) {
+  die(`${source} is not an OpenAPI document (openapi, info.version, paths)`);
+}
+const next = parsed as OpenApiDocument;
 
 const current = (await Bun.file(target).exists())
   ? (JSON.parse(await Bun.file(target).text()) as OpenApiDocument)

@@ -22,7 +22,59 @@ export type OpenApiDocument = JsonObject & {
   components?: { schemas?: Record<string, JsonObject> };
 };
 
-export const HTTP_METHODS = ["get", "post", "put", "patch", "delete"] as const;
+export const HTTP_METHODS = [
+  "get",
+  "post",
+  "put",
+  "patch",
+  "delete",
+  "head",
+  "options",
+  "trace",
+] as const;
+
+/** Schema keywords `type()` understands (shaping the rendered type). */
+const TYPE_KEYWORDS = new Set([
+  "$ref",
+  "const",
+  "enum",
+  "oneOf",
+  "anyOf",
+  "allOf",
+  "type",
+  "items",
+  "properties",
+  "required",
+  "additionalProperties",
+]);
+/** Keywords that only document or constrain values (no effect on the TS type). */
+const IGNORED_KEYWORDS = new Set([
+  "description",
+  "example",
+  "examples",
+  "title",
+  "default",
+  "deprecated",
+  "readOnly",
+  "writeOnly",
+  "format",
+  "pattern",
+  "minimum",
+  "maximum",
+  "exclusiveMinimum",
+  "exclusiveMaximum",
+  "multipleOf",
+  "minLength",
+  "maxLength",
+  "minItems",
+  "maxItems",
+  "uniqueItems",
+  "minProperties",
+  "maxProperties",
+  "contentEncoding",
+  "contentMediaType",
+  "$comment",
+]);
 
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const SCHEMA_REF_PREFIX = "#/components/schemas/";
@@ -46,7 +98,11 @@ const docComment = (text: unknown, indent: string): string => {
     .join("\n")}\n${indent} */\n`;
 };
 
-/** JSON value equality that ignores documentation-only keywords. */
+/**
+ * JSON value equality that ignores documentation-only keywords. Keys of
+ * `properties` / `patternProperties` maps are property NAMES (a property may
+ * well be called `description`), so those are never stripped.
+ */
 const stripDocs = (value: Json): Json => {
   if (Array.isArray(value)) return value.map(stripDocs);
   if (!isObject(value)) return value;
@@ -55,7 +111,19 @@ const stripDocs = (value: Json): Json => {
     if (key === "description" || key === "example" || key === "examples") {
       continue;
     }
-    out[key] = stripDocs(value[key] as Json);
+    const child = value[key] as Json;
+    if (
+      (key === "properties" || key === "patternProperties") &&
+      isObject(child)
+    ) {
+      const map: JsonObject = {};
+      for (const name of Object.keys(child).sort()) {
+        map[name] = stripDocs(child[name] as Json);
+      }
+      out[key] = map;
+    } else {
+      out[key] = stripDocs(child);
+    }
   }
   return out;
 };
@@ -99,6 +167,11 @@ export class OpenApiTypeRenderer {
       return "unknown";
     }
     if (!isObject(schema)) throw new Error(`Unsupported schema: ${schema}`);
+    for (const key of Object.keys(schema)) {
+      if (!TYPE_KEYWORDS.has(key) && !IGNORED_KEYWORDS.has(key)) {
+        throw new Error(`Unsupported schema keyword: ${key}`);
+      }
+    }
 
     if (typeof schema.$ref === "string") return this.refName(schema.$ref);
     if ("const" in schema) return JSON.stringify(schema.const);
@@ -158,6 +231,12 @@ export class OpenApiTypeRenderer {
       );
     }
     if (extra !== undefined && extra !== false) {
+      if (extra !== true && names.length > 0) {
+        // `{ a: number; [key: string]: string }` does not compile.
+        throw new Error(
+          `Unsupported schema: properties (${names.join(", ")}) combined with a typed additionalProperties`,
+        );
+      }
       members.push(
         `${inner}[key: string]: ${extra === true ? "unknown" : this.type(extra, inner)};`,
       );
@@ -166,8 +245,9 @@ export class OpenApiTypeRenderer {
     return `{\n${members.join("\n")}\n${indent}}`;
   }
 
+  /** Parenthesizes unions/intersections (legal around object literals too). */
   private wrap(type: string): string {
-    return /[|&]/.test(type) && !type.startsWith("{") ? `(${type})` : type;
+    return /[|&]/.test(type) ? `(${type})` : type;
   }
 }
 
@@ -194,6 +274,33 @@ const resolve = (doc: OpenApiDocument, schema: Json): JsonObject => {
   return schema;
 };
 
+/** The `application/json` request body of an operation, if any. */
+const jsonRequestBody = (
+  operation: JsonObject,
+  where: string,
+): { body: JsonObject; media: JsonObject } | undefined => {
+  if (operation.requestBody === undefined) return undefined;
+  const body = operation.requestBody;
+  const media =
+    isObject(body) && isObject(body.content)
+      ? body.content["application/json"]
+      : undefined;
+  if (!isObject(body) || !isObject(media)) {
+    throw new Error(
+      `${where}: requestBody must have content["application/json"]`,
+    );
+  }
+  return { body, media };
+};
+
+/** `METHOD /path (operationId)`, for error messages. */
+const describeOperation = (
+  method: string,
+  path: string,
+  operation: JsonObject,
+): string =>
+  `${method.toUpperCase()} ${path} (${String(operation.operationId)})`;
+
 /** Flat, comparable view of every operation in the document. */
 export const summarizeOperations = (
   doc: OpenApiDocument,
@@ -214,13 +321,12 @@ export const summarizeOperations = (
             name: String(parameter.name),
             required: parameter.required === true,
           }));
-      const body = isObject(operation.requestBody)
-        ? operation.requestBody
-        : undefined;
-      const bodySchema = body
-        ? ((body.content as JsonObject)["application/json"] as JsonObject)
-            .schema
-        : undefined;
+      const json = jsonRequestBody(
+        operation,
+        describeOperation(method, path, operation),
+      );
+      const body = json?.body;
+      const bodySchema = json?.media.schema;
       const security = (
         Array.isArray(operation.security) ? operation.security : globalSecurity
       ) as JsonObject[];
@@ -251,10 +357,12 @@ export const summarizeOperations = (
   return operations;
 };
 
-const operationKey = (operationId: string): string => {
-  // `otp.issue` -> `issue`
-  const segments = operationId.split(".");
-  return segments[segments.length - 1] ?? operationId;
+/** `otp.issue` -> `issue`. */
+const operationKey = (operationId: unknown, where: string): string => {
+  if (typeof operationId !== "string" || operationId === "") {
+    throw new Error(`${where}: missing operationId`);
+  }
+  return operationId.slice(operationId.lastIndexOf(".") + 1);
 };
 
 const paramsObject = (
@@ -291,6 +399,11 @@ export const renderOpenApiTypes = (doc: OpenApiDocument): string => {
   );
 
   for (const [name, schema] of Object.entries(doc.components?.schemas ?? {})) {
+    if (!IDENTIFIER.test(name)) {
+      throw new Error(
+        `Component schema name "${name}" is not a valid TypeScript identifier`,
+      );
+    }
     out.push(
       `${docComment(schema.description, "")}export type ${name} = ${renderer.type(schema)};`,
       "",
@@ -301,22 +414,31 @@ export const renderOpenApiTypes = (doc: OpenApiDocument): string => {
     "/** Wire-level request/response types for every OpenAPI operation, keyed by operation name. */",
     "export interface OpenApiOperations {",
   );
+  const keys = new Set<string>();
   for (const [path, item] of Object.entries(doc.paths)) {
     for (const method of HTTP_METHODS) {
       const operation = item[method];
       if (!operation) continue;
+      const where = describeOperation(method, path, operation);
+      const key = operationKey(operation.operationId, where);
+      if (keys.has(key)) {
+        throw new Error(`${where}: duplicate operation name "${key}"`);
+      }
+      keys.add(key);
       const parameters = (
         Array.isArray(operation.parameters) ? operation.parameters : []
       ) as JsonObject[];
-      const body = isObject(operation.requestBody)
-        ? ((operation.requestBody.content as JsonObject)[
-            "application/json"
-          ] as JsonObject)
-        : undefined;
+      const body = jsonRequestBody(operation, where)?.media;
       const responses = isObject(operation.responses)
         ? operation.responses
         : {};
-      const ok = responses["200"] ?? responses["201"];
+      const successStatus = Object.keys(responses)
+        .filter((status) => /^2\d\d$/.test(status))
+        .sort()[0];
+      if (successStatus === undefined) {
+        throw new Error(`${where}: no 2xx response`);
+      }
+      const ok = responses[successStatus];
       const okSchema =
         isObject(ok) && isObject(ok.content)
           ? (ok.content["application/json"] as JsonObject | undefined)?.schema
@@ -329,7 +451,7 @@ export const renderOpenApiTypes = (doc: OpenApiDocument): string => {
       };
       const indent = "    ";
       out.push(
-        `${docComment(`${method.toUpperCase()} ${path} (\`${String(operation.operationId)}\`)`, "  ")}  ${quoteKey(operationKey(String(operation.operationId)))}: {`,
+        `${docComment(`${method.toUpperCase()} ${path} (\`${String(operation.operationId)}\`)`, "  ")}  ${quoteKey(key)}: {`,
         `    operationId: ${JSON.stringify(operation.operationId)};`,
         `    method: ${JSON.stringify(method.toUpperCase())};`,
         `    path: ${JSON.stringify(path)};`,
