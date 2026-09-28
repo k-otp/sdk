@@ -16,12 +16,18 @@ const isStores = (value: unknown): value is OtpStores =>
 /**
  * Creates (or takes) the OTP stores and shares them with descendants via
  * Svelte context. Call it during component initialization (e.g. in the root
- * layout). In-flight requests are aborted when that component is destroyed.
+ * layout). Stores created here have their in-flight requests aborted when
+ * that component is destroyed; stores you pass in keep the lifetime you
+ * manage (call their `abort()` yourself).
  */
 export const setOtpContext = (
   source: OtpStores | OtpClientSource,
 ): OtpStores => {
-  const stores = isStores(source) ? source : createOtpStores(source);
+  if (isStores(source)) {
+    setContext(CONTEXT_KEY, source);
+    return source;
+  }
+  const stores = createOtpStores(source);
   setContext(CONTEXT_KEY, stores);
   onDestroy(() => stores.abort());
   return stores;

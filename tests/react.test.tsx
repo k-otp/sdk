@@ -53,6 +53,26 @@ describe("OtpProvider", () => {
     expect(result.current).toBe(first);
   });
 
+  test("switching from client to options after mount still provides a client", () => {
+    const { fetch } = mockFetch(() => json(200, issueOutput));
+    const client = createOtpClient({ apiKey: "pk_test", fetch });
+    let useOptions = false;
+    const wrapper = ({ children }: { children?: ReactNode }) =>
+      useOptions ? (
+        <OtpProvider options={{ apiKey: "pk_test", fetch }}>
+          {children}
+        </OtpProvider>
+      ) : (
+        <OtpProvider client={client}>{children}</OtpProvider>
+      );
+    const { result, rerender } = renderHook(() => useOtpClient(), { wrapper });
+    expect(result.current).toBe(client);
+    useOptions = true;
+    rerender();
+    expect(result.current).not.toBe(client);
+    expect(typeof result.current.issue).toBe("function");
+  });
+
   test("hooks throw a TypeError without a provider or client", () => {
     expect(() => renderHook(() => useOtpVerify())).toThrow(TypeError);
   });

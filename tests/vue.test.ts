@@ -50,6 +50,16 @@ describe("plugin and injection", () => {
     );
   });
 
+  test("provideOtpClient outside setup() and missing sources throw TypeErrors", () => {
+    const { fetch } = mockFetch(() => json(200, issueOutput));
+    expect(() => provideOtpClient({ apiKey: "pk_vue", fetch })).toThrow(
+      /inside a component's setup/,
+    );
+    expect(() =>
+      createOtpPlugin(undefined as unknown as { apiKey: string }),
+    ).toThrow(TypeError);
+  });
+
   test("provideOtpClient provides to descendants", async () => {
     const { fetch } = mockFetch(() => json(200, issueOutput));
     let injected: unknown;

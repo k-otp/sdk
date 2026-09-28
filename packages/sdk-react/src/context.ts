@@ -11,7 +11,7 @@ import {
   type ReactElement,
   type ReactNode,
   useContext,
-  useState,
+  useRef,
 } from "react";
 
 /** Any client with `issue`/`verify` (an `OtpClient` from `createOtpClient`). */
@@ -31,8 +31,8 @@ export type OtpProviderProps = {
     }
   | {
       /**
-       * Options for `createOtpClient`. Read once on the first render; pass a
-       * `client` instead to control its lifetime.
+       * Options for `createOtpClient`. Read once, when the provider first
+       * needs its own client; pass a `client` instead to control its lifetime.
        */
       options: OtpClientOptions;
       client?: undefined;
@@ -45,10 +45,13 @@ export type OtpProviderProps = {
  * the provider is safe to render on the server.
  */
 export const OtpProvider = (props: OtpProviderProps): ReactElement => {
-  const [owned] = useState<OtpClient | null>(() =>
-    props.client ? null : createOtpClient(props.options),
-  );
-  const client = props.client ?? owned;
+  // Created lazily, so switching from `client` to `options` after mount
+  // still yields a client instead of publishing `null`.
+  const owned = useRef<OtpClient | null>(null);
+  if (!props.client && !owned.current) {
+    owned.current = createOtpClient(props.options);
+  }
+  const client = props.client ?? owned.current;
   return createElement(
     OtpClientContext.Provider,
     { value: client },

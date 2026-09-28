@@ -26,11 +26,17 @@ export type OtpClientLike = OtpIssueVerifyClient;
 /** A client instance, or options for `createOtpClient`. */
 export type OtpClientSource = OtpClientLike | OtpClientOptions;
 
-const toOtpClient = (source: OtpClientSource): OtpClientLike =>
-  typeof (source as OtpClientLike).issue === "function" &&
-  typeof (source as OtpClientLike).verify === "function"
+const toOtpClient = (source: OtpClientSource): OtpClientLike => {
+  if (typeof source !== "object" || source === null) {
+    throw new TypeError(
+      'Pass an OTP client or createOtpClient options (e.g. { apiKey: "pk_..." }).',
+    );
+  }
+  return typeof (source as OtpClientLike).issue === "function" &&
+    typeof (source as OtpClientLike).verify === "function"
     ? (source as OtpClientLike)
     : createOtpClient(source as OtpClientOptions);
+};
 
 type Store<TState> = {
   getState: () => TState;

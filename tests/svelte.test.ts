@@ -10,6 +10,7 @@ import {
 import { compile, VERSION } from "svelte/compiler";
 import { get } from "svelte/store";
 import {
+  hangUntilAborted,
   issueOutput,
   json,
   mockFetch,
@@ -118,6 +119,20 @@ describe("Svelte components (SSR)", () => {
     return file;
   };
 
+  /** Renders a compiled component on the server and returns its HTML. */
+  const renderSsr = async (file: string): Promise<string> => {
+    const Component = (await import(file)).default;
+    if (svelte4) {
+      // Svelte 4 SSR components expose a static render().
+      return (Component as { render: () => { html: string } }).render().html;
+    }
+    const server = "svelte/server";
+    const { render } = (await import(server)) as {
+      render: (component: unknown) => { body: string };
+    };
+    return render(Component).body;
+  };
+
   test("setOtpContext/getOtpContext share stores; render is idle with no request", async () => {
     const { fetch, calls } = mockFetch(() => json(200, issueOutput));
     (globalThis as { __otpFetch?: typeof fetch }).__otpFetch = fetch;
@@ -138,19 +153,33 @@ describe("Svelte components (SSR)", () => {
       </script>
       <Child />`,
     );
-    const Parent = (await import(parent)).default;
-    let body: string;
-    if (svelte4) {
-      // Svelte 4 SSR components expose a static render().
-      body = (Parent as { render: () => { html: string } }).render().html;
-    } else {
-      const server = "svelte/server";
-      const { render } = (await import(server)) as {
-        render: (component: unknown) => { body: string };
-      };
-      body = render(Parent).body;
-    }
+    const body = await renderSsr(parent);
     expect(body).toContain("idle/false");
     expect(calls).toHaveLength(0);
+  });
+
+  test("setOtpContext only aborts the stores it created", async () => {
+    const { fetch, calls } = mockFetch((r) => hangUntilAborted(r.signal));
+    const g = globalThis as {
+      __otpFetch?: typeof fetch;
+      __otpStores?: unknown;
+    };
+    g.__otpFetch = fetch;
+    const shared = createOtpStores({ apiKey: "pk_ssr", fetch });
+    g.__otpStores = shared;
+    const pending = shared.issue.run(issueInput);
+    const withShared = await load(
+      "WithShared",
+      `<script>
+        import { setOtpContext } from "@k-otp/sdk-svelte";
+        setOtpContext(globalThis.__otpStores);
+      </script>
+      <p>shared</p>`,
+    );
+    // SSR runs onDestroy right after rendering.
+    await renderSsr(withShared);
+    expect(calls[0]?.signal.aborted).toBe(false);
+    shared.abort();
+    expect((await pending).error?.code).toBe("ABORTED");
   });
 });
