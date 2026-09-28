@@ -1,0 +1,5622 @@
+{
+  "info": {
+    "title": "k-otp API",
+    "version": "1.1.0",
+    "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`."
+  },
+  "servers": [
+    {
+      "url": "https://api.k-otp.dev/v1",
+      "description": "Production"
+    },
+    {
+      "url": "/v1",
+      "description": "Same origin as this document (local `bun run dev:api`, preview deployments)"
+    }
+  ],
+  "tags": [
+    {
+      "name": "otp",
+      "description": "OTP issue, verify, status, dashboard history, wallet balance, ledger, and template APIs."
+    }
+  ],
+  "security": [
+    {
+      "secretKey": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "publicKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "pk_...",
+        "description": "Public key (`pk_` prefix, credential type `public_token`) for browser clients: `Authorization: Bearer pk_...`. Only `POST /issue` and `POST /verify` accept it. Every request must carry an `Origin` header that exactly matches one of the key's `allowedOrigins` (no wildcards); a missing or unlisted `Origin` is rejected with 403. A public key may only hold `otp:issue`, `otp:verify`; keys with any other scope (including `*`) are rejected at authentication."
+      },
+      "secretKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "sk_...",
+        "description": "Secret key (`sk_` prefix, credential type `secret_token`) for server-side use only: `Authorization: Bearer sk_...`. Never embed it in browser or mobile clients. Each operation lists the scope it requires in `x-required-scopes`; `x-accepted-scopes` lists other scopes that also satisfy it (`*` grants every scope)."
+      }
+    },
+    "schemas": {
+      "IssueOtpInput": {
+        "type": "object",
+        "properties": {
+          "phoneNumber": {
+            "type": "string",
+            "description": "Recipient mobile number (at most 32 characters after trimming). Stored only\nas a hash and never returned by any endpoint.",
+            "example": "01012345678"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "Caller-defined purpose label (1-64 characters after trimming). A new issue\nfor the same phone number and purpose replaces the previous active issue.",
+            "example": "login"
+          },
+          "channel": {
+            "oneOf": [
+              {
+                "const": "alimtalk"
+              },
+              {
+                "const": "sms"
+              }
+            ],
+            "description": "Delivery channel. Defaults to `sms`."
+          },
+          "templateId": {
+            "type": "string",
+            "description": "Whitelisted template id from `GET /v1/templates`. The default template is\nused when omitted.",
+            "example": "otp_default_kr"
+          },
+          "templateVariables": {
+            "$ref": "#/components/schemas/TrackMetadata",
+            "description": "Values for the template's declared variables (see\n`GET /v1/templates/{templateId}`). `code` is always supplied by the server\nand must not be included."
+          },
+          "from": {
+            "type": "string",
+            "description": "Optional sender identity override (at most 64 characters after trimming)."
+          },
+          "messageType": {
+            "oneOf": [
+              {
+                "const": "LMS"
+              },
+              {
+                "const": "SMS"
+              }
+            ],
+            "description": "SMS message type for the `sms` channel."
+          },
+          "cost": {
+            "type": "number",
+            "description": "Credits to reserve and debit for this issue: an integer from 1 to 100000. Defaults to 1."
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/TrackMetadata",
+            "description": "Free-form string key/value tags stored with the issue. Subject to a\nserver-side size budget and never returned by dashboard endpoints."
+          },
+          "expiresInSec": {
+            "type": "number",
+            "description": "OTP lifetime in seconds: an integer from 30 to 600. Defaults to 180."
+          },
+          "maxAttempts": {
+            "type": "number",
+            "description": "Maximum verification attempts: an integer from 1 to 10. Defaults to 5."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "description": "Idempotency key; alternative to the `Idempotency-Key` header. One of the two\nis required, and they must match when both are sent. 1-128 visible ASCII\ncharacters without spaces after trimming. Reuse the same key when retrying.",
+            "example": "signup-3f2a9c1e-0001"
+          }
+        },
+        "required": [
+          "phoneNumber",
+          "purpose"
+        ],
+        "description": "Request body for `POST /v1/issue`."
+      },
+      "TrackMetadata": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        },
+        "description": "String-to-string map."
+      },
+      "IssueOtpOutput": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "string",
+            "description": "Identifier of the issued OTP; pass it to `POST /v1/verify`."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "When the OTP stops being verifiable (RFC 3339)."
+          },
+          "attemptsRemaining": {
+            "type": "number",
+            "description": "Verification attempts left for this issue."
+          },
+          "queuedAt": {
+            "type": "string",
+            "description": "When delivery was queued (RFC 3339)."
+          }
+        },
+        "required": [
+          "issueId",
+          "expiresAt",
+          "attemptsRemaining",
+          "queuedAt"
+        ],
+        "description": "Result of `POST /v1/issue`. The OTP code itself is never returned."
+      },
+      "IssueOtpPaymentErrorData": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "oneOf": [
+              {
+                "const": "INSUFFICIENT_CREDIT"
+              },
+              {
+                "const": "OVERDRAFT_LIMIT_EXCEEDED"
+              }
+            ],
+            "description": "Why quota admission rejected the issue."
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "description": "Error data of a 402 PAYMENT_REQUIRED response from `POST /v1/issue`."
+      },
+      "VerifyOtpInput": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "string",
+            "description": "`issueId` returned by `POST /v1/issue`."
+          },
+          "code": {
+            "type": "string",
+            "description": "The 6-digit numeric code the end user received.",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "issueId",
+          "code"
+        ],
+        "description": "Request body for `POST /v1/verify`."
+      },
+      "VerifyOtpOutput": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "`true` only when the code matched an active, unexpired issue."
+          },
+          "reasonCode": {
+            "oneOf": [
+              {
+                "const": "ALREADY_VERIFIED"
+              },
+              {
+                "const": "EXPIRED"
+              },
+              {
+                "const": "MAX_ATTEMPTS"
+              },
+              {
+                "const": "MISMATCH"
+              },
+              {
+                "const": "NOT_FOUND"
+              },
+              {
+                "const": "REPLACED"
+              }
+            ],
+            "description": "Present when `verified` is `false`."
+          },
+          "attemptsRemaining": {
+            "type": "number",
+            "description": "Verification attempts left after this call."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Expiry of the issue (RFC 3339)."
+          },
+          "verifiedAt": {
+            "type": "string",
+            "description": "When the issue was verified (RFC 3339), if it has been."
+          }
+        },
+        "required": [
+          "issueId",
+          "verified",
+          "attemptsRemaining",
+          "expiresAt"
+        ],
+        "description": "Result of `POST /v1/verify`. A failed verification is still a 200 response\nwith `verified: false` and a `reasonCode`."
+      },
+      "GetIssueStatusInput": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "string",
+            "description": "`issueId` returned by `POST /v1/issue`."
+          }
+        },
+        "required": [
+          "issueId"
+        ],
+        "description": "Query for `GET /v1/status`."
+      },
+      "GetIssueStatusOutput": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string",
+            "description": "Identifier of the outbound message used for delivery tracking."
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "templateId": {
+            "type": "string"
+          },
+          "verificationStatus": {
+            "oneOf": [
+              {
+                "const": "expired"
+              },
+              {
+                "const": "issued"
+              },
+              {
+                "const": "max_attempts"
+              },
+              {
+                "const": "replaced"
+              },
+              {
+                "const": "verified"
+              }
+            ]
+          },
+          "deliveryStatus": {
+            "oneOf": [
+              {
+                "const": "delivered"
+              },
+              {
+                "const": "failed"
+              },
+              {
+                "const": "queued"
+              },
+              {
+                "const": "sent"
+              },
+              {
+                "const": "unknown"
+              }
+            ]
+          },
+          "overallStatus": {
+            "oneOf": [
+              {
+                "const": "delivered"
+              },
+              {
+                "const": "delivery_failed"
+              },
+              {
+                "const": "expired"
+              },
+              {
+                "const": "in_progress"
+              },
+              {
+                "const": "max_attempts"
+              },
+              {
+                "const": "pending_lookup"
+              },
+              {
+                "const": "replaced"
+              },
+              {
+                "const": "verified"
+              }
+            ],
+            "description": "`verificationStatus` unless it is `issued`; otherwise derived from\n`deliveryStatus` for user-facing display."
+          },
+          "providerOutcomeAmbiguous": {
+            "type": "boolean",
+            "description": "`true` when the provider outcome of the send is unknown (for example a\nprovider timeout). Such sends are never retried automatically."
+          },
+          "providerOutcomeCode": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "Provider result code, when available."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "RFC 3339 timestamp."
+          },
+          "verifiedAt": {
+            "type": "string",
+            "description": "RFC 3339 timestamp, present once verified."
+          },
+          "attemptsUsed": {
+            "type": "number"
+          },
+          "maxAttempts": {
+            "type": "number"
+          },
+          "attemptsRemaining": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "RFC 3339 timestamp."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "RFC 3339 timestamp."
+          }
+        },
+        "required": [
+          "issueId",
+          "messageId",
+          "purpose",
+          "templateId",
+          "verificationStatus",
+          "deliveryStatus",
+          "overallStatus",
+          "expiresAt",
+          "attemptsUsed",
+          "maxAttempts",
+          "attemptsRemaining",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false,
+        "description": "Status of a single issue. The phone number is never included."
+      },
+      "ListOtpIssuesInput": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "$ref": "#/components/schemas/DashboardPageLimit"
+          },
+          "cursor": {
+            "$ref": "#/components/schemas/DashboardCursor",
+            "description": "`nextCursor` from the previous page."
+          },
+          "verificationStatus": {
+            "oneOf": [
+              {
+                "const": "expired"
+              },
+              {
+                "const": "issued"
+              },
+              {
+                "const": "max_attempts"
+              },
+              {
+                "const": "replaced"
+              },
+              {
+                "const": "verified"
+              }
+            ],
+            "description": "Filter by effective verification status. `issued` matches only unexpired\nissues; `expired` also matches `issued` rows whose expiry has passed."
+          },
+          "createdFrom": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Inclusive lower bound on `createdAt`."
+          },
+          "createdTo": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Exclusive upper bound on `createdAt`; must be later than `createdFrom`."
+          }
+        },
+        "required": [],
+        "additionalProperties": false,
+        "description": "Query for `GET /v1/issues`. All fields are optional."
+      },
+      "DashboardPageLimit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "description": "Page size: 1-100 items. Defaults to 50 when omitted."
+      },
+      "DashboardCursor": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512,
+        "pattern": "^[A-Za-z0-9_-]+$",
+        "description": "Opaque keyset pagination cursor. Send back the `nextCursor` value unchanged;\na cursor is only valid for the endpoint that returned it."
+      },
+      "ListOtpIssuesOutput": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/OtpDashboardIssue"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/components/schemas/DashboardCursor",
+            "description": "Cursor for the next page; absent on the last page."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false,
+        "description": "One page of `GET /v1/issues`, newest first."
+      },
+      "OtpDashboardIssue": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "purpose": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "templateId": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "channel": {
+            "oneOf": [
+              {
+                "const": "alimtalk"
+              },
+              {
+                "const": "sms"
+              }
+            ]
+          },
+          "verificationStatus": {
+            "oneOf": [
+              {
+                "const": "expired"
+              },
+              {
+                "const": "issued"
+              },
+              {
+                "const": "max_attempts"
+              },
+              {
+                "const": "replaced"
+              },
+              {
+                "const": "verified"
+              }
+            ],
+            "description": "Effective status: an `issued` row past its expiry is reported as `expired`."
+          },
+          "deliveryStatus": {
+            "oneOf": [
+              {
+                "const": "delivered"
+              },
+              {
+                "const": "failed"
+              },
+              {
+                "const": "queued"
+              },
+              {
+                "const": "sent"
+              },
+              {
+                "const": "unknown"
+              }
+            ],
+            "description": "Latest tracked delivery status; `unknown` when the tracker has no record or is unavailable."
+          },
+          "overallStatus": {
+            "oneOf": [
+              {
+                "const": "delivered"
+              },
+              {
+                "const": "delivery_failed"
+              },
+              {
+                "const": "expired"
+              },
+              {
+                "const": "in_progress"
+              },
+              {
+                "const": "max_attempts"
+              },
+              {
+                "const": "pending_lookup"
+              },
+              {
+                "const": "replaced"
+              },
+              {
+                "const": "verified"
+              }
+            ],
+            "description": "Same derivation as `GET /v1/status`."
+          },
+          "billingStatus": {
+            "$ref": "#/components/schemas/OtpBillingStatus"
+          },
+          "debitedAmount": {
+            "$ref": "#/components/schemas/OtpCreditQuantity",
+            "description": "Credits debited for this issue so far."
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Credit unit, currently `CREDIT`."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Undefined only for legacy records that predate persisted expiry timestamps."
+          },
+          "verifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Present once the issue was verified."
+          },
+          "attemptsUsed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "maxAttempts": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "attemptsRemaining": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "issueId",
+          "purpose",
+          "templateId",
+          "channel",
+          "verificationStatus",
+          "deliveryStatus",
+          "overallStatus",
+          "billingStatus",
+          "debitedAmount",
+          "currency",
+          "attemptsUsed",
+          "maxAttempts",
+          "attemptsRemaining",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false,
+        "description": "PII-free dashboard projection. Phone identifiers, OTP material, provider\npayloads, idempotency values, and free-form metadata are intentionally absent."
+      },
+      "OtpBillingStatus": {
+        "oneOf": [
+          {
+            "const": "debit_pending"
+          },
+          {
+            "const": "debited"
+          },
+          {
+            "const": "release_pending"
+          },
+          {
+            "const": "released"
+          },
+          {
+            "const": "reserved"
+          }
+        ],
+        "description": "Billing lifecycle of an issue: credit is `reserved` at admission, then either\ndebited (`debit_pending` -> `debited`) or released (`release_pending` ->\n`released`) once send processing finishes."
+      },
+      "OtpCreditQuantity": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991,
+        "description": "Non-negative integer credit quantity."
+      },
+      "GetOtpIssueInput": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "`issueId` returned by `POST /v1/issue`."
+          }
+        },
+        "required": [
+          "issueId"
+        ],
+        "additionalProperties": false,
+        "description": "Path parameters for `GET /v1/issues/{issueId}`."
+      },
+      "ListOtpCreditLedgerInput": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "$ref": "#/components/schemas/DashboardPageLimit"
+          },
+          "cursor": {
+            "$ref": "#/components/schemas/DashboardCursor",
+            "description": "`nextCursor` from the previous page."
+          },
+          "entryType": {
+            "oneOf": [
+              {
+                "const": "clawback"
+              },
+              {
+                "const": "credit"
+              },
+              {
+                "const": "debit"
+              },
+              {
+                "const": "refund"
+              }
+            ],
+            "description": "Filter by entry type."
+          },
+          "createdFrom": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Inclusive lower bound on `createdAt`."
+          },
+          "createdTo": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Exclusive upper bound on `createdAt`; must be later than `createdFrom`."
+          }
+        },
+        "required": [],
+        "additionalProperties": false,
+        "description": "Query for `GET /v1/credit-ledger`. All fields are optional."
+      },
+      "ListOtpCreditLedgerOutput": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/OtpCreditLedgerItem"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/components/schemas/DashboardCursor",
+            "description": "Cursor for the next page; absent on the last page."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false,
+        "description": "One page of `GET /v1/credit-ledger`, newest first."
+      },
+      "OtpCreditLedgerItem": {
+        "type": "object",
+        "properties": {
+          "ledgerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issueId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Related issue for `debit`/`refund` entries; absent for `credit` top-ups and `clawback`."
+          },
+          "entryType": {
+            "$ref": "#/components/schemas/OtpCreditLedgerEntryType"
+          },
+          "amountDelta": {
+            "$ref": "#/components/schemas/OtpCreditSignedValue",
+            "description": "Signed wallet delta: debit and clawback are negative; credit and refund are positive."
+          },
+          "balanceAfter": {
+            "$ref": "#/components/schemas/OtpCreditSignedValue",
+            "description": "May be negative when the tenant's quota policy permits overdraft."
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Credit unit, currently `CREDIT`."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "ledgerId",
+          "entryType",
+          "amountDelta",
+          "balanceAfter",
+          "currency",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "description": "Audit-safe wallet mutation projection for the authenticated tenant."
+      },
+      "OtpCreditLedgerEntryType": {
+        "oneOf": [
+          {
+            "const": "clawback"
+          },
+          {
+            "const": "credit"
+          },
+          {
+            "const": "debit"
+          },
+          {
+            "const": "refund"
+          }
+        ],
+        "description": "Wallet ledger entry type: `credit` (top-up), `debit` (issue charge), `refund`\n(issue charge returned), or `clawback` (purchased credits removed, e.g. after\na credit-pack refund)."
+      },
+      "OtpCreditSignedValue": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Signed integer credit quantity."
+      },
+      "GetOtpBalanceInput": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "description": "`GET /v1/balance` takes no parameters."
+      },
+      "OtpBalanceOutput": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "number",
+            "description": "Current balance as a credit quantity (not money)."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Unit of `balance`; currently always `CREDIT`."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When the wallet last changed (RFC 3339)."
+          }
+        },
+        "required": [
+          "appId",
+          "balance",
+          "currency",
+          "updatedAt"
+        ],
+        "description": "Credit wallet balance of the authenticated app."
+      },
+      "ListTemplatesInput": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "description": "`GET /v1/templates` takes no parameters."
+      },
+      "ListTemplatesOutput": {
+        "type": "object",
+        "properties": {
+          "defaultTemplateId": {
+            "type": "string",
+            "description": "Template used when `POST /v1/issue` omits `templateId`."
+          },
+          "templates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateSummary"
+            }
+          },
+          "note": {
+            "type": "string",
+            "description": "Human-readable policy note."
+          }
+        },
+        "required": [
+          "defaultTemplateId",
+          "templates",
+          "note"
+        ],
+        "description": "All templates available to the authenticated app."
+      },
+      "TemplateSummary": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "description": "Value to pass as `templateId` on `POST /v1/issue`."
+          },
+          "name": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "`true` for the template used when `templateId` is omitted."
+          },
+          "providerTemplateCode": {
+            "type": "string",
+            "description": "Pre-registered provider (AlimTalk) template code."
+          },
+          "channelSupport": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "const": "alimtalk"
+                },
+                {
+                  "const": "sms"
+                }
+              ]
+            },
+            "description": "Channels this template can be sent on."
+          },
+          "body": {
+            "type": "string",
+            "description": "Message body; `#{code}` is replaced with the OTP and other `#{variable}` placeholders with `templateVariables`."
+          }
+        },
+        "required": [
+          "templateId",
+          "name",
+          "isDefault",
+          "providerTemplateCode",
+          "channelSupport",
+          "body"
+        ]
+      },
+      "GetTemplateInput": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "description": "Template id from `GET /v1/templates`."
+          }
+        },
+        "required": [
+          "templateId"
+        ],
+        "description": "Path parameters for `GET /v1/templates/{templateId}`."
+      },
+      "TemplatePublicDetail": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "channelSupport": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "const": "alimtalk"
+                },
+                {
+                  "const": "sms"
+                }
+              ]
+            },
+            "description": "Channels this template can be sent on."
+          },
+          "body": {
+            "type": "string",
+            "description": "Message body; `#{code}` is replaced with the OTP and other `#{variable}` placeholders with `templateVariables`."
+          },
+          "variables": {
+            "$ref": "#/components/schemas/TemplateVariableSchema",
+            "description": "Variables accepted in `templateVariables` when issuing with this template."
+          }
+        },
+        "required": [
+          "templateId",
+          "name",
+          "channelSupport",
+          "body",
+          "variables"
+        ],
+        "description": "Template detail returned by `GET /v1/templates/{templateId}`."
+      },
+      "TemplateVariableSchema": {
+        "type": "object",
+        "properties": {
+          "required": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Variable names that must be supplied."
+          },
+          "properties": {
+            "$ref": "#/components/schemas/RecordstringTemplateVariableProperty"
+          },
+          "additionalProperties": {
+            "const": false
+          }
+        },
+        "required": [
+          "required",
+          "properties",
+          "additionalProperties"
+        ],
+        "description": "JSON-schema-like variable definition. `code` is always filled in by the server and must not be sent in `templateVariables`."
+      },
+      "RecordstringTemplateVariableProperty": {
+        "type": "object",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/TemplateVariableProperty"
+        }
+      },
+      "TemplateVariableProperty": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "string"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Regular expression the value must match, if constrained."
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "description": "Definition of one template variable."
+      }
+    }
+  },
+  "openapi": "3.1.1",
+  "paths": {
+    "/issue": {
+      "post": {
+        "operationId": "otp.issue",
+        "summary": "Issue OTP and queue outbound delivery",
+        "description": "Generates a 6-digit OTP, applies quota admission, records the issue, and queues SMS or AlimTalk delivery. The plaintext code is never returned; only `issueId`, expiry, and attempt metadata are.\n\n**Idempotency.** An idempotency key is required, either in the `Idempotency-Key` header or the body `idempotencyKey` field (both must match when both are sent). A retry with the same key and payload returns the original response without re-sending or re-debiting. When the outcome of the first attempt is unknown (timeout, 503), retry only with the same key.\n\n**Replacement.** Issuing again for the same phone number and purpose (with a new key) marks the previous `issued` OTP as `replaced`.\n\n**Billing.** Credit is reserved at admission and finalized asynchronously after send processing; the response does not include balance or debit amounts. Quota rejection returns 402 with `data.code`.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.",
+        "tags": [
+          "otp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phoneNumber": {
+                    "type": "string",
+                    "description": "Recipient mobile number (at most 32 characters after trimming). Stored only\nas a hash and never returned by any endpoint.",
+                    "example": "01012345678"
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "description": "Caller-defined purpose label (1-64 characters after trimming). A new issue\nfor the same phone number and purpose replaces the previous active issue.",
+                    "example": "login"
+                  },
+                  "channel": {
+                    "oneOf": [
+                      {
+                        "const": "alimtalk"
+                      },
+                      {
+                        "const": "sms"
+                      }
+                    ],
+                    "description": "Delivery channel. Defaults to `sms`."
+                  },
+                  "templateId": {
+                    "type": "string",
+                    "description": "Whitelisted template id from `GET /v1/templates`. The default template is\nused when omitted.",
+                    "example": "otp_default_kr"
+                  },
+                  "templateVariables": {
+                    "$ref": "#/components/schemas/TrackMetadata",
+                    "description": "Values for the template's declared variables (see\n`GET /v1/templates/{templateId}`). `code` is always supplied by the server\nand must not be included."
+                  },
+                  "from": {
+                    "type": "string",
+                    "description": "Optional sender identity override (at most 64 characters after trimming)."
+                  },
+                  "messageType": {
+                    "oneOf": [
+                      {
+                        "const": "LMS"
+                      },
+                      {
+                        "const": "SMS"
+                      }
+                    ],
+                    "description": "SMS message type for the `sms` channel."
+                  },
+                  "cost": {
+                    "type": "number",
+                    "description": "Credits to reserve and debit for this issue: an integer from 1 to 100000. Defaults to 1."
+                  },
+                  "metadata": {
+                    "$ref": "#/components/schemas/TrackMetadata",
+                    "description": "Free-form string key/value tags stored with the issue. Subject to a\nserver-side size budget and never returned by dashboard endpoints."
+                  },
+                  "expiresInSec": {
+                    "type": "number",
+                    "description": "OTP lifetime in seconds: an integer from 30 to 600. Defaults to 180."
+                  },
+                  "maxAttempts": {
+                    "type": "number",
+                    "description": "Maximum verification attempts: an integer from 1 to 10. Defaults to 5."
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "description": "Idempotency key; alternative to the `Idempotency-Key` header. One of the two\nis required, and they must match when both are sent. 1-128 visible ASCII\ncharacters without spaces after trimming. Reuse the same key when retrying.",
+                    "example": "signup-3f2a9c1e-0001"
+                  }
+                },
+                "required": [
+                  "phoneNumber",
+                  "purpose"
+                ],
+                "description": "Request body for `POST /v1/issue`."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP issued (or an idempotent replay of an earlier issue with the same key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "issueId": {
+                      "type": "string",
+                      "description": "Identifier of the issued OTP; pass it to `POST /v1/verify`."
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "description": "When the OTP stops being verifiable (RFC 3339)."
+                    },
+                    "attemptsRemaining": {
+                      "type": "number",
+                      "description": "Verification attempts left for this issue."
+                    },
+                    "queuedAt": {
+                      "type": "string",
+                      "description": "When delivery was queued (RFC 3339)."
+                    }
+                  },
+                  "required": [
+                    "issueId",
+                    "expiresAt",
+                    "attemptsRemaining",
+                    "queuedAt"
+                  ],
+                  "description": "Result of `POST /v1/issue`. The OTP code itself is never returned."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: invalid payload, missing/blank idempotency key, header/body key mismatch, unknown template or template variables, or `expiresInSec`/`maxAttempts`/`cost` out of range.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "BAD_REQUEST"
+                        },
+                        "status": {
+                          "const": 400
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Bad Request"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: the `Authorization: Bearer` credential is missing, malformed, inactive, or rejected by introspection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "UNAUTHORIZED"
+                        },
+                        "status": {
+                          "const": 401
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Unauthorized"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "PAYMENT_REQUIRED: quota admission rejected the issue. `data.code` is `INSUFFICIENT_CREDIT` or `OVERDRAFT_LIMIT_EXCEEDED`; top up the wallet before retrying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "PAYMENT_REQUIRED"
+                        },
+                        "status": {
+                          "const": 402
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "PAYMENT_REQUIRED"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "oneOf": [
+                                {
+                                  "const": "INSUFFICIENT_CREDIT"
+                                },
+                                {
+                                  "const": "OVERDRAFT_LIMIT_EXCEEDED"
+                                }
+                              ],
+                              "description": "Why quota admission rejected the issue."
+                            }
+                          },
+                          "required": [
+                            "code"
+                          ],
+                          "description": "Error data of a 402 PAYMENT_REQUIRED response from `POST /v1/issue`."
+                        }
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message",
+                        "data"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: the credential lacks `otp:issue` (or an accepted alias), or a `pk_` public key was sent without an `Origin` header / with an `Origin` that is not an exact match for one of the key's allowedOrigins.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "FORBIDDEN"
+                        },
+                        "status": {
+                          "const": 403
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Forbidden"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONFLICT: the idempotency key was already used with a different payload, or the replayed issue has since been replaced by a newer issue.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "CONFLICT"
+                        },
+                        "status": {
+                          "const": 409
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Conflict"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "INTERNAL_SERVER_ERROR"
+                        },
+                        "status": {
+                          "const": 500
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Internal Server Error"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: introspection or a downstream dependency is unavailable, or an earlier attempt with this idempotency key is still being resolved. Retry later with the same key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "SERVICE_UNAVAILABLE"
+                        },
+                        "status": {
+                          "const": 503
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Service Unavailable"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "publicKey": []
+          },
+          {
+            "secretKey": []
+          }
+        ],
+        "x-required-scopes": [
+          "otp:issue"
+        ],
+        "x-accepted-scopes": [
+          "otp:send",
+          "*"
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "example": "signup-3f2a9c1e-0001",
+            "description": "Client-generated key that makes `POST /issue` safe to retry. Required for every issue request unless the body `idempotencyKey` is provided; if both are sent they must match. After trimming, the key must be 1-128 visible ASCII characters (no spaces). Retrying with the same key and payload replays the original result without a second send or debit; reusing a key with a different payload returns 409 CONFLICT. If the first attempt timed out or returned 503, retry with the same key — never mint a new key, because the provider outcome may be ambiguous and a new key can cause a duplicate SMS."
+          }
+        ]
+      }
+    },
+    "/verify": {
+      "post": {
+        "operationId": "otp.verify",
+        "summary": "Verify OTP code",
+        "description": "Checks a 6-digit `code` against `issueId` with one-time semantics. On success the issue transitions to `verified` and cannot be verified again. A wrong code consumes one attempt. Verification failures are returned as 200 with `verified: false` and a `reasonCode` (`MISMATCH`, `MAX_ATTEMPTS`, `EXPIRED`, `ALREADY_VERIFIED`, `REPLACED`, `NOT_FOUND`), not as HTTP errors.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.",
+        "tags": [
+          "otp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "issueId": {
+                    "type": "string",
+                    "description": "`issueId` returned by `POST /v1/issue`."
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "The 6-digit numeric code the end user received.",
+                    "example": "123456"
+                  }
+                },
+                "required": [
+                  "issueId",
+                  "code"
+                ],
+                "description": "Request body for `POST /v1/verify`."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification result. Check `verified`; failures carry `reasonCode`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "issueId": {
+                      "type": "string"
+                    },
+                    "verified": {
+                      "type": "boolean",
+                      "description": "`true` only when the code matched an active, unexpired issue."
+                    },
+                    "reasonCode": {
+                      "oneOf": [
+                        {
+                          "const": "ALREADY_VERIFIED"
+                        },
+                        {
+                          "const": "EXPIRED"
+                        },
+                        {
+                          "const": "MAX_ATTEMPTS"
+                        },
+                        {
+                          "const": "MISMATCH"
+                        },
+                        {
+                          "const": "NOT_FOUND"
+                        },
+                        {
+                          "const": "REPLACED"
+                        }
+                      ],
+                      "description": "Present when `verified` is `false`."
+                    },
+                    "attemptsRemaining": {
+                      "type": "number",
+                      "description": "Verification attempts left after this call."
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "description": "Expiry of the issue (RFC 3339)."
+                    },
+                    "verifiedAt": {
+                      "type": "string",
+                      "description": "When the issue was verified (RFC 3339), if it has been."
+                    }
+                  },
+                  "required": [
+                    "issueId",
+                    "verified",
+                    "attemptsRemaining",
+                    "expiresAt"
+                  ],
+                  "description": "Result of `POST /v1/verify`. A failed verification is still a 200 response\nwith `verified: false` and a `reasonCode`."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: invalid payload, blank `issueId`, or `code` is not a 6-digit numeric string.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "BAD_REQUEST"
+                        },
+                        "status": {
+                          "const": 400
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Bad Request"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: the `Authorization: Bearer` credential is missing, malformed, inactive, or rejected by introspection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "UNAUTHORIZED"
+                        },
+                        "status": {
+                          "const": 401
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Unauthorized"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: the credential lacks `otp:verify` (or an accepted alias), or a `pk_` public key was sent without an `Origin` header / with an `Origin` that is not an exact match for one of the key's allowedOrigins.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "FORBIDDEN"
+                        },
+                        "status": {
+                          "const": 403
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Forbidden"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONFLICT: the request conflicts with the current state of the resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "CONFLICT"
+                        },
+                        "status": {
+                          "const": 409
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Conflict"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "INTERNAL_SERVER_ERROR"
+                        },
+                        "status": {
+                          "const": 500
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Internal Server Error"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: credential introspection or a downstream dependency is temporarily unavailable. Retry with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "SERVICE_UNAVAILABLE"
+                        },
+                        "status": {
+                          "const": 503
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Service Unavailable"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "publicKey": []
+          },
+          {
+            "secretKey": []
+          }
+        ],
+        "x-required-scopes": [
+          "otp:verify"
+        ],
+        "x-accepted-scopes": [
+          "otp:read",
+          "*"
+        ]
+      }
+    },
+    "/status": {
+      "get": {
+        "operationId": "otp.status",
+        "summary": "Get OTP issue status",
+        "description": "Returns verification state, delivery state, and the computed `overallStatus` for one issue owned by the authenticated app. `overallStatus` equals `verificationStatus` unless it is `issued`; while `issued` it is derived from `deliveryStatus` (`delivered` -> `delivered`, `failed` -> `delivery_failed`, `queued`/`sent` -> `in_progress`, `unknown` -> `pending_lookup`).\n\nImmediately after `POST /issue` the issue row may still be persisting asynchronously; for up to 60 seconds such an issue is reported as `pending_lookup` instead of 404. The phone number is never returned.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "tags": [
+          "otp"
+        ],
+        "parameters": [
+          {
+            "name": "issueId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "`issueId` returned by `POST /v1/issue`."
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "description": "`issueId` returned by `POST /v1/issue`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current status of the issue.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "issueId": {
+                      "type": "string"
+                    },
+                    "messageId": {
+                      "type": "string",
+                      "description": "Identifier of the outbound message used for delivery tracking."
+                    },
+                    "purpose": {
+                      "type": "string"
+                    },
+                    "templateId": {
+                      "type": "string"
+                    },
+                    "verificationStatus": {
+                      "oneOf": [
+                        {
+                          "const": "expired"
+                        },
+                        {
+                          "const": "issued"
+                        },
+                        {
+                          "const": "max_attempts"
+                        },
+                        {
+                          "const": "replaced"
+                        },
+                        {
+                          "const": "verified"
+                        }
+                      ]
+                    },
+                    "deliveryStatus": {
+                      "oneOf": [
+                        {
+                          "const": "delivered"
+                        },
+                        {
+                          "const": "failed"
+                        },
+                        {
+                          "const": "queued"
+                        },
+                        {
+                          "const": "sent"
+                        },
+                        {
+                          "const": "unknown"
+                        }
+                      ]
+                    },
+                    "overallStatus": {
+                      "oneOf": [
+                        {
+                          "const": "delivered"
+                        },
+                        {
+                          "const": "delivery_failed"
+                        },
+                        {
+                          "const": "expired"
+                        },
+                        {
+                          "const": "in_progress"
+                        },
+                        {
+                          "const": "max_attempts"
+                        },
+                        {
+                          "const": "pending_lookup"
+                        },
+                        {
+                          "const": "replaced"
+                        },
+                        {
+                          "const": "verified"
+                        }
+                      ],
+                      "description": "`verificationStatus` unless it is `issued`; otherwise derived from\n`deliveryStatus` for user-facing display."
+                    },
+                    "providerOutcomeAmbiguous": {
+                      "type": "boolean",
+                      "description": "`true` when the provider outcome of the send is unknown (for example a\nprovider timeout). Such sends are never retried automatically."
+                    },
+                    "providerOutcomeCode": {
+                      "type": "string",
+                      "maxLength": 128,
+                      "description": "Provider result code, when available."
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "description": "RFC 3339 timestamp."
+                    },
+                    "verifiedAt": {
+                      "type": "string",
+                      "description": "RFC 3339 timestamp, present once verified."
+                    },
+                    "attemptsUsed": {
+                      "type": "number"
+                    },
+                    "maxAttempts": {
+                      "type": "number"
+                    },
+                    "attemptsRemaining": {
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "RFC 3339 timestamp."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "RFC 3339 timestamp."
+                    }
+                  },
+                  "required": [
+                    "issueId",
+                    "messageId",
+                    "purpose",
+                    "templateId",
+                    "verificationStatus",
+                    "deliveryStatus",
+                    "overallStatus",
+                    "expiresAt",
+                    "attemptsUsed",
+                    "maxAttempts",
+                    "attemptsRemaining",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Status of a single issue. The phone number is never included."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: `issueId` is missing or blank.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "BAD_REQUEST"
+                        },
+                        "status": {
+                          "const": 400
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Bad Request"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: the `Authorization: Bearer` credential is missing, malformed, inactive, or rejected by introspection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "UNAUTHORIZED"
+                        },
+                        "status": {
+                          "const": 401
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Unauthorized"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: the credential lacks `otp:status` (or an accepted alias), or a `pk_` public key was used. Public keys are limited to issue/verify.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "FORBIDDEN"
+                        },
+                        "status": {
+                          "const": 403
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Forbidden"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: no issue with this `issueId` exists for the authenticated app (issues of other apps are indistinguishable from missing ones).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "NOT_FOUND"
+                        },
+                        "status": {
+                          "const": 404
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Not Found"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONFLICT: the request conflicts with the current state of the resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "CONFLICT"
+                        },
+                        "status": {
+                          "const": 409
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Conflict"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "INTERNAL_SERVER_ERROR"
+                        },
+                        "status": {
+                          "const": 500
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Internal Server Error"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: credential introspection or a downstream dependency is temporarily unavailable. Retry with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "SERVICE_UNAVAILABLE"
+                        },
+                        "status": {
+                          "const": 503
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Service Unavailable"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "secretKey": []
+          }
+        ],
+        "x-required-scopes": [
+          "otp:status"
+        ],
+        "x-accepted-scopes": [
+          "otp:read",
+          "*"
+        ]
+      }
+    },
+    "/issues": {
+      "get": {
+        "operationId": "otp.listIssues",
+        "summary": "List OTP issues for the authenticated app",
+        "description": "Returns a PII-free dashboard projection of OTP issues. The tenant is always derived from the bearer credential. Phone numbers, OTP material, provider payloads, idempotency keys, and free-form metadata are never included.\n\nResults are ordered newest first (`createdAt` descending, ties broken by id) and keyset-paginated. Pass `limit` (1-100, default 50) and, for subsequent pages, the opaque `cursor` returned as `nextCursor`; `nextCursor` is omitted on the last page. Cursors are bound to the endpoint that issued them and must be sent unchanged. Keep the same filters while paging.\n\nOptional `createdFrom`/`createdTo` (RFC 3339 date-time) select the half-open range `[createdFrom, createdTo)`; when both are given `createdFrom` must be earlier than `createdTo`. `verificationStatus` filters by effective status: `issued` matches only unexpired issues, and `expired` also includes `issued` rows whose expiry has passed.\n\n`deliveryStatus` is read from the delivery tracker and falls back to `unknown` if the tracker is temporarily unavailable.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "tags": [
+          "otp"
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DashboardPageLimit"
+            },
+            "style": "deepObject",
+            "explode": true,
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "description": "Page size: 1-100 items. Defaults to 50 when omitted."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DashboardCursor",
+              "description": "`nextCursor` from the previous page."
+            },
+            "style": "deepObject",
+            "explode": true,
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "description": "`nextCursor` from the previous page."
+          },
+          {
+            "name": "verificationStatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "const": "expired"
+                },
+                {
+                  "const": "issued"
+                },
+                {
+                  "const": "max_attempts"
+                },
+                {
+                  "const": "replaced"
+                },
+                {
+                  "const": "verified"
+                }
+              ],
+              "description": "Filter by effective verification status. `issued` matches only unexpired\nissues; `expired` also matches `issued` rows whose expiry has passed."
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "description": "Filter by effective verification status. `issued` matches only unexpired\nissues; `expired` also matches `issued` rows whose expiry has passed."
+          },
+          {
+            "name": "createdFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Inclusive lower bound on `createdAt`."
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "description": "Inclusive lower bound on `createdAt`."
+          },
+          {
+            "name": "createdTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Exclusive upper bound on `createdAt`; must be later than `createdFrom`."
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "description": "Exclusive upper bound on `createdAt`; must be later than `createdFrom`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of issues, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "$ref": "#/components/schemas/OtpDashboardIssue"
+                      }
+                    },
+                    "nextCursor": {
+                      "$ref": "#/components/schemas/DashboardCursor",
+                      "description": "Cursor for the next page; absent on the last page."
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false,
+                  "description": "One page of `GET /v1/issues`, newest first."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: invalid query, `limit` outside 1-100, malformed cursor, a cursor issued by a different endpoint, or `createdFrom` not earlier than `createdTo`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "BAD_REQUEST"
+                        },
+                        "status": {
+                          "const": 400
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Bad Request"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: the `Authorization: Bearer` credential is missing, malformed, inactive, or rejected by introspection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "UNAUTHORIZED"
+                        },
+                        "status": {
+                          "const": 401
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Unauthorized"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: the credential lacks `otp:dashboard:read` (or an accepted alias), or a `pk_` public key was used. Public keys are limited to issue/verify.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "FORBIDDEN"
+                        },
+                        "status": {
+                          "const": 403
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Forbidden"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONFLICT: the request conflicts with the current state of the resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "CONFLICT"
+                        },
+                        "status": {
+                          "const": 409
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Conflict"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "INTERNAL_SERVER_ERROR"
+                        },
+                        "status": {
+                          "const": 500
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Internal Server Error"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: credential introspection or a downstream dependency is temporarily unavailable. Retry with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "SERVICE_UNAVAILABLE"
+                        },
+                        "status": {
+                          "const": 503
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Service Unavailable"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "secretKey": []
+          }
+        ],
+        "x-required-scopes": [
+          "otp:dashboard:read"
+        ],
+        "x-accepted-scopes": [
+          "otp:read",
+          "*"
+        ]
+      }
+    },
+    "/issues/{issueId}": {
+      "get": {
+        "operationId": "otp.getIssue",
+        "summary": "Get an OTP issue for the authenticated app",
+        "description": "Returns the same PII-free projection as `GET /issues` for a single issue, including billing status and attempt counters. Issue identifiers belonging to other apps are indistinguishable from missing records.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "tags": [
+          "otp"
+        ],
+        "parameters": [
+          {
+            "name": "issueId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "`issueId` returned by `POST /v1/issue`."
+            },
+            "description": "`issueId` returned by `POST /v1/issue`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The issue projection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "issueId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "purpose": {
+                      "type": "string",
+                      "maxLength": 256
+                    },
+                    "templateId": {
+                      "type": "string",
+                      "maxLength": 256
+                    },
+                    "channel": {
+                      "oneOf": [
+                        {
+                          "const": "alimtalk"
+                        },
+                        {
+                          "const": "sms"
+                        }
+                      ]
+                    },
+                    "verificationStatus": {
+                      "oneOf": [
+                        {
+                          "const": "expired"
+                        },
+                        {
+                          "const": "issued"
+                        },
+                        {
+                          "const": "max_attempts"
+                        },
+                        {
+                          "const": "replaced"
+                        },
+                        {
+                          "const": "verified"
+                        }
+                      ],
+                      "description": "Effective status: an `issued` row past its expiry is reported as `expired`."
+                    },
+                    "deliveryStatus": {
+                      "oneOf": [
+                        {
+                          "const": "delivered"
+                        },
+                        {
+                          "const": "failed"
+                        },
+                        {
+                          "const": "queued"
+                        },
+                        {
+                          "const": "sent"
+                        },
+                        {
+                          "const": "unknown"
+                        }
+                      ],
+                      "description": "Latest tracked delivery status; `unknown` when the tracker has no record or is unavailable."
+                    },
+                    "overallStatus": {
+                      "oneOf": [
+                        {
+                          "const": "delivered"
+                        },
+                        {
+                          "const": "delivery_failed"
+                        },
+                        {
+                          "const": "expired"
+                        },
+                        {
+                          "const": "in_progress"
+                        },
+                        {
+                          "const": "max_attempts"
+                        },
+                        {
+                          "const": "pending_lookup"
+                        },
+                        {
+                          "const": "replaced"
+                        },
+                        {
+                          "const": "verified"
+                        }
+                      ],
+                      "description": "Same derivation as `GET /v1/status`."
+                    },
+                    "billingStatus": {
+                      "$ref": "#/components/schemas/OtpBillingStatus"
+                    },
+                    "debitedAmount": {
+                      "$ref": "#/components/schemas/OtpCreditQuantity",
+                      "description": "Credits debited for this issue so far."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "description": "Credit unit, currently `CREDIT`."
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Undefined only for legacy records that predate persisted expiry timestamps."
+                    },
+                    "verifiedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Present once the issue was verified."
+                    },
+                    "attemptsUsed": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "maxAttempts": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "attemptsRemaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "issueId",
+                    "purpose",
+                    "templateId",
+                    "channel",
+                    "verificationStatus",
+                    "deliveryStatus",
+                    "overallStatus",
+                    "billingStatus",
+                    "debitedAmount",
+                    "currency",
+                    "attemptsUsed",
+                    "maxAttempts",
+                    "attemptsRemaining",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false,
+                  "description": "PII-free dashboard projection. Phone identifiers, OTP material, provider\npayloads, idempotency values, and free-form metadata are intentionally absent."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: `issueId` is not a UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "BAD_REQUEST"
+                        },
+                        "status": {
+                          "const": 400
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Bad Request"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: the `Authorization: Bearer` credential is missing, malformed, inactive, or rejected by introspection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "UNAUTHORIZED"
+                        },
+                        "status": {
+                          "const": 401
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Unauthorized"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: the credential lacks `otp:dashboard:read` (or an accepted alias), or a `pk_` public key was used. Public keys are limited to issue/verify.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "FORBIDDEN"
+                        },
+                        "status": {
+                          "const": 403
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Forbidden"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: no issue with this `issueId` exists for the authenticated app.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "NOT_FOUND"
+                        },
+                        "status": {
+                          "const": 404
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Not Found"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONFLICT: the request conflicts with the current state of the resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "CONFLICT"
+                        },
+                        "status": {
+                          "const": 409
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Conflict"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "INTERNAL_SERVER_ERROR"
+                        },
+                        "status": {
+                          "const": 500
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Internal Server Error"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: credential introspection or a downstream dependency is temporarily unavailable. Retry with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "SERVICE_UNAVAILABLE"
+                        },
+                        "status": {
+                          "const": 503
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Service Unavailable"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "secretKey": []
+          }
+        ],
+        "x-required-scopes": [
+          "otp:dashboard:read"
+        ],
+        "x-accepted-scopes": [
+          "otp:read",
+          "*"
+        ]
+      }
+    },
+    "/credit-ledger": {
+      "get": {
+        "operationId": "otp.listCreditLedger",
+        "summary": "List wallet ledger entries for the authenticated app",
+        "description": "Returns an audit projection of wallet mutations: `credit` top-ups, per-issue `debit`s, and `refund`s. `amountDelta` is signed (debits are negative) and `balanceAfter` is the wallet balance after the entry. Internal billing references, external payment references, and initiator metadata are omitted; `issueId` is present only for issue-linked entries.\n\nResults are ordered newest first (`createdAt` descending, ties broken by id) and keyset-paginated. Pass `limit` (1-100, default 50) and, for subsequent pages, the opaque `cursor` returned as `nextCursor`; `nextCursor` is omitted on the last page. Cursors are bound to the endpoint that issued them and must be sent unchanged. Keep the same filters while paging.\n\nOptional `createdFrom`/`createdTo` (RFC 3339 date-time) select the half-open range `[createdFrom, createdTo)`; when both are given `createdFrom` must be earlier than `createdTo`. `entryType` filters by entry type.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "tags": [
+          "otp"
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DashboardPageLimit"
+            },
+            "style": "deepObject",
+            "explode": true,
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "description": "Page size: 1-100 items. Defaults to 50 when omitted."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DashboardCursor",
+              "description": "`nextCursor` from the previous page."
+            },
+            "style": "deepObject",
+            "explode": true,
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "description": "`nextCursor` from the previous page."
+          },
+          {
+            "name": "entryType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "const": "clawback"
+                },
+                {
+                  "const": "credit"
+                },
+                {
+                  "const": "debit"
+                },
+                {
+                  "const": "refund"
+                }
+              ],
+              "description": "Filter by entry type."
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "description": "Filter by entry type."
+          },
+          {
+            "name": "createdFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Inclusive lower bound on `createdAt`."
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "description": "Inclusive lower bound on `createdAt`."
+          },
+          {
+            "name": "createdTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Exclusive upper bound on `createdAt`; must be later than `createdFrom`."
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "description": "Exclusive upper bound on `createdAt`; must be later than `createdFrom`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of ledger entries, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "$ref": "#/components/schemas/OtpCreditLedgerItem"
+                      }
+                    },
+                    "nextCursor": {
+                      "$ref": "#/components/schemas/DashboardCursor",
+                      "description": "Cursor for the next page; absent on the last page."
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false,
+                  "description": "One page of `GET /v1/credit-ledger`, newest first."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: invalid query, `limit` outside 1-100, malformed cursor, a cursor issued by a different endpoint, or `createdFrom` not earlier than `createdTo`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "BAD_REQUEST"
+                        },
+                        "status": {
+                          "const": 400
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Bad Request"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: the `Authorization: Bearer` credential is missing, malformed, inactive, or rejected by introspection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "UNAUTHORIZED"
+                        },
+                        "status": {
+                          "const": 401
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Unauthorized"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: the credential lacks `otp:ledger:read` (or an accepted alias), or a `pk_` public key was used. Public keys are limited to issue/verify.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "FORBIDDEN"
+                        },
+                        "status": {
+                          "const": 403
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Forbidden"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONFLICT: the request conflicts with the current state of the resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "CONFLICT"
+                        },
+                        "status": {
+                          "const": 409
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Conflict"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "INTERNAL_SERVER_ERROR"
+                        },
+                        "status": {
+                          "const": 500
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Internal Server Error"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: credential introspection or a downstream dependency is temporarily unavailable. Retry with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "SERVICE_UNAVAILABLE"
+                        },
+                        "status": {
+                          "const": 503
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Service Unavailable"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "secretKey": []
+          }
+        ],
+        "x-required-scopes": [
+          "otp:ledger:read"
+        ],
+        "x-accepted-scopes": [
+          "otp:dashboard:read",
+          "otp:read",
+          "*"
+        ]
+      }
+    },
+    "/balance": {
+      "get": {
+        "operationId": "otp.balance",
+        "summary": "Get wallet balance",
+        "description": "Returns the current credit wallet balance for the authenticated app. `balance` is a credit quantity (not money) and `currency` is `CREDIT`. Reading the balance never affects OTP issue status.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "tags": [
+          "otp"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Current wallet balance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appId": {
+                      "type": "string"
+                    },
+                    "balance": {
+                      "type": "number",
+                      "description": "Current balance as a credit quantity (not money)."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Unit of `balance`; currently always `CREDIT`."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "When the wallet last changed (RFC 3339)."
+                    }
+                  },
+                  "required": [
+                    "appId",
+                    "balance",
+                    "currency",
+                    "updatedAt"
+                  ],
+                  "description": "Credit wallet balance of the authenticated app."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: the request failed input validation. `message` describes the first failing constraint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "BAD_REQUEST"
+                        },
+                        "status": {
+                          "const": 400
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Bad Request"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: the `Authorization: Bearer` credential is missing, malformed, inactive, or rejected by introspection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "UNAUTHORIZED"
+                        },
+                        "status": {
+                          "const": 401
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Unauthorized"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: the credential lacks `otp:balance` (or an accepted alias), or a `pk_` public key was used. Public keys are limited to issue/verify.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "FORBIDDEN"
+                        },
+                        "status": {
+                          "const": 403
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Forbidden"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONFLICT: the request conflicts with the current state of the resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "CONFLICT"
+                        },
+                        "status": {
+                          "const": 409
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Conflict"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "INTERNAL_SERVER_ERROR"
+                        },
+                        "status": {
+                          "const": 500
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Internal Server Error"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: credential introspection or a downstream dependency is temporarily unavailable. Retry with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "SERVICE_UNAVAILABLE"
+                        },
+                        "status": {
+                          "const": 503
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Service Unavailable"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "secretKey": []
+          }
+        ],
+        "x-required-scopes": [
+          "otp:balance"
+        ],
+        "x-accepted-scopes": [
+          "*"
+        ]
+      }
+    },
+    "/templates": {
+      "get": {
+        "operationId": "otp.listTemplates",
+        "summary": "List available OTP templates",
+        "description": "Returns the whitelisted message templates that `POST /issue` accepts via `templateId`, plus the default template id used when `templateId` is omitted. The list is small and not paginated. Every template body contains the `#{code}` placeholder; new templates are registered operationally, not through the API.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "tags": [
+          "otp"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "All available templates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "defaultTemplateId": {
+                      "type": "string",
+                      "description": "Template used when `POST /v1/issue` omits `templateId`."
+                    },
+                    "templates": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TemplateSummary"
+                      }
+                    },
+                    "note": {
+                      "type": "string",
+                      "description": "Human-readable policy note."
+                    }
+                  },
+                  "required": [
+                    "defaultTemplateId",
+                    "templates",
+                    "note"
+                  ],
+                  "description": "All templates available to the authenticated app."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: the request failed input validation. `message` describes the first failing constraint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "BAD_REQUEST"
+                        },
+                        "status": {
+                          "const": 400
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Bad Request"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: the `Authorization: Bearer` credential is missing, malformed, inactive, or rejected by introspection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "UNAUTHORIZED"
+                        },
+                        "status": {
+                          "const": 401
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Unauthorized"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: the credential lacks `otp:templates` (or an accepted alias), or a `pk_` public key was used. Public keys are limited to issue/verify.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "FORBIDDEN"
+                        },
+                        "status": {
+                          "const": 403
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Forbidden"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONFLICT: the request conflicts with the current state of the resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "CONFLICT"
+                        },
+                        "status": {
+                          "const": 409
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Conflict"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "INTERNAL_SERVER_ERROR"
+                        },
+                        "status": {
+                          "const": 500
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Internal Server Error"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: credential introspection or a downstream dependency is temporarily unavailable. Retry with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "SERVICE_UNAVAILABLE"
+                        },
+                        "status": {
+                          "const": 503
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Service Unavailable"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "secretKey": []
+          }
+        ],
+        "x-required-scopes": [
+          "otp:templates"
+        ],
+        "x-accepted-scopes": [
+          "otp:read",
+          "*"
+        ]
+      }
+    },
+    "/templates/{templateId}": {
+      "get": {
+        "operationId": "otp.getTemplate",
+        "summary": "Get template detail",
+        "description": "Returns one template including the `variables` schema that `templateVariables` must satisfy on `POST /issue`. `code` is always filled in by the server and must not be sent in `templateVariables`.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "tags": [
+          "otp"
+        ],
+        "parameters": [
+          {
+            "name": "templateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Template id from `GET /v1/templates`."
+            },
+            "description": "Template id from `GET /v1/templates`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Template detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "templateId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "channelSupport": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "const": "alimtalk"
+                          },
+                          {
+                            "const": "sms"
+                          }
+                        ]
+                      },
+                      "description": "Channels this template can be sent on."
+                    },
+                    "body": {
+                      "type": "string",
+                      "description": "Message body; `#{code}` is replaced with the OTP and other `#{variable}` placeholders with `templateVariables`."
+                    },
+                    "variables": {
+                      "$ref": "#/components/schemas/TemplateVariableSchema",
+                      "description": "Variables accepted in `templateVariables` when issuing with this template."
+                    }
+                  },
+                  "required": [
+                    "templateId",
+                    "name",
+                    "channelSupport",
+                    "body",
+                    "variables"
+                  ],
+                  "description": "Template detail returned by `GET /v1/templates/{templateId}`."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: the request failed input validation. `message` describes the first failing constraint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "BAD_REQUEST"
+                        },
+                        "status": {
+                          "const": 400
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Bad Request"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: the `Authorization: Bearer` credential is missing, malformed, inactive, or rejected by introspection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "UNAUTHORIZED"
+                        },
+                        "status": {
+                          "const": 401
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Unauthorized"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: the credential lacks `otp:templates` (or an accepted alias), or a `pk_` public key was used. Public keys are limited to issue/verify.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "FORBIDDEN"
+                        },
+                        "status": {
+                          "const": 403
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Forbidden"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: no template with this `templateId` is available.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "NOT_FOUND"
+                        },
+                        "status": {
+                          "const": 404
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Not Found"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONFLICT: the request conflicts with the current state of the resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "CONFLICT"
+                        },
+                        "status": {
+                          "const": 409
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Conflict"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "INTERNAL_SERVER_ERROR"
+                        },
+                        "status": {
+                          "const": 500
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Internal Server Error"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: credential introspection or a downstream dependency is temporarily unavailable. Retry with backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "SERVICE_UNAVAILABLE"
+                        },
+                        "status": {
+                          "const": 503
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Service Unavailable"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "secretKey": []
+          }
+        ],
+        "x-required-scopes": [
+          "otp:templates"
+        ],
+        "x-accepted-scopes": [
+          "otp:read",
+          "*"
+        ]
+      }
+    }
+  }
+}
