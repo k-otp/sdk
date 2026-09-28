@@ -1,0 +1,5 @@
+[test]
+# Adapter tests need a DOM (React rendering, form actions). Kept out of the
+# package tests so sdk-core/sdk-server run without browser globals.
+preload = ["./setup-dom.ts"]
+timeout = 10000

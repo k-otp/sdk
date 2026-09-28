@@ -1,0 +1,26 @@
+{
+  "name": "k-otp-sdk-tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Adapter tests (React, Vue, Svelte) and the cross-adapter parity suite. Runs under happy-dom.",
+  "type": "module",
+  "scripts": {
+    "test": "bun test ."
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "catalog:",
+    "@k-otp/sdk-core": "workspace:*",
+    "@k-otp/sdk-react": "workspace:*",
+    "@k-otp/sdk-svelte": "workspace:*",
+    "@k-otp/sdk-vue": "workspace:*",
+    "@testing-library/dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/bun": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "svelte": "catalog:",
+    "vue": "catalog:"
+  }
+}

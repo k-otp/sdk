@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["bun"],
+    "jsx": "react-jsx",
+    "isolatedDeclarations": false
+  },
+  "include": ["./**/*.ts", "./**/*.tsx", "../packages/sdk-core/test/helpers.ts"]
+}

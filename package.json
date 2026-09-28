@@ -11,6 +11,7 @@
   "workspaces": {
     "packages": [
       "packages/*",
+      "tests",
       "examples/*"
     ],
     "catalog": {
@@ -40,7 +41,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "test": "bun test packages",
+    "test": "bun test packages && bun run --cwd tests test",
     "gen:types": "bun run scripts/generate-types.ts",
     "check:openapi": "bun run scripts/generate-types.ts --check && bun test packages/sdk-core/test/contract-drift.test.ts",
     "sync:openapi": "bun run scripts/sync-openapi.ts",
