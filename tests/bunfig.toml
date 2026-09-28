@@ -1,5 +1,6 @@
 [test]
 # Adapter tests need a DOM (React rendering, form actions). Kept out of the
 # package tests so sdk-core/sdk-server run without browser globals.
+# `preload` resolves against the working directory, so run these tests with
+# cwd = tests/: `bun run --cwd tests test` (not `bun test tests` from the root).
 preload = ["./setup-dom.ts"]
-timeout = 10000

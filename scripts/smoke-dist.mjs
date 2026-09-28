@@ -21,8 +21,14 @@ const issueOutput = {
   attemptsRemaining: 5,
   queuedAt: "2026-01-01T00:00:00Z",
 };
-const fetch = async (request) => {
+const fetch = async (input, init) => {
+  // Normalize like a real fetch would, whatever the calling convention.
+  const request = new Request(input, init);
+  assert.equal(request.method, "POST");
+  assert.equal(new URL(request.url).pathname, "/v1/issue");
+  assert.match(request.headers.get("authorization") ?? "", /^Bearer [ps]k_/);
   assert.equal(request.headers.get("idempotency-key"), "smoke-1");
+  assert.equal((await request.json()).idempotencyKey, "smoke-1");
   return new Response(JSON.stringify(issueOutput), {
     headers: { "content-type": "application/json" },
   });
@@ -61,7 +67,8 @@ for (const [label, mod] of [
   console.log(`ok - ${label}`);
 }
 
-const context = vm.createContext({
+/** Browser-like globals for the IIFE bundles. */
+const browserGlobals = {
   fetch,
   Response,
   Request,
@@ -87,30 +94,47 @@ const context = vm.createContext({
   clearTimeout,
   crypto: globalThis.crypto,
   console,
-});
-context.window = context;
-context.document = {};
-vm.runInContext(
-  readFileSync(dist("sdk-core", "k-otp.iife.min.js"), "utf8"),
-  context,
-);
-const result = await vm.runInContext(
-  `KOtp.createOtpClient({ apiKey: "pk_smoke" }).issue(${JSON.stringify(input)})`,
-  context,
-);
-assert.equal(result.issueId, issueOutput.issueId);
-assert.throws(
-  () => vm.runInContext(`KOtp.createOtpClient({ apiKey: "sk_live" })`, context),
-  /Refusing to use an sk_ secret key/,
-);
-const flowResult = await vm.runInContext(
-  `KOtp.createOtpFlow(KOtp.createOtpClient({ apiKey: "pk_smoke" }), {
-    createIdempotencyKey: () => "smoke-1",
-  }).send({ phoneNumber: "01012345678", purpose: "smoke" })`,
-  context,
-);
-assert.equal(flowResult.data.issueId, issueOutput.issueId);
-console.log("ok - iife (window.KOtp, KOtp.createOtpFlow)");
+  document: {},
+};
+// Both published CDN bundles (separate tsdown passes, so they can diverge).
+// Results cross the vm boundary as JSON so deepEqual compares plain data.
+for (const file of ["k-otp.iife.js", "k-otp.iife.min.js"]) {
+  const bundleContext = vm.createContext({ ...browserGlobals });
+  bundleContext.window = bundleContext;
+  vm.runInContext(readFileSync(dist("sdk-core", file), "utf8"), bundleContext);
+  const result = await vm.runInContext(
+    `KOtp.createOtpClient({ apiKey: "pk_smoke" })
+      .issue(${JSON.stringify(input)})
+      .then((r) => JSON.stringify(r))`,
+    bundleContext,
+  );
+  assert.deepEqual(JSON.parse(result), issueOutput, file);
+  assert.throws(
+    () =>
+      vm.runInContext(
+        `KOtp.createOtpClient({ apiKey: "sk_live" })`,
+        bundleContext,
+      ),
+    /Refusing to use an sk_ secret key/,
+  );
+  const flow = await vm.runInContext(
+    `(async () => {
+      const flow = KOtp.createOtpFlow(KOtp.createOtpClient({ apiKey: "pk_smoke" }), {
+        createIdempotencyKey: () => "smoke-1",
+      });
+      const sent = await flow.send({ phoneNumber: "01012345678", purpose: "smoke" });
+      return JSON.stringify({
+        data: sent.data,
+        cooldownRemainingMs: flow.getState().cooldownRemainingMs,
+      });
+    })()`,
+    bundleContext,
+  );
+  const flowResult = JSON.parse(flow);
+  assert.deepEqual(flowResult.data, issueOutput, file);
+  assert.equal(flowResult.cooldownRemainingMs > 0, true, file);
+  console.log(`ok - iife ${file} (window.KOtp, KOtp.createOtpFlow)`);
+}
 
 for (const [label, mod] of [
   [
@@ -186,6 +210,13 @@ for (const [label, mod] of [
 
 const svelte = await import(pathToFileURL(dist("sdk-svelte", "index.js")).href);
 const stores = svelte.createOtpStores({ apiKey: "pk_smoke", fetch });
+// Observe the store wiring, not only the promise returned by run().
+const statuses = [];
+const unsubscribe = stores.issue.subscribe((state) =>
+  statuses.push(state.status),
+);
 const svelteResult = await stores.issue.run(adapterInput);
+unsubscribe();
 assert.deepEqual(svelteResult.data, issueOutput, "svelte esm");
+assert.deepEqual(statuses, ["idle", "loading", "success"], "svelte esm");
 console.log("ok - svelte esm");

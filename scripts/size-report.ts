@@ -3,9 +3,11 @@
  * Reports (and enforces budgets for) the browser cost of `@k-otp/sdk-core`
  * and the framework adapters:
  *
- * - ESM: what an app bundler ships for `import { createOtpClient,
- *   createIdempotencyKey } from "@k-otp/sdk-core"` (tree-shaken, minified,
- *   dependencies included), measured from the built `dist/`.
+ * - ESM: every public runtime export of `@k-otp/sdk-core` (`export *` from
+ *   the built `dist/`, so new exports are measured automatically), minified,
+ *   dependencies included. This is the worst case; apps that import less
+ *   ship less.
+ * - Headless: every export of `@k-otp/sdk-core/headless`.
  * - IIFE: the CDN bundle `dist/k-otp.iife.min.js`.
  * - Adapters: every public export of `@k-otp/sdk-react|vue|svelte`, once with
  *   sdk-core external (adapter cost alone) and once with sdk-core bundled
@@ -24,59 +26,44 @@ const coreDir = path.join(root, "packages/sdk-core");
 /** Budgets in bytes (min+gzip). Raise deliberately, with a reason. */
 const BUDGETS = {
   esm: 13 * 1024,
+  headless: 4 * 1024,
   // Includes the headless flow (KOtp.createOtpFlow) since 0.1.0.
   iife: 14 * 1024,
   // Adapter code only (sdk-core and the framework are external).
   adapter: 2 * 1024,
-  // What an app ships for OTP with an adapter (sdk-core included, framework external).
-  adapterWithCore: 14 * 1024,
+  // What an app ships for OTP with an adapter (sdk-core included, framework
+  // external). 15 kB: every re-exported sdk-core API is measured (`export *`).
+  adapterWithCore: 15 * 1024,
 } as const;
 
-/** Every public runtime export of each adapter. */
+/** The adapters; every public runtime export is measured (`export *`). */
 const ADAPTERS = [
   {
     name: "@k-otp/sdk-react",
     dir: "packages/sdk-react",
     framework: ["react"],
-    exports: [
-      "OtpProvider",
-      "useOtpClient",
-      "useOtpIssue",
-      "useOtpVerify",
-      "useOtpFlow",
-    ],
   },
   {
     name: "@k-otp/sdk-vue",
     dir: "packages/sdk-vue",
     framework: ["vue"],
-    exports: [
-      "createOtpPlugin",
-      "provideOtpClient",
-      "useOtpClient",
-      "useOtp",
-      "useOtpFlow",
-    ],
   },
   {
     name: "@k-otp/sdk-svelte",
     dir: "packages/sdk-svelte",
     framework: ["svelte", "svelte/store"],
-    exports: [
-      "createOtpStores",
-      "createOtpFlowStore",
-      "setOtpContext",
-      "getOtpContext",
-      "otpForm",
-    ],
   },
 ] as const;
 
 const kb = (bytes: number): string => `${(bytes / 1024).toFixed(2)} kB`;
 
+/**
+ * Bundles `entry` and returns the bytes of ALL outputs (chunks/assets too).
+ * Bare imports (`@orpc/*`, `@k-otp/sdk-core`) resolve from the imported
+ * `dist/` file's package, like they would in an app.
+ */
 const bundle = async (
   entry: string,
-  root: string,
   external: string[] = [],
 ): Promise<Buffer> => {
   const result = await Bun.build({
@@ -84,53 +71,80 @@ const bundle = async (
     target: "browser",
     format: "esm",
     minify: true,
-    root,
     external,
   });
   if (!result.success) {
-    console.error(result.logs);
-    process.exit(1);
+    throw new AggregateError(result.logs, `Bun.build failed for ${entry}`);
   }
-  const output = result.outputs[0];
-  if (!output) throw new Error("Bun.build produced no output");
-  return Buffer.from(await output.arrayBuffer());
+  if (result.outputs.length === 0) {
+    throw new Error("Bun.build produced no output");
+  }
+  return Buffer.concat(
+    await Promise.all(
+      result.outputs.map(async (output) =>
+        Buffer.from(await output.arrayBuffer()),
+      ),
+    ),
+  );
+};
+
+/** A built file, with a hint instead of a raw ENOENT when it is missing. */
+const built = async (file: string): Promise<string> => {
+  if (!(await Bun.file(file).exists())) {
+    throw new Error(
+      `${path.relative(root, file)} is missing. Run \`bun run build\` first.`,
+    );
+  }
+  return file;
+};
+
+/** Writes an entry that re-exports everything from `file`. */
+const reexportAll = async (
+  work: string,
+  name: string,
+  file: string,
+): Promise<string> => {
+  const entry = path.join(work, `${name}.js`);
+  await writeFile(
+    entry,
+    `export * from ${JSON.stringify(await built(file))};\n`,
+  );
+  return entry;
 };
 
 const work = await mkdtemp(path.join(tmpdir(), "k-otp-size-"));
 let failed = false;
 try {
-  const entry = path.join(work, "entry.js");
-  await writeFile(
-    entry,
-    `export { createOtpClient, createIdempotencyKey, isOtpApiError } from ${JSON.stringify(
-      path.join(coreDir, "dist/index.js"),
-    )};\n`,
+  const esm = await bundle(
+    await reexportAll(work, "core", path.join(coreDir, "dist/index.js")),
   );
-  // Resolve @orpc/* from the sdk-core package like an app would.
-  const esm = await bundle(entry, coreDir);
+  const headless = await bundle(
+    await reexportAll(work, "headless", path.join(coreDir, "dist/headless.js")),
+  );
   const iife = Buffer.from(
-    await Bun.file(path.join(coreDir, "dist/k-otp.iife.min.js")).arrayBuffer(),
+    await Bun.file(
+      await built(path.join(coreDir, "dist/k-otp.iife.min.js")),
+    ).arrayBuffer(),
   );
 
   const rows: [string, Buffer, number][] = [
-    ["@k-otp/sdk-core ESM (tree-shaken)", esm, BUDGETS.esm],
+    ["@k-otp/sdk-core ESM (all exports)", esm, BUDGETS.esm],
+    ["@k-otp/sdk-core/headless ESM (all exports)", headless, BUDGETS.headless],
     ["@k-otp/sdk-core IIFE (k-otp.iife.min.js)", iife, BUDGETS.iife],
   ];
 
   for (const adapter of ADAPTERS) {
     const dir = path.join(root, adapter.dir);
-    const adapterEntry = path.join(work, `${path.basename(dir)}.js`);
-    await writeFile(
-      adapterEntry,
-      `export { ${adapter.exports.join(", ")} } from ${JSON.stringify(
-        path.join(dir, "dist/index.js"),
-      )};\n`,
+    const adapterEntry = await reexportAll(
+      work,
+      path.basename(dir),
+      path.join(dir, "dist/index.js"),
     );
     const framework = [...adapter.framework];
     rows.push(
       [
         `${adapter.name} ESM (adapter only)`,
-        await bundle(adapterEntry, dir, [
+        await bundle(adapterEntry, [
           ...framework,
           "@k-otp/sdk-core",
           "@k-otp/sdk-core/headless",
@@ -139,7 +153,7 @@ try {
       ],
       [
         `${adapter.name} ESM (+ sdk-core, ${adapter.framework[0]} external)`,
-        await bundle(adapterEntry, dir, framework),
+        await bundle(adapterEntry, framework),
         BUDGETS.adapterWithCore,
       ],
     );
@@ -156,4 +170,5 @@ try {
 } finally {
   await rm(work, { recursive: true, force: true });
 }
-process.exit(failed ? 1 : 0);
+// exitCode (not exit()) lets piped stdout flush first.
+process.exitCode = failed ? 1 : 0;

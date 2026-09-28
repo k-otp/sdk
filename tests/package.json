@@ -5,7 +5,7 @@
   "description": "Adapter tests (React, Vue, Svelte) and the cross-adapter parity suite. Runs under happy-dom.",
   "type": "module",
   "scripts": {
-    "test": "bun test ."
+    "test": "bun test --timeout 10000 ."
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "catalog:",

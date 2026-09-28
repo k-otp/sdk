@@ -9,6 +9,11 @@
 import path from "node:path";
 import { parseArgs } from "node:util";
 
+/**
+ * Catalog pins per major. An empty object means "the major the catalog
+ * already pins": keep it in sync with the root catalog when that major
+ * changes (tests/versions.test.ts asserts the installed major either way).
+ */
 const VERSIONS: Record<string, Record<string, Record<string, string>>> = {
   react: {
     "18": {
@@ -28,16 +33,23 @@ const VERSIONS: Record<string, Record<string, Record<string, string>>> = {
 const { values } = parseArgs({
   options: { react: { type: "string" }, svelte: { type: "string" } },
 });
+if (!values.react && !values.svelte) {
+  throw new Error("pass --react <major> and/or --svelte <major>");
+}
 const file = path.resolve(import.meta.dir, "..", "package.json");
 const manifest = (await Bun.file(file).json()) as {
-  workspaces: { catalog: Record<string, string> };
+  workspaces?: { catalog?: Record<string, string> };
 };
+const catalog = manifest.workspaces?.catalog;
+if (!catalog || typeof catalog !== "object") {
+  throw new Error(`${file} has no workspaces.catalog to pin`);
+}
 for (const framework of ["react", "svelte"] as const) {
   const major = values[framework];
   if (!major) continue;
   const pins = VERSIONS[framework]?.[major];
   if (!pins) throw new Error(`unsupported ${framework} major: ${major}`);
-  Object.assign(manifest.workspaces.catalog, pins);
+  Object.assign(catalog, pins);
   console.log(`${framework} ${major}: ${JSON.stringify(pins)}`);
 }
 await Bun.write(file, `${JSON.stringify(manifest, null, 2)}\n`);

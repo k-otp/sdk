@@ -1,7 +1,7 @@
 [install]
-# Reproducible installs: CI uses --frozen-lockfile as well.
+# Reproducibility comes from the committed bun.lock (CI installs with
+# --frozen-lockfile); `bun add` keeps writing caret ranges.
 exact = false
 
-[test]
-root = "."
-timeout = 10000
+# Test timeouts are set with `bun test --timeout` in the package scripts:
+# bunfig.toml has no [test] timeout option.
