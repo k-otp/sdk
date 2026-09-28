@@ -29,7 +29,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
@@ -46,9 +46,13 @@ jobs:
 
       - name: Warn if changeset missing
         if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          CHANGED="$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}")"
+          # Three-dot diff: only the PR's own changes since the merge base.
+          CHANGED="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}")"
           if echo "$CHANGED" | grep -Eq '^packages/[^/]+/(src/|package\.json)'; then
             if ! echo "$CHANGED" | grep -q '^\.sampo/changesets/.*\.md$'; then
               echo "::warning::Releasable package changes without a Sampo changeset. Run 'sampo add' and commit the file under .sampo/changesets/."
@@ -81,6 +85,7 @@ jobs:
         with:
           name: dist
           path: packages/*/dist
+          if-no-files-found: error
           retention-days: 7
 
   node-smoke:
@@ -97,7 +102,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
@@ -128,7 +133,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
@@ -163,7 +168,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 

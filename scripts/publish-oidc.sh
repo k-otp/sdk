@@ -45,6 +45,20 @@ pkg_field() {
   node -p "require(process.argv[1]).$2" "${ROOT_DIR}/$1/package.json"
 }
 
+# Every publishable packages/* package must be listed above.
+for manifest in "${ROOT_DIR}"/packages/*/package.json; do
+  dir="packages/$(basename "$(dirname "$manifest")")"
+  [[ "$(pkg_field "$dir" private)" == "true" ]] && continue
+  listed="false"
+  for known in "${PACKAGE_DIRS[@]}"; do
+    [[ "$known" == "$dir" ]] && listed="true"
+  done
+  if [[ "$listed" != "true" ]]; then
+    echo "${dir} is publishable but missing from PACKAGE_DIRS" >&2
+    exit 1
+  fi
+done
+
 # Return codes: 0 = version exists, 1 = missing (or package not created yet),
 # 2 = network/parse error.
 registry_has_version() {
@@ -52,7 +66,8 @@ registry_has_version() {
   local encoded="${name//@/%40}"
   encoded="${encoded//\//%2F}"
   local resp http json
-  if ! resp="$(curl -sSL -w '\n%{http_code}' "https://registry.npmjs.org/${encoded}" 2>/dev/null)"; then
+  if ! resp="$(curl -sSL --connect-timeout 10 --max-time 30 --retry 3 --retry-all-errors \
+    -w '\n%{http_code}' "https://registry.npmjs.org/${encoded}" 2>/dev/null)"; then
     return 2
   fi
   http="$(printf '%s' "$resp" | tail -n 1)"
@@ -110,14 +125,21 @@ if [[ "$MODE" == "check" ]]; then
       exit 2
     fi
   done
+  # Everything is on npm but the release tag is missing (e.g. a previous run
+  # failed after publishing): run publish mode again to finish the release.
+  if [[ "$SHOULD_PUBLISH" == "false" ]] &&
+    ! git -C "$ROOT_DIR" ls-remote --exit-code --tags origin "refs/tags/v${RELEASE_VERSION}" >/dev/null 2>&1; then
+    echo "v${RELEASE_VERSION} is published but not tagged; finishing the release."
+    SHOULD_PUBLISH="true"
+  fi
   emit "should_publish=${SHOULD_PUBLISH}"
   exit 0
 fi
 
 echo "Building and validating packages..."
-(cd "$ROOT_DIR" && bun run build && bun run check:pack)
+# smoke:dist loads the built ESM/CJS/IIFE output with Node before publishing.
+(cd "$ROOT_DIR" && bun run build && bun run check:pack && bun run smoke:dist)
 
-PUBLISHED_ANY="false"
 for dir in "${PACKAGE_DIRS[@]}"; do
   NAME="$(pkg_field "$dir" name)"
   set +e
@@ -140,24 +162,21 @@ for dir in "${PACKAGE_DIRS[@]}"; do
   echo "Publishing ${NAME}@${RELEASE_VERSION}"
   npm publish "$TARBALL" --access public
   rm -f "$TARBALL"
-  PUBLISHED_ANY="true"
 done
 
-if [[ "$PUBLISHED_ANY" != "true" ]]; then
-  echo "No packages to publish."
-  exit 0
-fi
-
+# Tags and the GitHub Release are (re)created whenever missing, also when an
+# earlier run published the packages but failed before this point.
 git config user.name "github-actions[bot]"
 git config user.email "github-actions[bot]@users.noreply.github.com"
-if ! git rev-parse -q --verify "refs/tags/v${RELEASE_VERSION}" >/dev/null; then
-  git tag "v${RELEASE_VERSION}"
-fi
+RELEASE_TAGS=("v${RELEASE_VERSION}")
 for dir in "${PACKAGE_DIRS[@]}"; do
-  TAG="$(pkg_field "$dir" name)-v${RELEASE_VERSION}"
+  RELEASE_TAGS+=("$(pkg_field "$dir" name)-v${RELEASE_VERSION}")
+done
+for TAG in "${RELEASE_TAGS[@]}"; do
   git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || git tag "$TAG"
 done
-git push origin --tags
+# Push only this release's tags (never every local tag).
+git push origin "${RELEASE_TAGS[@]/#/refs/tags/}"
 
 if command -v gh >/dev/null 2>&1 && [[ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]]; then
   export GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
