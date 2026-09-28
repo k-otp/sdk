@@ -43,7 +43,7 @@ const { verified, reasonCode } = await otp.verify({ issueId, code: "123456" });
 ## 핵심 규칙
 
 - **`sk_` 비밀 키는 절대 브라우저/앱에 포함하지 마세요.** `sdk-core`는 브라우저에서 `sk_` 키를,
-  `sdk-server`는 `pk_` 키와 브라우저 실행을 거부합니다.
+  `sdk-server`는 `sk_`로 시작하지 않는 키(`pk_` 포함)와 브라우저 실행을 거부합니다.
 - **`pk_` 공개 키**는 `issue`/`verify`만 가능하며, 요청의 `Origin`이 키의 `allowedOrigins` 중
   하나와 정확히 일치해야 합니다(스킴·호스트·포트, 와일드카드 없음). 불일치 시 `403 FORBIDDEN`.
 - **`issue`에는 멱등키가 필수입니다.** 한 번의 "인증번호 보내기" 동작마다 키를 하나 만들고 저장한 뒤,

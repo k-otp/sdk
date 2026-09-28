@@ -31,8 +31,8 @@ All SDK methods reject with `OtpApiError`:
 | `ABORTED` | 0 | no | Your `AbortSignal` fired. |
 | `UNKNOWN` | any | no | Anything else (unexpected status, malformed success body). |
 
-Configuration mistakes (missing `apiKey`, a `pk_` key in `sdk-server`, an `sk_`
-key in a browser, no `fetch`) throw `TypeError` instead.
+Configuration mistakes (missing `apiKey`, a key without the `sk_` prefix in
+`sdk-server`, an `sk_` key in a browser, no `fetch`) throw `TypeError` instead.
 
 ## Idempotency for `issue`
 

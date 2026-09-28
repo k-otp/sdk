@@ -370,6 +370,32 @@ describe("key guards", () => {
     );
   });
 
+  test("refuses keys without the sk_ prefix at construction", () => {
+    for (const apiKey of ["test_1", "SK_live_1", "sk-live-1", "Bearer sk_1"]) {
+      expect(() => createOtpServerClient({ apiKey })).toThrow(
+        /requires an sk_ secret key; received a key without the sk_ prefix/,
+      );
+    }
+  });
+
+  test("accepts sk_ keys after trimming whitespace", () => {
+    expect(() =>
+      createOtpServerClient({ apiKey: "  sk_test_1\n" }),
+    ).not.toThrow();
+  });
+
+  test("refuses lazily resolved keys without the sk_ prefix before any request", async () => {
+    const { fetch, calls } = mockFetch(api);
+    const client = createOtpServerClient({
+      apiKey: async () => "live_1",
+      fetch,
+    });
+    const error = await client.getBalance().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as TypeError).message).toMatch(/without the sk_ prefix/);
+    expect(calls).toHaveLength(0);
+  });
+
   test("refuses lazily resolved pk_ keys before any request", async () => {
     const { fetch, calls } = mockFetch(api);
     const client = createOtpServerClient({

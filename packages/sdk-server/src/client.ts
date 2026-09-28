@@ -95,11 +95,15 @@ const isBrowser = (): boolean =>
   typeof (globalThis as { document?: unknown }).document !== "undefined";
 
 const assertSecretKey = (apiKey: string): void => {
+  if (apiKey.startsWith("sk_")) return;
   if (apiKey.startsWith("pk_")) {
     throw new TypeError(
       "@k-otp/sdk-server requires an sk_ secret key; received a pk_ public key. Use @k-otp/sdk-core in browsers with pk_ keys.",
     );
   }
+  throw new TypeError(
+    "@k-otp/sdk-server requires an sk_ secret key; received a key without the sk_ prefix. Check that K-OTP secret keys (sk_...) are loaded from your server-side configuration.",
+  );
 };
 
 /**

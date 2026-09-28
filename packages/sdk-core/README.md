@@ -172,7 +172,8 @@ called for client-side validation failures (no request is made).
 - **Request ids in browsers:** response headers are only readable when the API
   exposes them via CORS, so `requestId` may be undefined in browsers.
 - **CommonJS:** the CJS build `require()`s the ESM-only `@orpc/*` packages,
-  which needs Node.js >= 20.19 (or 22.12+).
+  which needs Node.js >= 20.19 (or 22.12+). ESM consumers are unaffected.
+- **Timeouts:** the default is 10 seconds per request (`DEFAULT_TIMEOUT_MS`).
 
 ## Versioning
 

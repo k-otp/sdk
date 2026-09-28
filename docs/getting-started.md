@@ -89,8 +89,12 @@ filled in by the server.
 | Option | Default |
 | --- | --- |
 | `baseUrl` | `https://api.k-otp.dev/v1` |
-| `timeoutMs` | `10000` |
+| `timeoutMs` | `10000` (10 s, per request) |
 | `fetch` | `globalThis.fetch` |
+
+Runtime requirements: Node.js >= 20.19 (the CommonJS builds `require()` the
+ESM-only oRPC packages, which needs `require(esm)` support), Bun, Deno, modern
+browsers and edge runtimes. `@k-otp/sdk-server` only accepts `sk_` keys.
 
 The OpenAPI document the SDK is generated from is vendored at
 [`spec/openapi.json`](../spec/openapi.json) (API version shown in

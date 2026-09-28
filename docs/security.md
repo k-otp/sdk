@@ -26,7 +26,8 @@ variables, Workers secrets, a secret manager).
 - A missing or unlisted `Origin` is rejected with `403 FORBIDDEN`. That is also
   why a `pk_` key does not work from a server or `curl` unless it sends a
   matching `Origin`.
-- `@k-otp/sdk-server` refuses `pk_` keys; use `sk_` on servers.
+- `@k-otp/sdk-server` only accepts keys that start with `sk_` (it refuses
+  `pk_` keys and anything unprefixed); use `sk_` on servers.
 
 Because a `pk_` key is visible to anyone, anyone can use it from a page on an
 allowed origin. Protect browser-direct flows with your own abuse controls

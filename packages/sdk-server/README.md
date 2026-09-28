@@ -55,11 +55,22 @@ export default {
 ## API
 
 `createOtpServerClient(options)` accepts the same options as
-`createOtpClient` in sdk-core (`apiKey`, `baseUrl`, `fetch`, `timeoutMs`,
-`headers`, `hooks`) plus `dangerouslyAllowBrowser`.
+`createOtpClient` in sdk-core plus `dangerouslyAllowBrowser`:
 
-- `pk_` public keys are refused with a `TypeError` (at construction, or before
-  the request for lazily resolved keys).
+| Option | Default | |
+| --- | --- | --- |
+| `apiKey` | required | `sk_...` secret key, or a (possibly async) function resolved before every request. |
+| `baseUrl` | `https://api.k-otp.dev/v1` | Must include `/v1`. |
+| `timeoutMs` | `10000` (10 s) | Per request; `0` disables. Override per call with `{ timeoutMs }`. |
+| `fetch` | `globalThis.fetch` | Custom fetch (tests, proxies, instrumentation). |
+| `headers` | | Extra headers; `authorization` cannot be overridden. |
+| `hooks` | | Telemetry hooks, see sdk-core. |
+| `dangerouslyAllowBrowser` | `false` | See below. |
+
+- The key must start with `sk_`. Anything else (a `pk_` public key, a key
+  without a prefix, a `Bearer ...` string) is refused with a `TypeError`, at
+  construction for string keys and before the request (no I/O) for lazily
+  resolved keys. Surrounding whitespace is trimmed.
 - Constructing the client where `window` and `document` exist throws, because
   an `sk_` key must never reach a browser. `dangerouslyAllowBrowser: true` is
   meant for jsdom-style tests only.
@@ -104,6 +115,17 @@ filters while paging (the helpers do this for you). Breaking out of a
 Rejections are `OtpApiError` with the same codes, `status`, `requestId`,
 `data` and `retryAfterMs` as sdk-core. See
 [errors and retries](../../docs/errors-and-retries.md).
+
+## Runtime notes
+
+- **Node.js >= 20.19** is required. The SDK talks to the API through oRPC,
+  whose packages are ESM-only; the CommonJS build (`require("@k-otp/sdk-server")`)
+  therefore relies on `require()` of ES modules, which is enabled by default
+  from Node.js 20.19 (and 22.12). ESM consumers (`import`) work on any
+  supported Node.js version, Bun, Deno and edge runtimes.
+- The default timeout is **10 seconds** per request (`DEFAULT_TIMEOUT_MS`).
+  A timeout rejects with `TIMEOUT`; for `issue` that outcome is ambiguous, so
+  retry with the same idempotency key.
 
 ## Not included
 
