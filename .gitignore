@@ -1,0 +1,29 @@
+# dependencies
+node_modules
+
+# build output
+dist
+*.tgz
+*.tsbuildinfo
+.pack
+
+# coverage / logs
+coverage
+*.lcov
+*.log
+
+# env
+.env
+.env.*
+!.env.example
+.npmrc
+
+# caches
+.cache
+.ttsc-cache
+
+# editors / OS
+.idea
+.vscode/*
+!.vscode/extensions.json
+.DS_Store

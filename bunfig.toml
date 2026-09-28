@@ -1,0 +1,7 @@
+[install]
+# Reproducible installs: CI uses --frozen-lockfile as well.
+exact = false
+
+[test]
+root = "."
+timeout = 10000

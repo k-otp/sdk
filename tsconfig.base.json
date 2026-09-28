@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "types": [],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "isolatedDeclarations": true,
+    "declaration": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+
+    // Resolve sibling SDK packages from source (no build needed for
+    // typecheck/tests). Published packages resolve through `exports`.
+    "paths": {
+      "@k-otp/sdk-core": ["./packages/sdk-core/src/index.ts"],
+      "@k-otp/sdk-core/contract": ["./packages/sdk-core/src/contract.ts"],
+      "@k-otp/sdk-core/internal": ["./packages/sdk-core/src/internal.ts"]
+    },
+
+    "plugins": [{ "transform": "@ttsc/lint" }]
+  }
+}
