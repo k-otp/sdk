@@ -117,3 +117,34 @@ jobs:
 
       - name: Smoke test ESM, CJS and IIFE builds
         run: node scripts/smoke-dist.mjs
+
+  examples:
+    name: Examples (typecheck, build, smoke)
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Download build output
+        uses: actions/download-artifact@v5
+        with:
+          name: dist
+          path: packages
+
+      - name: Typecheck, build and smoke-test examples
+        run: bun run check:examples

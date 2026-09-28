@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>K-OTP + script tag</title>
+    <!--
+      Local build of @k-otp/sdk-core (served by serve.ts). In production load it
+      from jsDelivr with an EXACT version and Subresource Integrity:
+
+      <script
+        src="https://cdn.jsdelivr.net/npm/@k-otp/sdk-core@0.1.0/dist/k-otp.iife.min.js"
+        integrity="sha384-REPLACE_WITH_THE_FILE_HASH"
+        crossorigin="anonymous"
+      ></script>
+
+      Hash: curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A
+    -->
+    <script src="./k-otp.iife.min.js"></script>
+  </head>
+  <body>
+    <main>
+      <h1>Phone verification</h1>
+      <p id="mode"></p>
+      <form id="send">
+        <input name="phoneNumber" inputmode="tel" placeholder="01012345678" required />
+        <button type="submit">Send code</button>
+      </form>
+      <form id="verify" hidden>
+        <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required />
+        <button type="submit">Verify</button>
+      </form>
+      <p id="status" role="status"></p>
+    </main>
+
+    <script>
+      // A pk_ PUBLIC key. Its allowedOrigins must list this page's exact origin
+      // (e.g. http://localhost:5173 while developing). Never use an sk_ key here.
+      const PUBLIC_KEY = "";
+      const RESEND_COOLDOWN_MS = 30000;
+
+      // Without a key, answer from a tiny in-page mock (the code is 123456).
+      const mockFetch = async (input, init) => {
+        const request = new Request(input, init);
+        const body = await request.json();
+        await new Promise((r) => setTimeout(r, 300));
+        const now = Date.now();
+        const reply = (data) => Response.json(data);
+        if (request.url.endsWith("/issue")) {
+          return reply({ issueId: `mock-${body.idempotencyKey}`, expiresAt: new Date(now + 180000).toISOString(), attemptsRemaining: 5, queuedAt: new Date(now).toISOString() });
+        }
+        const verified = body.code === "123456";
+        return reply({ issueId: body.issueId, verified, reasonCode: verified ? undefined : "MISMATCH", attemptsRemaining: verified ? 5 : 4, expiresAt: new Date(now + 60000).toISOString(), verifiedAt: verified ? new Date(now).toISOString() : undefined });
+      };
+
+      const otp = PUBLIC_KEY
+        ? KOtp.createOtpClient({ apiKey: PUBLIC_KEY })
+        : KOtp.createOtpClient({ apiKey: "pk_mock", fetch: mockFetch });
+      document.getElementById("mode").textContent = PUBLIC_KEY ? "" : "Mock mode: the code is 123456.";
+
+      const sendForm = document.getElementById("send");
+      const verifyForm = document.getElementById("verify");
+      const status = document.getElementById("status");
+      const sendButton = sendForm.querySelector("button");
+
+      // One idempotency key per send attempt, reused while that attempt's
+      // outcome is unknown (timeout, network error, 5xx, 429).
+      let pending = null; // { phoneNumber, key }
+      let issueId = null;
+      let cooldownUntil = 0;
+
+      const tick = () => {
+        const left = Math.ceil((cooldownUntil - Date.now()) / 1000);
+        sendButton.disabled = left > 0;
+        sendButton.textContent = left > 0 ? `Resend in ${left}s` : issueId ? "Resend code" : "Send code";
+        if (left > 0) setTimeout(tick, 1000);
+      };
+
+      sendForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const phoneNumber = new FormData(sendForm).get("phoneNumber");
+        if (!pending || pending.phoneNumber !== phoneNumber) {
+          pending = { phoneNumber, key: KOtp.createIdempotencyKey("signup") };
+        }
+        sendButton.disabled = true;
+        status.textContent = "Sending...";
+        try {
+          const result = await otp.issue({ phoneNumber, purpose: "signup", idempotencyKey: pending.key });
+          pending = null;
+          issueId = result.issueId;
+          verifyForm.hidden = false;
+          status.textContent = "Code sent.";
+          cooldownUntil = Date.now() + RESEND_COOLDOWN_MS;
+        } catch (error) {
+          if (!KOtp.isOtpApiError(error)) throw error;
+          if (!error.retryable) pending = null; // definitive: next send is new
+          if (error.retryAfterMs) cooldownUntil = Date.now() + error.retryAfterMs;
+          status.textContent =
+            error.code === "PAYMENT_REQUIRED" ? "Sending is temporarily unavailable."
+            : error.code === "FORBIDDEN" ? "This origin is not allowed for the public key."
+            : error.retryable ? "Could not confirm the code was sent. Retrying is safe."
+            : `Could not send the code (${error.code}).`;
+        }
+        tick();
+      });
+
+      verifyForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const code = new FormData(verifyForm).get("code");
+        try {
+          const result = await otp.verify({ issueId, code });
+          status.textContent = result.verified
+            ? "Verified!"
+            : result.reasonCode === "MISMATCH"
+              ? `Wrong code, ${result.attemptsRemaining} attempts left.`
+              : `This code can no longer be used (${result.reasonCode}). Request a new one.`;
+        } catch (error) {
+          status.textContent = KOtp.isOtpApiError(error) ? `Verification failed (${error.code}).` : String(error);
+        }
+      });
+    </script>
+  </body>
+</html>

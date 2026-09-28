@@ -110,7 +110,10 @@ const adapterInput = { ...input };
 const react = await import("react");
 const { renderToString } = await import("react-dom/server");
 for (const [label, mod] of [
-  ["react esm", await import(pathToFileURL(dist("sdk-react", "index.js")).href)],
+  [
+    "react esm",
+    await import(pathToFileURL(dist("sdk-react", "index.js")).href),
+  ],
   ["react cjs", require(dist("sdk-react", "index.cjs"))],
 ]) {
   let issue;

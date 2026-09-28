@@ -1,0 +1,20 @@
+{
+  "name": "k-otp-example-vanilla-cdn",
+  "version": "0.0.0",
+  "private": true,
+  "description": "K-OTP issue -> verify from a single static HTML page with the window.KOtp script bundle",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "node serve.ts",
+    "build": "node build.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@k-otp/sdk-core": "workspace:*",
+    "@types/node": "^22.18.0",
+    "typescript": "~5.9.3"
+  }
+}

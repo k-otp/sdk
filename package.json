@@ -47,8 +47,9 @@
     "sync:openapi": "bun run scripts/sync-openapi.ts",
     "check:pack": "bun run scripts/check-pack.ts",
     "size": "bun run scripts/size-report.ts",
-    "check": "bun run typecheck && bun run lint && bun run test && bun run build && bun run check:pack && bun run smoke:dist && bun run size",
-    "smoke:dist": "node scripts/smoke-dist.mjs"
+    "check": "bun run typecheck && bun run lint && bun run test && bun run build && bun run check:pack && bun run smoke:dist && bun run size && bun run check:examples",
+    "smoke:dist": "node scripts/smoke-dist.mjs",
+    "check:examples": "bun run scripts/check-examples.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
