@@ -1,6 +1,6 @@
 {
   "name": "@k-otp/sdk-core",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Framework-agnostic K-OTP (Korean OTP API) client: issue and verify one-time passwords from browsers, SSR and edge runtimes.",
   "keywords": [
     "k-otp",
@@ -68,14 +68,14 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "engines": {
     "node": ">=20.19"
   },
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "scripts": {
     "build": "rm -rf dist && tsdown",

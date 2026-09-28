@@ -1,0 +1,24 @@
+# Sampo configuration for k-otp-sdk
+version = 1
+
+[git]
+default_branch = "main"
+
+[github]
+repository = "k-otp/k-otp-sdk"
+
+[packages]
+# Ignore any package that can't be published (e.g. "private": true).
+ignore_unpublished = true
+
+# Keep the workspace root and examples out of versioning/release flows.
+ignore = [
+  "npm/k-otp-sdk-workspace",
+]
+
+# Lockstep versioning for every published @k-otp/sdk-* package. Add future
+# adapters (sdk-react, sdk-vue, sdk-svelte) to this group.
+fixed = [[
+  "npm/@k-otp/sdk-core",
+  "npm/@k-otp/sdk-server",
+]]

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices", ":dependencyDashboard"],
+  "timezone": "Asia/Seoul",
+  "labels": ["dependencies"],
+  "rangeStrategy": "bump",
+  "prConcurrentLimit": 5,
+  "schedule": ["before 9am on the first day of the month"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 9am on the first day of the month"],
+    "groupName": "monthly lock file maintenance"
+  },
+  "ignorePaths": ["**/node_modules/**"],
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions monthly"
+    },
+    {
+      "matchManagers": ["npm", "bun"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true,
+      "automerge": false,
+      "groupName": "major dependency updates"
+    },
+    {
+      "matchManagers": ["npm", "bun"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "monthly dependency maintenance"
+    },
+    {
+      "description": "oRPC is a runtime dependency of @k-otp/sdk-core: keep all packages aligned and review bundle size.",
+      "matchPackageNames": ["@orpc/**"],
+      "groupName": "orpc runtime",
+      "automerge": false
+    },
+    {
+      "matchPackageNames": [
+        "@types/bun",
+        "typescript",
+        "ttsc",
+        "@ttsc/lint",
+        "tsdown",
+        "@biomejs/biome"
+      ],
+      "groupName": "typescript toolchain monthly"
+    },
+    {
+      "matchFileNames": ["examples/**/package.json"],
+      "groupName": "examples monthly"
+    }
+  ]
+}

@@ -43,6 +43,7 @@ const ALLOWED_TOP_LEVEL = new Set([
   "dist",
   "package.json",
   "README.md",
+  "CHANGELOG.md",
   "LICENSE",
 ]);
 

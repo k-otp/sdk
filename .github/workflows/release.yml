@@ -1,0 +1,124 @@
+name: Release
+
+# On every push to main:
+# 1. If unpublished versions exist AND npm Trusted Publishing is enabled
+#    (repository variable NPM_TRUSTED_PUBLISHING == 'true'), publish them.
+# 2. Otherwise, while changesets are pending, keep the `sampo/release` PR
+#    (version bumps + changelogs) up to date.
+#
+# Until the owner finishes the steps in docs/releasing.md this workflow only
+# maintains the release PR and never publishes.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BUN_VERSION: "1.4.2"
+  NODE_VERSION: "24"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node (npm OIDC)
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Publish check
+        id: publish_check
+        run: ./scripts/publish-oidc.sh --check
+
+      - name: Trusted publishing gate
+        id: gate
+        env:
+          TRUSTED_PUBLISHING: ${{ vars.NPM_TRUSTED_PUBLISHING }}
+        run: |
+          if [[ "${TRUSTED_PUBLISHING:-}" == "true" ]]; then
+            echo "enabled=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >>"$GITHUB_OUTPUT"
+            if [[ "${{ steps.publish_check.outputs.should_publish }}" == "true" ]]; then
+              echo "::warning::Unpublished versions exist, but npm Trusted Publishing is not enabled (set repository variable NPM_TRUSTED_PUBLISHING=true after following docs/releasing.md). Skipping publish."
+            fi
+          fi
+
+      - name: Detect pending changesets
+        id: changesets
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          has_changesets=false
+          for f in .sampo/changesets/*.md; do
+            has_changesets=true
+            break
+          done
+          echo "has_changesets=${has_changesets}" >>"$GITHUB_OUTPUT"
+
+      - name: Run Sampo (release PR)
+        if: ${{ steps.changesets.outputs.has_changesets == 'true' && steps.publish_check.outputs.should_publish != 'true' }}
+        id: sampo
+        uses: bruits/sampo/crates/sampo-github-action@main
+        with:
+          command: auto
+          create-github-release: false
+          base-branch: main
+          pr-branch: sampo/release
+          pr-title: "chore(release): publish"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trigger CI for release PR branch
+        if: ${{ steps.sampo.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin sampo/release >/dev/null 2>&1; then
+            gh workflow run ci.yml --ref sampo/release
+          else
+            echo "sampo/release branch not found; skipping CI dispatch."
+          fi
+
+      - name: Install dependencies
+        if: ${{ steps.publish_check.outputs.should_publish == 'true' && steps.gate.outputs.enabled == 'true' }}
+        run: bun install --frozen-lockfile
+
+      - name: Pre-publish verification
+        if: ${{ steps.publish_check.outputs.should_publish == 'true' && steps.gate.outputs.enabled == 'true' }}
+        run: |
+          set -euo pipefail
+          bun run typecheck
+          bun run check:openapi
+          bun run test
+
+      - name: Publish packages (npm OIDC)
+        if: ${{ steps.publish_check.outputs.should_publish == 'true' && steps.gate.outputs.enabled == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/publish-oidc.sh

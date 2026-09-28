@@ -15,7 +15,7 @@
     },
     "packages/sdk-core": {
       "name": "@k-otp/sdk-core",
-      "version": "0.1.0",
+      "version": "0.0.0",
       "dependencies": {
         "@orpc/client": "catalog:",
         "@orpc/contract": "catalog:",
@@ -24,7 +24,7 @@
     },
     "packages/sdk-server": {
       "name": "@k-otp/sdk-server",
-      "version": "0.1.0",
+      "version": "0.0.0",
       "dependencies": {
         "@k-otp/sdk-core": "workspace:*",
       },
