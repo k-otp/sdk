@@ -90,7 +90,7 @@ input after an ambiguous failure (`TIMEOUT`, `NETWORK_ERROR`, 5xx, 429,
 `ABORTED`) and drops it after a success or a definitive error. Server
 `retryAfterMs` starts a cooldown like `resendCooldownMs`; the countdown ticks
 about once a second while the store has subscribers. Actions that cannot run
-resolve with `{ skipped: "cooldown" | "busy" | "no-issue" | "no-previous-send" }`.
+resolve with `{ skipped: "cooldown" | "busy" | "no-issue" | "no-previous-send" | "terminal" }`.
 
 ### `setOtpContext(storesOrClientOrOptions)` / `getOtpContext()`
 

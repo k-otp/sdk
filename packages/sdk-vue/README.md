@@ -130,7 +130,7 @@ input after an ambiguous failure (`TIMEOUT`, `NETWORK_ERROR`, 5xx, 429,
 `ABORTED`) and drops it after a success or a definitive error. Server
 `retryAfterMs` starts a cooldown like `resendCooldownMs`. Actions that cannot
 run resolve with `{ skipped: "cooldown" | "busy" | "no-issue" |
-"no-previous-send" }`. See the
+"no-previous-send" | "terminal" }`. See the
 [issue -> verify UX guide](../../docs/issue-verify-ux.md).
 
 ## Runtime notes

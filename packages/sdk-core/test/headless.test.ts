@@ -354,6 +354,77 @@ describe("createOtpFlow", () => {
     expect(state.canVerify).toBe(true);
   });
 
+  test("skips verify while a send is in flight and after a terminal outcome", async () => {
+    const gate = deferred<Response>();
+    let issues = 0;
+    const { flow, calls } = setup((r) => {
+      if (!r.url.pathname.endsWith("/issue")) return json(200, verifyOutput);
+      issues++;
+      return issues === 1 ? json(200, issueOutput) : gate.promise;
+    });
+    await flow.send(sendInput);
+    const resend = flow.resend();
+    expect((await flow.verify("123456")).skipped).toBe("busy");
+    gate.resolve(json(200, { ...issueOutput, issueId: "i_2" }));
+    await resend;
+    expect((await flow.verify("123456")).data).toEqual(verifyOutput);
+    expect(flow.getState().verified).toBe(true);
+    // Verifying again would only yield ALREADY_VERIFIED and flip `verified`.
+    expect((await flow.verify("123456")).skipped).toBe("terminal");
+    expect(flow.getState().verified).toBe(true);
+    expect(
+      calls.filter((c) => c.url.pathname.endsWith("/verify")),
+    ).toHaveLength(1);
+  });
+
+  test("a verify superseded by a newer send does not write its outcome", async () => {
+    const { flow } = setup((r) =>
+      r.url.pathname.endsWith("/issue")
+        ? json(200, issueOutput)
+        : hangUntilAborted(r.signal),
+    );
+    await flow.send(sendInput);
+    const verifying = flow.verify("123456");
+    await flow.resend();
+    expect((await verifying).error?.code).toBe("ABORTED");
+    const state = flow.getState();
+    expect(state.error).toBeUndefined();
+    expect(state.verifyState.status).toBe("idle");
+    expect(state.canVerify).toBe(true);
+  });
+
+  test("abort notifies subscribers so isLoading does not stay stuck", async () => {
+    const { flow } = setup((r) => hangUntilAborted(r.signal));
+    const seen: boolean[] = [];
+    const unsubscribe = flow.subscribe(() =>
+      seen.push(flow.getState().isLoading),
+    );
+    const pending = flow.send(sendInput);
+    flow.abort();
+    await pending;
+    unsubscribe();
+    expect(seen).toEqual([true, false]);
+    expect(flow.getState().isLoading).toBe(false);
+  });
+
+  test("a rejected call (TypeError) publishes a fresh snapshot before rethrowing", async () => {
+    const flow = createOtpFlow(
+      {
+        issue: async () => {
+          throw new TypeError("bad config");
+        },
+        verify: async () => verifyOutput,
+      },
+      { resendCooldownMs: 0 },
+    );
+    const seen: boolean[] = [];
+    flow.subscribe(() => seen.push(flow.getState().isLoading));
+    const error = await flow.send(sendInput).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect(seen).toEqual([true, false]);
+    expect(flow.getState().isLoading).toBe(false);
+  });
+
   test("reset clears the flow but keeps the cooldown", async () => {
     let clock = 0;
     const { flow } = setup(() => json(200, issueOutput), {

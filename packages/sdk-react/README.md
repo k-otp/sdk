@@ -141,7 +141,7 @@ is called again with the same input after an ambiguous failure (`TIMEOUT`,
 definitive error (400/401/402/403/409), so the next send is a new attempt.
 Server `retryAfterMs` (429/503) starts a cooldown just like
 `resendCooldownMs`. Actions that cannot run resolve with
-`{ skipped: "cooldown" | "busy" | "no-issue" | "no-previous-send" }`.
+`{ skipped: "cooldown" | "busy" | "no-issue" | "no-previous-send" | "terminal" }`.
 Options are read when the flow is created.
 
 ## Runtime notes

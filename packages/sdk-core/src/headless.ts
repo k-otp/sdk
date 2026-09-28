@@ -196,10 +196,18 @@ export const createOtpOperation = <TInput, TResult>(
 export type OtpFlowSkipReason =
   /** A resend cooldown (local or server `retryAfterMs`) is active. */
   | "cooldown"
-  /** The same operation is already in flight. */
+  /**
+   * The same operation is already in flight (for `verify`, also while a
+   * `send` is in flight, since it may replace the current `issueId`).
+   */
   | "busy"
   /** `verify` was called before a successful `send`. */
   | "no-issue"
+  /**
+   * `verify` was called after the current code was verified or can no longer
+   * be used (`EXPIRED`, `MAX_ATTEMPTS`, `REPLACED`, ...). `send` a new one.
+   */
+  | "terminal"
   /** `resend` was called before any `send`. */
   | "no-previous-send";
 
@@ -274,7 +282,10 @@ export type OtpFlowController = {
   ) => Promise<OtpFlowResult<IssueResult>>;
   /** `send` with the input of the previous `send`. */
   resend: (options?: OtpRequestOptions) => Promise<OtpFlowResult<IssueResult>>;
-  /** Verifies `code` against the latest `issueId`. */
+  /**
+   * Verifies `code` against the latest `issueId`. Skipped while a `send` is
+   * in flight and after a terminal outcome (see {@link OtpFlowSkipReason}).
+   */
   verify: (
     code: string,
     options?: OtpRequestOptions,
@@ -284,39 +295,38 @@ export type OtpFlowController = {
    * server-side rate limits do not reset either.
    */
   reset: () => void;
-  /** Aborts in-flight calls (e.g. on unmount). */
+  /** Aborts in-flight calls (e.g. on unmount) and notifies subscribers. */
   abort: () => void;
 };
 
 /** Default local resend cooldown of `createOtpFlow` (30 seconds). */
 export const DEFAULT_RESEND_COOLDOWN_MS = 30_000;
 
-/** Outcome may have reached the server: retry with the same key. */
-const AMBIGUOUS_CODES: ReadonlySet<string> = new Set([
-  "TOO_MANY_REQUESTS",
-  "INTERNAL_SERVER_ERROR",
-  "SERVICE_UNAVAILABLE",
-  "TIMEOUT",
-  "NETWORK_ERROR",
-  "ABORTED",
-]);
+/**
+ * Outcome may have reached the server: retry with the same key. Every
+ * `retryable` error, plus an abort (the request may already have been sent).
+ */
+const isAmbiguous = (error: OtpApiError): boolean =>
+  error.retryable || error.code === "ABORTED";
 
 /** Verification outcomes after which the issued code can no longer be used. */
-const TERMINAL_REASONS: ReadonlySet<string> = new Set([
-  "MAX_ATTEMPTS",
-  "EXPIRED",
-  "REPLACED",
-  "NOT_FOUND",
-  "ALREADY_VERIFIED",
-]);
+const TERMINAL_REASONS: ReadonlySet<VerifyReasonCode> =
+  new Set<VerifyReasonCode>([
+    "MAX_ATTEMPTS",
+    "EXPIRED",
+    "REPLACED",
+    "NOT_FOUND",
+    "ALREADY_VERIFIED",
+  ]);
 
 /** Deterministic JSON for comparing inputs (object keys sorted). */
 const fingerprint = (value: unknown): string =>
   JSON.stringify(value, (_key, v: unknown) =>
     v && typeof v === "object" && !Array.isArray(v)
       ? Object.fromEntries(
+          // Object keys are unique, so `a === b` never happens.
           Object.entries(v as Record<string, unknown>).sort(([a], [b]) =>
-            a < b ? -1 : a > b ? 1 : 0,
+            a < b ? -1 : 1,
           ),
         )
       : v,
@@ -359,6 +369,13 @@ export const createOtpFlow = (
   const remaining = (): number =>
     cooldownUntil === undefined ? 0 : Math.max(0, cooldownUntil - now());
 
+  /** The current code was verified or can no longer be used. */
+  const isTerminal = (): boolean =>
+    verifyResult !== undefined &&
+    (verifyResult.verified ||
+      (verifyResult.reasonCode !== undefined &&
+        TERMINAL_REASONS.has(verifyResult.reasonCode)));
+
   const build = (): OtpFlowState => {
     const issue = issueOp.getState();
     const verify = verifyOp.getState();
@@ -384,10 +401,9 @@ export const createOtpFlow = (
       canSend: !issue.isLoading && cooldownRemainingMs === 0,
       canVerify:
         issued !== undefined &&
-        !verified &&
         !verify.isLoading &&
         !issue.isLoading &&
-        !(reasonCode && TERMINAL_REASONS.has(reasonCode)),
+        !isTerminal(),
     };
   };
 
@@ -428,6 +444,20 @@ export const createOtpFlow = (
     }
   };
 
+  /**
+   * Awaits an operation run. A rejection (a programmer error such as a
+   * TypeError) is rethrown after publishing a fresh snapshot, so subscribers
+   * never keep a stale "loading" state.
+   */
+  const settle = async <T>(promise: Promise<T>): Promise<T> => {
+    try {
+      return await promise;
+    } catch (error) {
+      notify();
+      throw error;
+    }
+  };
+
   const skip = <T>(reason: OtpFlowSkipReason): OtpFlowResult<T> => ({
     data: undefined,
     error: undefined,
@@ -450,11 +480,11 @@ export const createOtpFlow = (
       requestOptions,
     );
     notify();
-    const result = await promise;
+    const result = await settle(promise);
     if (current !== generation) return result;
     if (result.error) {
       lastError = result.error;
-      if (!AMBIGUOUS_CODES.has(result.error.code) && pending === attempt) {
+      if (!isAmbiguous(result.error) && pending === attempt) {
         pending = undefined;
       }
       startCooldown(result.error.retryAfterMs);
@@ -472,15 +502,20 @@ export const createOtpFlow = (
 
   const verify: OtpFlowController["verify"] = async (code, requestOptions) => {
     if (!issued) return skip("no-issue");
-    if (verifyOp.getState().isLoading) return skip("busy");
+    if (verifyOp.getState().isLoading || issueOp.getState().isLoading) {
+      return skip("busy");
+    }
+    if (isTerminal()) return skip("terminal");
     const current = generation;
+    const target = issued;
     const promise = verifyOp.run(
-      { issueId: issued.issueId, code },
+      { issueId: target.issueId, code },
       requestOptions,
     );
     notify();
-    const result = await promise;
-    if (current !== generation) return result;
+    const result = await settle(promise);
+    // A newer send replaced the code (and aborted this call): drop the outcome.
+    if (current !== generation || issued !== target) return result;
     if (result.error) {
       lastError = result.error;
     } else {
@@ -495,7 +530,9 @@ export const createOtpFlow = (
     generation++;
     issueOp.abort();
     verifyOp.abort();
-    snapshot = build();
+    // Subscribers (e.g. a "cancel" button) must see isLoading flip back.
+    // After an unmount nobody is subscribed, so this only refreshes the snapshot.
+    notify();
   };
 
   return {

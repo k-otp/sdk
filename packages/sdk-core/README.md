@@ -185,7 +185,7 @@ flow.getState(); // issueId, verified, reasonCode, error, canSend, canVerify,
 - Cooldown: `resendCooldownMs` (default `DEFAULT_RESEND_COOLDOWN_MS`, 30 s)
   after each successful send, and the server's `retryAfterMs` on 429/503.
 - Actions never reject for API errors; blocked actions resolve with
-  `{ skipped: "cooldown" | "busy" | "no-issue" | "no-previous-send" }`.
+  `{ skipped: "cooldown" | "busy" | "no-issue" | "no-previous-send" | "terminal" }`.
 - `verified: false` with `EXPIRED`, `MAX_ATTEMPTS`, `REPLACED`, `NOT_FOUND`
   or `ALREADY_VERIFIED` is terminal for that code (`canVerify` becomes false).
 - `reset()` clears the flow but keeps the cooldown; `abort()` cancels
