@@ -49,6 +49,17 @@ describe("HTTP error envelope mapping", () => {
     expect(error.retryable).toBe(retryable);
   });
 
+  test("prefers X-Request-Id over request-id and cf-ray", async () => {
+    const error = await verify(() =>
+      errorEnvelope(403, "FORBIDDEN", "no", undefined, {
+        "cf-ray": "8a1b2c3d4e-ICN",
+        "request-id": "other",
+        "X-Request-Id": "req_preferred",
+      }),
+    );
+    expect(error.requestId).toBe("req_preferred");
+  });
+
   test("undefined server errors (defined: false) keep their code", async () => {
     const error = await verify(() =>
       json(500, {

@@ -1,8 +1,8 @@
 {
   "info": {
     "title": "k-otp API",
-    "version": "1.1.0",
-    "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`."
+    "version": "1.2.0",
+    "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`.\n\n**Request id.** Every response carries `X-Request-Id` (also exposed to allowed browser origins via CORS).\nA request `X-Request-Id` matching `^[A-Za-z0-9._:-]{8,128}$` is echoed; otherwise the API generates one.\nQuote it when contacting support."
   },
   "servers": [
     {
@@ -1016,6 +1016,18 @@
         ],
         "description": "Definition of one template variable."
       }
+    },
+    "headers": {
+      "XRequestId": {
+        "description": "Opaque request correlation id, present on every response (success and error). Echoes the request `X-Request-Id` when it matches `^[A-Za-z0-9._:-]{8,128}$`; otherwise a generated UUID. Quote it when contacting support.",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{8,128}$",
+          "minLength": 8,
+          "maxLength": 128
+        }
+      }
     }
   },
   "openapi": "3.1.1",
@@ -1145,6 +1157,11 @@
                   "description": "Result of `POST /v1/issue`. The OTP code itself is never returned."
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "400": {
@@ -1204,6 +1221,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -1265,6 +1287,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "402": {
@@ -1320,6 +1347,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -1381,6 +1413,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "409": {
@@ -1440,6 +1477,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -1501,6 +1543,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "503": {
@@ -1560,6 +1607,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           }
@@ -1688,6 +1740,11 @@
                   "description": "Result of `POST /v1/verify`. A failed verification is still a 200 response\nwith `verified: false` and a `reasonCode`."
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "400": {
@@ -1747,6 +1804,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -1808,6 +1870,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "403": {
@@ -1867,6 +1934,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -1928,6 +2000,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "500": {
@@ -1988,6 +2065,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "503": {
@@ -2047,6 +2129,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           }
@@ -2232,6 +2319,11 @@
                   "description": "Status of a single issue. The phone number is never included."
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "400": {
@@ -2291,6 +2383,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -2352,6 +2449,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "403": {
@@ -2411,6 +2513,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -2472,6 +2579,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "409": {
@@ -2531,6 +2643,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -2592,6 +2709,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "503": {
@@ -2651,6 +2773,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           }
@@ -2787,6 +2914,11 @@
                   "description": "One page of `GET /v1/issues`, newest first."
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "400": {
@@ -2846,6 +2978,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -2907,6 +3044,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "403": {
@@ -2966,6 +3108,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -3027,6 +3174,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "500": {
@@ -3087,6 +3239,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "503": {
@@ -3146,6 +3303,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           }
@@ -3349,6 +3511,11 @@
                   "description": "PII-free dashboard projection. Phone identifiers, OTP material, provider\npayloads, idempotency values, and free-form metadata are intentionally absent."
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "400": {
@@ -3408,6 +3575,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -3469,6 +3641,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "403": {
@@ -3528,6 +3705,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -3589,6 +3771,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "409": {
@@ -3648,6 +3835,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -3709,6 +3901,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "503": {
@@ -3768,6 +3965,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           }
@@ -3901,6 +4103,11 @@
                   "description": "One page of `GET /v1/credit-ledger`, newest first."
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "400": {
@@ -3961,6 +4168,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "401": {
@@ -4020,6 +4232,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -4081,6 +4298,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "409": {
@@ -4140,6 +4362,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -4201,6 +4428,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "503": {
@@ -4260,6 +4492,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           }
@@ -4321,6 +4558,11 @@
                   "description": "Credit wallet balance of the authenticated app."
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "400": {
@@ -4381,6 +4623,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "401": {
@@ -4440,6 +4687,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -4501,6 +4753,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "409": {
@@ -4560,6 +4817,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -4621,6 +4883,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "503": {
@@ -4681,6 +4948,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           }
         },
@@ -4736,6 +5008,11 @@
                   ],
                   "description": "All templates available to the authenticated app."
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -4797,6 +5074,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "401": {
@@ -4856,6 +5138,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -4917,6 +5204,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "409": {
@@ -4976,6 +5268,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -5037,6 +5334,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "503": {
@@ -5096,6 +5398,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           }
@@ -5181,6 +5488,11 @@
                   "description": "Template detail returned by `GET /v1/templates/{templateId}`."
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "400": {
@@ -5240,6 +5552,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -5301,6 +5618,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "403": {
@@ -5360,6 +5682,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -5421,6 +5748,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "409": {
@@ -5480,6 +5812,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           },
@@ -5541,6 +5878,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              }
             }
           },
           "503": {
@@ -5600,6 +5942,11 @@
                     }
                   ]
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
               }
             }
           }
