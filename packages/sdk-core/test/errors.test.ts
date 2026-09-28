@@ -128,6 +128,31 @@ describe("HTTP error envelope mapping", () => {
   });
 });
 
+describe("interrupted responses", () => {
+  test("a body stream that fails after the headers maps to NETWORK_ERROR", async () => {
+    const error = await verify(
+      () =>
+        new Response(
+          new ReadableStream({
+            start: (controller) =>
+              controller.error(new TypeError("terminated")),
+          }),
+          {
+            status: 200,
+            headers: {
+              "content-type": "application/json",
+              "x-request-id": "req_1",
+            },
+          },
+        ),
+    );
+    expect(error.code).toBe("NETWORK_ERROR");
+    expect(error.status).toBe(0);
+    expect(error.retryable).toBe(true);
+    expect(error.requestId).toBe("req_1");
+  });
+});
+
 describe("Retry-After", () => {
   test("delta-seconds header", async () => {
     const error = await verify(() =>

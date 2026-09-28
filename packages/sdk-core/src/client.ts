@@ -1,4 +1,5 @@
 import { otpPublicContract } from "./contract";
+import { isBrowser } from "./env";
 import { issueWith, verifyWith } from "./operations";
 import {
   createOtpTransport,
@@ -16,6 +17,10 @@ export type OtpClientOptions = OtpTransportOptions & {
   /**
    * Allow an `sk_` secret key when running in a browser. Never do this in
    * production: anyone can read the key from your bundle.
+   *
+   * The guard only detects browser pages (`window` + `document`). It cannot
+   * tell a browser Web/Service Worker from a server-side edge runtime, so it
+   * does not fire there: never ship an `sk_` key in a worker bundle either.
    */
   dangerouslyAllowSecretKeyInBrowser?: boolean;
 };
@@ -32,10 +37,6 @@ export type OtpClient = {
     options?: OtpRequestOptions,
   ) => Promise<VerifyResult>;
 };
-
-const isBrowser = (): boolean =>
-  typeof (globalThis as { window?: unknown }).window !== "undefined" &&
-  typeof (globalThis as { document?: unknown }).document !== "undefined";
 
 /**
  * Creates an `issue`/`verify` client. Creation performs no I/O and never

@@ -6,6 +6,8 @@
  * failure, abort, or a client-side validation failure before any request).
  */
 
+import type { IssueOtpPaymentErrorData } from "./generated/openapi";
+
 /** All normalized error codes. */
 export const OTP_API_ERROR_CODES = [
   "BAD_REQUEST",
@@ -25,9 +27,12 @@ export const OTP_API_ERROR_CODES = [
 
 export type OtpApiErrorCode = (typeof OTP_API_ERROR_CODES)[number];
 
-/** `data` of a 402 PAYMENT_REQUIRED error from `issue`. */
+/**
+ * `data` of a 402 PAYMENT_REQUIRED error from `issue`: the generated wire type,
+ * open to reasons a newer API version may add.
+ */
 export type OtpPaymentRequiredData = {
-  code: "INSUFFICIENT_CREDIT" | "OVERDRAFT_LIMIT_EXCEEDED" | (string & {});
+  code: IssueOtpPaymentErrorData["code"] | (string & {});
 };
 
 export type OtpApiErrorOptions = {
@@ -235,11 +240,9 @@ export const otpErrorFromResponse = (
     typeof envelope?.message === "string" && envelope.message
       ? envelope.message
       : `K-OTP API request failed with HTTP ${status}`;
-  const data = envelope
-    ? envelope.data
-    : typeof body === "string" && body
-      ? body
-      : undefined;
+  let data: unknown;
+  if (envelope) data = envelope.data;
+  else if (typeof body === "string" && body) data = body;
   return new OtpApiError({
     code,
     status,

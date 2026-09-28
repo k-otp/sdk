@@ -14,7 +14,7 @@ const randomUuid = (): string => {
     return cryptoApi.randomUUID();
   }
   if (typeof cryptoApi?.getRandomValues !== "function") {
-    throw new Error(
+    throw new TypeError(
       "createIdempotencyKey() needs Web Crypto (globalThis.crypto). Pass your own unique key instead.",
     );
   }

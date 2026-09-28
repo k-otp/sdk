@@ -9,6 +9,7 @@
 import { createORPCClient, type ORPCError } from "@orpc/client";
 import type { AnyContractRouter, ContractRouterClient } from "@orpc/contract";
 import { OpenAPILink } from "@orpc/openapi-client/fetch";
+import { isBrowser } from "./env";
 import {
   isOtpApiError,
   normalizeOtpApiError,
@@ -60,7 +61,10 @@ export type OtpTransportOptions = {
   fetch?: typeof fetch;
   /** Per-request timeout in ms. Default: 10000. `0` disables it. */
   timeoutMs?: number;
-  /** Extra request headers. `authorization` cannot be overridden. */
+  /**
+   * Extra request headers. `authorization` and `idempotency-key` are set by
+   * the SDK and cannot be overridden here.
+   */
   headers?: Record<string, string>;
   hooks?: OtpTelemetryHooks;
 };
@@ -118,13 +122,17 @@ export const resolveBaseUrl = (baseUrl: string): string => {
   );
 };
 
-/** Header merge where `required` wins (case-insensitively). */
+/**
+ * Header merge where `required` wins (case-insensitively) and `reserved`
+ * names are dropped from `optional`.
+ */
 export const mergeHeaders = (
   required: Record<string, string>,
   optional: Record<string, string> | undefined,
+  reserved: readonly string[] = [],
 ): Record<string, string> => {
   const requiredNames = new Set(
-    Object.keys(required).map((name) => name.toLowerCase()),
+    [...Object.keys(required), ...reserved].map((name) => name.toLowerCase()),
   );
   const merged: Record<string, string> = {};
   for (const [name, value] of Object.entries(optional ?? {})) {
@@ -182,9 +190,11 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
   const link = new OpenAPILink<TransportContext>(contract, {
     url: baseUrl,
     headers: ({ context }) =>
+      // The per-call idempotency key (issue) must always be authoritative.
       mergeHeaders(
         { authorization: `Bearer ${context.apiKey}` },
         options.headers,
+        ["idempotency-key"],
       ),
     fetch: async (request, init, callOptions) => {
       callOptions.context.capture.fetchStarted = true;
@@ -292,12 +302,18 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
  * no CORS headers when a pk_ key is used from an origin outside its
  * allowedOrigins, so that is the most common cause in browsers.
  */
-export const BROWSER_NETWORK_HINT: string =
+const BROWSER_NETWORK_HINT: string =
   " (In a browser this is also how a CORS rejection looks: if it works with curl, check that this page's origin is listed exactly - scheme, host and port - in the pk_ key's allowedOrigins.)";
 
-const inBrowser = (): boolean =>
-  typeof (globalThis as { window?: unknown }).window !== "undefined" &&
-  typeof (globalThis as { document?: unknown }).document !== "undefined";
+/** The error or one of its causes (oRPC wraps body read failures). */
+const findTypeError = (error: unknown): TypeError | undefined => {
+  let current = error;
+  for (let depth = 0; depth < 3 && current instanceof Error; depth++) {
+    if (current instanceof TypeError) return current;
+    current = current.cause;
+  }
+  return undefined;
+};
 
 const normalizeTransportError = (
   error: unknown,
@@ -339,6 +355,18 @@ const normalizeTransportError = (
         cause: error,
       });
     }
+    const interrupted = findTypeError(error);
+    if (interrupted) {
+      // The connection failed while the body was being read (a body that is
+      // not valid JSON is a SyntaxError instead): same as a network failure.
+      return new OtpApiError({
+        code: "NETWORK_ERROR",
+        status: 0,
+        message: `K-OTP API response was interrupted: ${interrupted.message}`,
+        requestId: readRequestId(headers),
+        cause: error,
+      });
+    }
     return new OtpApiError({
       code: "UNKNOWN",
       status,
@@ -355,7 +383,7 @@ const normalizeTransportError = (
       status: 0,
       message: `K-OTP API request failed: ${
         error instanceof Error ? error.message : String(error)
-      }${inBrowser() ? BROWSER_NETWORK_HINT : ""}`,
+      }${isBrowser() ? BROWSER_NETWORK_HINT : ""}`,
       cause: error,
     });
   }

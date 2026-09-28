@@ -75,7 +75,11 @@ describe("issue", () => {
       baseUrl: "http://localhost:8788/v1/",
       apiKey: "pk_test",
       fetch,
-      headers: { "x-app-version": "1.2.3", Authorization: "Bearer evil" },
+      headers: {
+        "x-app-version": "1.2.3",
+        Authorization: "Bearer evil",
+        "Idempotency-Key": "stale-client-level-key",
+      },
     });
 
     const result = await client.issue({
