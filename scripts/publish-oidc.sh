@@ -36,6 +36,9 @@ fi
 PACKAGE_DIRS=(
   "packages/sdk-core"
   "packages/sdk-server"
+  "packages/sdk-react"
+  "packages/sdk-vue"
+  "packages/sdk-svelte"
 )
 
 pkg_field() {

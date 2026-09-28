@@ -54,8 +54,13 @@
     "@biomejs/biome": "catalog:",
     "@ttsc/lint": "catalog:",
     "@types/bun": "catalog:",
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "svelte": "catalog:",
     "tsdown": "catalog:",
     "ttsc": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vue": "catalog:"
   }
 }

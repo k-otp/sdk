@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Loads the BUILT packages with plain Node.js (ESM import, CJS require, and the
-// IIFE bundle in a vm context) and performs one mocked call through each.
+// IIFE bundle in a vm context) and performs one mocked call through each. The
+// adapters are exercised the way SSR frameworks load them: React through
+// react-dom/server, Vue through vue/server-renderer, Svelte stores directly.
 // Run after `bun run build`: `node scripts/smoke-dist.mjs`.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -102,3 +104,56 @@ assert.throws(
   /Refusing to use an sk_ secret key/,
 );
 console.log("ok - iife (window.KOtp)");
+
+// Adapters.
+const adapterInput = { ...input };
+const react = await import("react");
+const { renderToString } = await import("react-dom/server");
+for (const [label, mod] of [
+  ["react esm", await import(pathToFileURL(dist("sdk-react", "index.js")).href)],
+  ["react cjs", require(dist("sdk-react", "index.cjs"))],
+]) {
+  let issue;
+  const View = () => {
+    issue = mod.useOtpIssue();
+    return react.createElement("p", null, issue.status);
+  };
+  const html = renderToString(
+    react.createElement(
+      mod.OtpProvider,
+      { options: { apiKey: "pk_smoke", fetch } },
+      react.createElement(View),
+    ),
+  );
+  assert.equal(html, "<p>idle</p>", label);
+  const result = await issue.run(adapterInput);
+  assert.deepEqual(result.data, issueOutput, label);
+  console.log(`ok - ${label}`);
+}
+
+const vue = await import("vue");
+const { renderToString: renderVue } = await import("vue/server-renderer");
+for (const [label, mod] of [
+  ["vue esm", await import(pathToFileURL(dist("sdk-vue", "index.js")).href)],
+  ["vue cjs", require(dist("sdk-vue", "index.cjs"))],
+]) {
+  let otp;
+  const app = vue.createSSRApp({
+    setup: () => {
+      otp = mod.useOtp();
+      return () => vue.h("p", otp.issue.status.value);
+    },
+  });
+  app.use(mod.createOtpPlugin({ apiKey: "pk_smoke", fetch }));
+  assert.equal(await renderVue(app), "<p>idle</p>", label);
+  const result = await otp.issue.run(adapterInput);
+  assert.deepEqual(result.data, issueOutput, label);
+  assert.equal(otp.issue.status.value, "success", label);
+  console.log(`ok - ${label}`);
+}
+
+const svelte = await import(pathToFileURL(dist("sdk-svelte", "index.js")).href);
+const stores = svelte.createOtpStores({ apiKey: "pk_smoke", fetch });
+const svelteResult = await stores.issue.run(adapterInput);
+assert.deepEqual(svelteResult.data, issueOutput, "svelte esm");
+console.log("ok - svelte esm");

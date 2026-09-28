@@ -11,14 +11,19 @@ repository = "k-otp/k-otp-sdk"
 # Ignore any package that can't be published (e.g. "private": true).
 ignore_unpublished = true
 
-# Keep the workspace root and examples out of versioning/release flows.
+# Keep the workspace root, tests and examples out of versioning/release flows
+# (they are private as well).
 ignore = [
   "npm/k-otp-sdk-workspace",
+  "npm/k-otp-sdk-tests",
+  "npm/k-otp-example-*",
 ]
 
-# Lockstep versioning for every published @k-otp/sdk-* package. Add future
-# adapters (sdk-react, sdk-vue, sdk-svelte) to this group.
+# Lockstep versioning for every published @k-otp/sdk-* package.
 fixed = [[
   "npm/@k-otp/sdk-core",
   "npm/@k-otp/sdk-server",
+  "npm/@k-otp/sdk-react",
+  "npm/@k-otp/sdk-vue",
+  "npm/@k-otp/sdk-svelte",
 ]]

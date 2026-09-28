@@ -64,8 +64,5 @@
   },
   "peerDependencies": {
     "vue": ">=3.3"
-  },
-  "devDependencies": {
-    "vue": "catalog:"
   }
 }

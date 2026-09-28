@@ -36,9 +36,25 @@ type Manifest = {
 const ALLOWED_DEPENDENCIES: Record<string, readonly string[]> = {
   "@k-otp/sdk-core": ["@orpc/client", "@orpc/contract", "@orpc/openapi-client"],
   "@k-otp/sdk-server": ["@k-otp/sdk-core"],
+  "@k-otp/sdk-react": ["@k-otp/sdk-core", "react"],
+  "@k-otp/sdk-vue": ["@k-otp/sdk-core", "vue"],
+  "@k-otp/sdk-svelte": ["@k-otp/sdk-core", "svelte"],
 };
 
-const PACKAGES = ["packages/sdk-core", "packages/sdk-server"];
+/** Frameworks must be peer dependencies (never bundled or installed twice). */
+const REQUIRED_PEERS: Record<string, readonly string[]> = {
+  "@k-otp/sdk-react": ["react"],
+  "@k-otp/sdk-vue": ["vue"],
+  "@k-otp/sdk-svelte": ["svelte"],
+};
+
+const PACKAGES = [
+  "packages/sdk-core",
+  "packages/sdk-server",
+  "packages/sdk-react",
+  "packages/sdk-vue",
+  "packages/sdk-svelte",
+];
 const ALLOWED_TOP_LEVEL = new Set([
   "dist",
   "package.json",
@@ -193,6 +209,14 @@ try {
     ) {
       // Harmless for consumers, but keep published manifests minimal.
       fail(name, "devDependencies should not be published");
+    }
+    for (const peer of REQUIRED_PEERS[name] ?? []) {
+      if (!manifest.peerDependencies?.[peer]) {
+        fail(name, `${peer} must be a peer dependency`);
+      }
+      if (manifest.dependencies?.[peer]) {
+        fail(name, `${peer} must not be a regular dependency`);
+      }
     }
     const coreRange = manifest.dependencies?.["@k-otp/sdk-core"];
     if (coreRange !== undefined) {

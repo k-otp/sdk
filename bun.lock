@@ -8,9 +8,14 @@
         "@biomejs/biome": "catalog:",
         "@ttsc/lint": "catalog:",
         "@types/bun": "catalog:",
+        "@types/react": "catalog:",
+        "react": "catalog:",
+        "react-dom": "catalog:",
+        "svelte": "catalog:",
         "tsdown": "catalog:",
         "ttsc": "catalog:",
         "typescript": "catalog:",
+        "vue": "catalog:",
       },
     },
     "packages/sdk-core": {
@@ -27,10 +32,6 @@
       "version": "0.0.0",
       "dependencies": {
         "@k-otp/sdk-core": "workspace:*",
-      },
-      "devDependencies": {
-        "@types/react": "catalog:",
-        "react": "catalog:",
       },
       "peerDependencies": {
         "react": ">=18",
@@ -49,9 +50,6 @@
       "dependencies": {
         "@k-otp/sdk-core": "workspace:*",
       },
-      "devDependencies": {
-        "svelte": "catalog:",
-      },
       "peerDependencies": {
         "svelte": ">=4",
       },
@@ -61,9 +59,6 @@
       "version": "0.0.0",
       "dependencies": {
         "@k-otp/sdk-core": "workspace:*",
-      },
-      "devDependencies": {
-        "vue": "catalog:",
       },
       "peerDependencies": {
         "vue": ">=3.3",
@@ -361,7 +356,7 @@
 
     "@yuku-toolchain/types": ["@yuku-toolchain/types@0.10.2", "", {}, "sha512-sSeo4SSSToiS+sSD+bwn/s94EEcaLJ7tG5LCp8gFYC1G5VzxzX7fqB6m9RU1yMD8KTpu6zdU/I1NlQf8hVBJ9Q=="],
 
-    "acorn": ["acorn@8.16.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw=="],
+    "acorn": ["acorn@8.18.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-lGq+9yr1/GuAWaVYIHRjvvySG5/4VfKIvC8EWxStPdcDh/Ka7FG3twP6v4d5BkravUilhIAsG4Qj83t02LWUPQ=="],
 
     "ansi-regex": ["ansi-regex@5.0.1", "", {}, "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ=="],
 
@@ -501,6 +496,6 @@
 
     "rolldown-plugin-dts/obug": ["obug@3.0.0", "", {}, "sha512-5vvB5+W7ePv+p3uqxi+RcW1XAzLW0/hxt3/4X4Lc4qHudzOhmBiBwOY6DRob4WnanAEGvNcLjF+KNOufrUoEQw=="],
 
-    "svelte/acorn": ["acorn@8.18.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-lGq+9yr1/GuAWaVYIHRjvvySG5/4VfKIvC8EWxStPdcDh/Ka7FG3twP6v4d5BkravUilhIAsG4Qj83t02LWUPQ=="],
+    "ttsc/acorn": ["acorn@8.16.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw=="],
   }
 }

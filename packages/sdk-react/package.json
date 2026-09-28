@@ -64,9 +64,5 @@
   },
   "peerDependencies": {
     "react": ">=18"
-  },
-  "devDependencies": {
-    "react": "catalog:",
-    "@types/react": "catalog:"
   }
 }

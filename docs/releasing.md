@@ -40,13 +40,17 @@ PR up to date and logs a warning instead of publishing.
    # after merging the first release PR (versions are 0.1.0):
    cd packages/sdk-core && bun pm pack && npm publish k-otp-sdk-core-0.1.0.tgz --access public
    cd ../sdk-server && bun pm pack && npm publish k-otp-sdk-server-0.1.0.tgz --access public
+   cd ../sdk-react && bun pm pack && npm publish k-otp-sdk-react-0.1.0.tgz --access public
+   cd ../sdk-vue && bun pm pack && npm publish k-otp-sdk-vue-0.1.0.tgz --access public
+   cd ../sdk-svelte && bun pm pack && npm publish k-otp-sdk-svelte-0.1.0.tgz --access public
    ```
    Always publish the `bun pm pack` tarball (it rewrites `workspace:*` to the
    exact version), never `npm publish` inside the package directory. Then tag
    the release commit (`git tag v0.1.0 && git push origin v0.1.0`) and create
    the GitHub Release.
 4. **Configure Trusted Publishing** for each package (`@k-otp/sdk-core`,
-   `@k-otp/sdk-server`, and future adapters) on npmjs.com -> package ->
+   `@k-otp/sdk-server`, `@k-otp/sdk-react`, `@k-otp/sdk-vue`,
+   `@k-otp/sdk-svelte`) on npmjs.com -> package ->
    *Settings -> Trusted publishing*:
    - Publisher: GitHub Actions
    - Organization or user: `k-otp`
@@ -69,9 +73,18 @@ provenance attestations.
    version (or `0.0.0` before the first release).
 2. Add `npm/<name>` to the `fixed` group in `.sampo/config.toml`.
 3. Add its directory to `PACKAGE_DIRS` in `scripts/publish-oidc.sh` (after its
-   dependencies) and to `PACKAGES` / `ALLOWED_DEPENDENCIES` in
-   `scripts/check-pack.ts`.
-4. Configure Trusted Publishing for the new npm package (steps 3-4 above).
+   dependencies) and to `PACKAGES` / `ALLOWED_DEPENDENCIES` (and
+   `REQUIRED_PEERS` for framework adapters) in `scripts/check-pack.ts`.
+4. Add its build to the root `build` script, its `tsconfig.json` to
+   `scripts/typecheck.ts`, a source `paths` entry to `tsconfig.base.json`, a
+   size budget to `scripts/size-report.ts` and a smoke check to
+   `scripts/smoke-dist.mjs`.
+5. Framework adapters: depend on `@k-otp/sdk-core` with `workspace:*` (packed
+   as the exact lockstep version), declare the framework as a
+   `peerDependency`, and put framework dev packages in the root
+   `devDependencies` (published manifests must not carry
+   `devDependencies`).
+6. Configure Trusted Publishing for the new npm package (steps 3-4 above).
 
 ## Manual checks
 

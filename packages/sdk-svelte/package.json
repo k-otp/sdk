@@ -58,8 +58,5 @@
   },
   "peerDependencies": {
     "svelte": ">=4"
-  },
-  "devDependencies": {
-    "svelte": "catalog:"
   }
 }
