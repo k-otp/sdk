@@ -331,7 +331,7 @@ describe("createOtpFlow", () => {
     await flow.resend();
     state = flow.getState();
     expect(state.reasonCode).toBeUndefined();
-    expect(state.verify.status).toBe("idle");
+    expect(state.verifyState.status).toBe("idle");
     expect(state.canVerify).toBe(true);
   });
 
@@ -345,7 +345,7 @@ describe("createOtpFlow", () => {
     flow.reset();
     const state = flow.getState();
     expect(state.issueId).toBeUndefined();
-    expect(state.issue.status).toBe("idle");
+    expect(state.issueState.status).toBe("idle");
     expect(state.cooldownRemainingMs).toBe(5_000);
     clock = 5_000;
     expect(flow.getState().canSend).toBe(true);

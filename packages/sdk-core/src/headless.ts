@@ -229,8 +229,10 @@ export type OtpFlowOptions = {
 
 /** Immutable snapshot of an issue -> verify flow. */
 export type OtpFlowState = {
-  readonly issue: OtpOperationState<IssueResult>;
-  readonly verify: OtpOperationState<VerifyResult>;
+  /** State of the underlying `issue` operation. */
+  readonly issueState: OtpOperationState<IssueResult>;
+  /** State of the underlying `verify` operation. */
+  readonly verifyState: OtpOperationState<VerifyResult>;
   /** `issueId` of the latest successful send. */
   readonly issueId: string | undefined;
   readonly expiresAt: string | undefined;
@@ -358,8 +360,8 @@ export const createOtpFlow = (
       ? undefined
       : verifyResult?.reasonCode;
     return {
-      issue,
-      verify,
+      issueState: issue,
+      verifyState: verify,
       issueId: issued?.issueId,
       expiresAt: issued?.expiresAt,
       attemptsRemaining:
