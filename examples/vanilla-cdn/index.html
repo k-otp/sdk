@@ -113,11 +113,10 @@
 
       const statusText = (s) => {
         if (s.verified) return "Verified!";
-        // `s.error` is the latest error of either operation: word it per
-        // operation. Match it against the send state (a verify retry resets
-        // verifyState to loading while `s.error` still holds the verify error).
+        // `s.error` is the latest error of either operation (it stays set
+        // while a retry is loading): word it for the operation that failed.
         if (s.error) {
-          return s.error === s.issueState.error ? describeSendError(s.error) : describeVerifyError(s.error);
+          return failedOp === "send" ? describeSendError(s.error) : describeVerifyError(s.error);
         }
         if (s.reasonCode === "MISMATCH") return `Wrong code, ${s.attemptsRemaining} attempts left.`;
         if (s.reasonCode) return `This code can no longer be used (${s.reasonCode}). Request a new one.`;
@@ -139,17 +138,25 @@
       const reportFailure = (error) => {
         status.textContent = `Could not start the request (${error?.message ?? error}).`;
       };
+      // Which operation produced `s.error`, recorded when a call settles.
+      let failedOp;
+      const settled = (op) => (result) => {
+        if (result.error && result.error === flow.getState().error) {
+          failedOp = op;
+          render();
+        }
+      };
       flow.subscribe(render);
       render();
 
       sendForm.addEventListener("submit", (event) => {
         event.preventDefault();
         const phoneNumber = String(new FormData(sendForm).get("phoneNumber"));
-        flow.send({ phoneNumber, purpose: "signup" }).catch(reportFailure);
+        flow.send({ phoneNumber, purpose: "signup" }).then(settled("send"), reportFailure);
       });
       verifyForm.addEventListener("submit", (event) => {
         event.preventDefault();
-        flow.verify(String(new FormData(verifyForm).get("code"))).catch(reportFailure);
+        flow.verify(String(new FormData(verifyForm).get("code"))).then(settled("verify"), reportFailure);
       });
     </script>
   </body>
