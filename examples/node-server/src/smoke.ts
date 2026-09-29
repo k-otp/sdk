@@ -51,6 +51,9 @@ try {
     (await post("/api/otp/send", { phoneNumber: "abc" })).status,
     400,
   );
+  // Past the drain cap the server gives up and drops the connection without
+  // writing to the destroyed socket.
+  await assert.rejects(post("/api/otp/send", "x".repeat(2_000_000)));
 
   // An ambiguous failure keeps the key; the retry of the same send reuses it.
   failNextIssue = true;

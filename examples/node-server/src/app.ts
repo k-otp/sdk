@@ -63,11 +63,15 @@ const readJson = async (
 ): Promise<Record<string, unknown>> => {
   const chunks: Buffer[] = [];
   let size = 0;
-  // Keep reading an oversize body instead of breaking out of the loop: that
-  // destroys the socket, and the client would see a reset instead of the 400.
+  // Keep reading an oversize body (up to MAX_DRAIN_BYTES) instead of stopping
+  // at once, so the client reads the 400 rather than a connection reset.
   for await (const chunk of req) {
     size += (chunk as Buffer).length;
-    if (size > MAX_DRAIN_BYTES) break; // give up: the socket is reset
+    if (size > MAX_DRAIN_BYTES) {
+      // Give up: drop the connection (the client sees a reset, not the 400).
+      req.socket.destroy();
+      break;
+    }
     if (size <= MAX_BODY_BYTES) chunks.push(chunk as Buffer);
   }
   if (size > MAX_BODY_BYTES) throw new InvalidBodyError("body too large", true);
@@ -206,6 +210,8 @@ export const createHandler = (otp: OtpServerClient) => {
         body = await readJson(req);
       } catch (error) {
         if (error instanceof InvalidBodyError) {
+          // Past MAX_DRAIN_BYTES the connection was dropped: nobody to answer.
+          if (res.destroyed || !res.socket || res.socket.destroyed) return;
           return send(
             res,
             400,
@@ -279,7 +285,9 @@ export const createHandler = (otp: OtpServerClient) => {
       return send(res, 404, { error: "NOT_FOUND" });
     } catch (error) {
       console.error(error);
-      if (!res.headersSent) send(res, 500, { error: "INTERNAL" });
+      if (!res.headersSent && !res.destroyed && res.socket) {
+        send(res, 500, { error: "INTERNAL" });
+      }
     }
   };
 };
