@@ -19,6 +19,24 @@ no npm token in the repository).
 
 Version `0.0.0` is the "never released" placeholder and is never published.
 
+## Recovering a half-finished release
+
+`publish-oidc.sh --check` reports two separate outputs:
+
+- `should_publish=true`: a package version is not on npm yet. The workflow
+  publishes, and skips the Sampo step in that run (the release PR is updated
+  again on the next push).
+- `needs_finalize=true`: every package is on npm, but the `vX.Y.Z` tag or the
+  GitHub Release is missing (an earlier run failed after `npm publish`). The
+  workflow re-runs the publish step, which skips the published packages and
+  only creates what is missing. This output does not gate the Sampo step, so
+  a stuck recovery can never stop the release PR from being updated.
+
+Recovery tags the commit that shipped the version, not the current `HEAD`:
+npm's recorded `gitHead` when present, otherwise the last commit that set
+`"version": "X.Y.Z"` in a `packages/*/package.json`. If neither is found the
+script fails and asks you to tag manually.
+
 ## Safe no-op until the owner enables publishing
 
 Publishing only happens when the repository variable
@@ -89,7 +107,7 @@ provenance attestations.
 ## Manual checks
 
 ```bash
-./scripts/publish-oidc.sh --check   # should_publish=true|false
+./scripts/publish-oidc.sh --check   # should_publish / needs_finalize
 sampo release --dry-run             # planned version bumps
 bun run check                       # full local gate
 ```

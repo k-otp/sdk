@@ -3,6 +3,8 @@ name: Release
 # On every push to main:
 # 1. If unpublished versions exist AND npm Trusted Publishing is enabled
 #    (repository variable NPM_TRUSTED_PUBLISHING == 'true'), publish them.
+#    If everything is published but a tag / GitHub Release is missing
+#    (needs_finalize), finish that release; this does not block step 2.
 # 2. Otherwise, while changesets are pending, keep the `sampo/release` PR
 #    (version bumps + changelogs) up to date.
 #
@@ -51,6 +53,9 @@ jobs:
 
       - name: Publish check
         id: publish_check
+        env:
+          # Lets --check detect a missing GitHub Release (recovery).
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/publish-oidc.sh --check
 
       - name: Trusted publishing gate
@@ -62,7 +67,7 @@ jobs:
             echo "enabled=true" >>"$GITHUB_OUTPUT"
           else
             echo "enabled=false" >>"$GITHUB_OUTPUT"
-            if [[ "${{ steps.publish_check.outputs.should_publish }}" == "true" ]]; then
+            if [[ "${{ steps.publish_check.outputs.should_publish }}" == "true" || "${{ steps.publish_check.outputs.needs_finalize }}" == "true" ]]; then
               echo "::warning::Unpublished versions exist, but npm Trusted Publishing is not enabled (set repository variable NPM_TRUSTED_PUBLISHING=true after following docs/releasing.md). Skipping publish."
             fi
           fi
@@ -117,8 +122,11 @@ jobs:
           bun run check:openapi
           bun run test
 
+      # Also runs for a recovery (needs_finalize): published packages are
+      # skipped and only the missing tags / GitHub Release are created. A
+      # recovery does not gate the Sampo step above (only should_publish does).
       - name: Publish packages (npm OIDC)
-        if: ${{ steps.publish_check.outputs.should_publish == 'true' && steps.gate.outputs.enabled == 'true' }}
+        if: ${{ (steps.publish_check.outputs.should_publish == 'true' || steps.publish_check.outputs.needs_finalize == 'true') && steps.gate.outputs.enabled == 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/publish-oidc.sh
