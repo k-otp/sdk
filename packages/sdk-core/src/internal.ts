@@ -1,9 +1,11 @@
 /**
- * Transport building blocks shared with `@k-otp/sdk-server`. (The adapters'
- * flow/operation state is public: `@k-otp/sdk-core/headless`.) Import from
+ * Transport building blocks shared with `@k-otp/sdk-server`, and the client
+ * resolver shared by the framework adapters. (The adapters' flow/operation
+ * state is public: `@k-otp/sdk-core/headless`.) Import from
  * `@k-otp/sdk-core/internal` only inside the K-OTP SDK packages: this entry
  * point is NOT covered by SemVer.
  */
+export { toOtpClient } from "./client-source";
 export { issueWith, verifyWith } from "./operations";
 export {
   createOtpTransport,

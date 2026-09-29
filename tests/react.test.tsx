@@ -73,6 +73,20 @@ describe("OtpProvider", () => {
     expect(typeof result.current.issue).toBe("function");
   });
 
+  test("a provider without client or options throws the shared TypeError", () => {
+    const props = {} as unknown as Parameters<typeof OtpProvider>[0];
+    // React logs the render error; keep the test output clean.
+    const error = console.error;
+    console.error = () => {};
+    try {
+      expect(() => render(<OtpProvider {...props} />)).toThrow(
+        /Pass an OTP client or createOtpClient options/,
+      );
+    } finally {
+      console.error = error;
+    }
+  });
+
   test("hooks throw a TypeError without a provider or client", () => {
     expect(() => renderHook(() => useOtpVerify())).toThrow(TypeError);
   });

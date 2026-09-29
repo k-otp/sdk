@@ -1,9 +1,6 @@
-import {
-  createOtpClient,
-  type OtpClient,
-  type OtpClientOptions,
-} from "@k-otp/sdk-core";
+import type { OtpClientOptions } from "@k-otp/sdk-core";
 import type { OtpIssueVerifyClient } from "@k-otp/sdk-core/headless";
+import { toOtpClient } from "@k-otp/sdk-core/internal";
 import {
   type Context,
   createContext,
@@ -47,9 +44,11 @@ export type OtpProviderProps = {
 export const OtpProvider = (props: OtpProviderProps): ReactElement => {
   // Created lazily, so switching from `client` to `options` after mount
   // still yields a client instead of publishing `null`.
-  const owned = useRef<OtpClient | null>(null);
+  // Neither `client` nor `options` (e.g. from untyped JS) throws the same
+  // descriptive TypeError as the Vue and Svelte adapters.
+  const owned = useRef<OtpClientLike | null>(null);
   if (!props.client && !owned.current) {
-    owned.current = createOtpClient(props.options);
+    owned.current = toOtpClient(props.options);
   }
   const client = props.client ?? owned.current;
   return createElement(

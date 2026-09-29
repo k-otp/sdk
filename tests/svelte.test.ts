@@ -24,6 +24,17 @@ const issueInput = {
 };
 
 describe("createOtpStores", () => {
+  test("a missing client source throws the shared TypeError", () => {
+    const missing = undefined as unknown as Parameters<
+      typeof createOtpStores
+    >[0];
+    for (const create of [createOtpStores, createOtpFlowStore]) {
+      expect(() => create(missing)).toThrow(
+        /Pass an OTP client or createOtpClient options/,
+      );
+    }
+  });
+
   test("accepts client options and performs no I/O on creation", async () => {
     const { fetch, calls } = mockFetch(() => json(200, issueOutput));
     const stores = createOtpStores({ apiKey: "pk_svelte", fetch });

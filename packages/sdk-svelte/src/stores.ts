@@ -1,12 +1,11 @@
-import {
-  createOtpClient,
-  type IssueInput,
-  type IssueResult,
-  type OtpApiError,
-  type OtpClientOptions,
-  type OtpRequestOptions,
-  type VerifyInput,
-  type VerifyResult,
+import type {
+  IssueInput,
+  IssueResult,
+  OtpApiError,
+  OtpClientOptions,
+  OtpRequestOptions,
+  VerifyInput,
+  VerifyResult,
 } from "@k-otp/sdk-core";
 import {
   createOtpFlow,
@@ -18,6 +17,7 @@ import {
   type OtpOperationState,
   type OtpRunResult,
 } from "@k-otp/sdk-core/headless";
+import { toOtpClient } from "@k-otp/sdk-core/internal";
 import { derived, type Readable, readable } from "svelte/store";
 
 /** Any client with `issue`/`verify` (an `OtpClient` from `createOtpClient`). */
@@ -25,18 +25,6 @@ export type OtpClientLike = OtpIssueVerifyClient;
 
 /** A client instance, or options for `createOtpClient`. */
 export type OtpClientSource = OtpClientLike | OtpClientOptions;
-
-const toOtpClient = (source: OtpClientSource): OtpClientLike => {
-  if (typeof source !== "object" || source === null) {
-    throw new TypeError(
-      'Pass an OTP client or createOtpClient options (e.g. { apiKey: "pk_..." }).',
-    );
-  }
-  return typeof (source as OtpClientLike).issue === "function" &&
-    typeof (source as OtpClientLike).verify === "function"
-    ? (source as OtpClientLike)
-    : createOtpClient(source as OtpClientOptions);
-};
 
 type Store<TState> = {
   getState: () => TState;

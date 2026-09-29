@@ -156,6 +156,7 @@ try {
           ...framework,
           "@k-otp/sdk-core",
           "@k-otp/sdk-core/headless",
+          "@k-otp/sdk-core/internal",
         ]),
         BUDGETS.adapter,
       ],

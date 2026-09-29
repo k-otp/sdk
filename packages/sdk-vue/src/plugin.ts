@@ -1,5 +1,6 @@
-import { createOtpClient, type OtpClientOptions } from "@k-otp/sdk-core";
+import type { OtpClientOptions } from "@k-otp/sdk-core";
 import type { OtpIssueVerifyClient } from "@k-otp/sdk-core/headless";
+import { toOtpClient } from "@k-otp/sdk-core/internal";
 import {
   type App,
   getCurrentInstance,
@@ -18,18 +19,6 @@ export type OtpClientSource = OtpClientLike | OtpClientOptions;
 /** Injection key of the OTP client (`app.provide` / `provide`). */
 export const OTP_CLIENT_KEY: InjectionKey<OtpClientLike> = Symbol("k-otp");
 
-const toClient = (source: OtpClientSource): OtpClientLike => {
-  if (typeof source !== "object" || source === null) {
-    throw new TypeError(
-      'Pass an OTP client or createOtpClient options (e.g. { apiKey: "pk_..." }).',
-    );
-  }
-  return typeof (source as OtpClientLike).issue === "function" &&
-    typeof (source as OtpClientLike).verify === "function"
-    ? (source as OtpClientLike)
-    : createOtpClient(source as OtpClientOptions);
-};
-
 /**
  * Vue plugin: `app.use(createOtpPlugin({ apiKey: "pk_..." }))`. The client is
  * provided per app (no globals), so create the plugin inside your
@@ -38,7 +27,7 @@ const toClient = (source: OtpClientSource): OtpClientLike => {
 export const createOtpPlugin = (
   source: OtpClientSource,
 ): { install: (app: App) => void } => {
-  const client = toClient(source);
+  const client = toOtpClient(source);
   return {
     install: (app) => {
       app.provide(OTP_CLIENT_KEY, client);
@@ -57,7 +46,7 @@ export const provideOtpClient = (source: OtpClientSource): OtpClientLike => {
       "provideOtpClient() must be called inside a component's setup(). Use app.use(createOtpPlugin(...)) at the app level.",
     );
   }
-  const client = toClient(source);
+  const client = toOtpClient(source);
   provide(OTP_CLIENT_KEY, client);
   return client;
 };

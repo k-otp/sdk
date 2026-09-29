@@ -57,7 +57,7 @@ describe("plugin and injection", () => {
     );
     expect(() =>
       createOtpPlugin(undefined as unknown as { apiKey: string }),
-    ).toThrow(TypeError);
+    ).toThrow(/Pass an OTP client or createOtpClient options/);
   });
 
   test("provideOtpClient provides to descendants", async () => {
