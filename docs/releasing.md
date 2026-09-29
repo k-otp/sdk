@@ -26,16 +26,20 @@ Version `0.0.0` is the "never released" placeholder and is never published.
 - `should_publish=true`: a package version is not on npm yet. The workflow
   publishes, and skips the Sampo step in that run (the release PR is updated
   again on the next push).
-- `needs_finalize=true`: every package is on npm, but the `vX.Y.Z` tag or the
-  GitHub Release is missing (an earlier run failed after `npm publish`). The
-  workflow re-runs the publish step, which skips the published packages and
-  only creates what is missing. This output does not gate the Sampo step, so
-  a stuck recovery can never stop the release PR from being updated.
+- `needs_finalize=true`: every package is on npm, but one of the release tags
+  (`vX.Y.Z` or a per-package `@k-otp/sdk-*-vX.Y.Z`) or the GitHub Release is
+  missing (an earlier run failed after `npm publish`). The workflow re-runs
+  the publish step, which skips the published packages and only creates what
+  is missing. This output does not gate the Sampo step, so a stuck recovery
+  can never stop the release PR from being updated. Tag and Release lookups
+  are retried; if they keep failing, `--check` warns and reports
+  `needs_finalize=false` for that run instead of failing the job.
 
-Recovery tags the commit that shipped the version, not the current `HEAD`:
-npm's recorded `gitHead` when present, otherwise the last commit that set
-`"version": "X.Y.Z"` in a `packages/*/package.json`. If neither is found the
-script fails and asks you to tag manually.
+When tags must be created, recovery tags the commit that shipped the version,
+not the current `HEAD`: npm's recorded `gitHead` when present, otherwise the
+last commit that set `"version": "X.Y.Z"` in a `packages/*/package.json`. If
+neither is found the script fails and asks you to tag manually. When every
+tag exists and only the GitHub Release is missing, no commit is resolved.
 
 ## Safe no-op until the owner enables publishing
 

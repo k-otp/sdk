@@ -15,9 +15,14 @@ set -euo pipefail
 #                                       # (re)creates missing tags + Release
 #
 # should_publish: some package version is not on npm yet (a new release).
-# needs_finalize: everything is on npm but a release tag or the GitHub Release
-#   is missing (an earlier run failed after publishing). Kept separate so a
-#   recovery never blocks the Sampo release-PR step.
+# needs_finalize: everything is on npm but a release tag (vX.Y.Z or a
+#   per-package @k-otp/sdk-*-vX.Y.Z) or the GitHub Release is missing (an
+#   earlier run failed after publishing). Kept separate so a recovery never
+#   blocks the Sampo release-PR step: when the tag / Release lookups keep
+#   failing, --check warns and reports needs_finalize=false instead of failing.
+#
+# PUBLISH_OIDC_RETRY_DELAY (seconds, default 2) scales the backoff between
+# the 3 attempts of a git / gh lookup (tests set it to 0).
 #
 # Requirements (publish mode): GitHub Actions job with `id-token: write`,
 # every package configured for Trusted Publishing from this repo + workflow
@@ -106,6 +111,21 @@ registry_git_head() {
     ' || true
 }
 
+# Runs "$@" up to 3 times while it returns 2 (error), with a linear backoff.
+# Any other status (an answer) is returned at once.
+with_retry() {
+  local attempt rc
+  for attempt in 1 2 3; do
+    rc=0
+    "$@" || rc="$?"
+    [[ "$rc" -ne 2 ]] && return "$rc"
+    if [[ "$attempt" -lt 3 ]]; then
+      sleep "$((attempt * ${PUBLISH_OIDC_RETRY_DELAY:-2}))"
+    fi
+  done
+  return 2
+}
+
 # Return codes: 0 = tag exists on origin, 1 = missing, 2 = error.
 remote_tag_exists() {
   local rc=0
@@ -126,15 +146,50 @@ github_release_exists() {
   if ! command -v gh >/dev/null 2>&1 || [[ -z "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]]; then
     return 3
   fi
-  local out rc=0
-  out="$(GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}" gh release view "$1" --json tagName 2>&1)" || rc="$?"
-  if [[ "$rc" -eq 0 ]]; then
-    return 0
-  elif [[ "$out" == *"release not found"* ]]; then
-    return 1
-  fi
-  echo "gh release view $1 failed: ${out}" >&2
+  # Decide on the HTTP status (first line of --include output), not on the
+  # wording of gh's error messages. gh exits non-zero for a 404 as well.
+  local out status
+  out="$(cd "$ROOT_DIR" && GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}" \
+    gh api --include "repos/{owner}/{repo}/releases/tags/$1" 2>/dev/null)" || true
+  status="$(printf '%s\n' "$out" | head -n 1 | awk '{print $2}')"
+  case "$status" in
+    200) return 0 ;;
+    404) return 1 ;;
+  esac
+  echo "GitHub Release lookup for $1 failed (HTTP ${status:-none})" >&2
   return 2
+}
+
+# Decides whether an already-published release still needs finalizing: sets
+# NEEDS_FINALIZE=true when any of RELEASE_TAGS is missing on origin or the
+# GitHub Release is missing. A lookup that keeps failing is "unknown": warn
+# and leave NEEDS_FINALIZE=false (a later run retries), never fail --check.
+detect_finalize() {
+  NEEDS_FINALIZE="false"
+  local tag rc
+  for tag in "${RELEASE_TAGS[@]}"; do
+    rc=0
+    with_retry remote_tag_exists "$tag" || rc="$?"
+    if [[ "$rc" -eq 1 ]]; then
+      echo "${tag} is published but not tagged; finishing the release."
+      NEEDS_FINALIZE="true"
+      return 0
+    elif [[ "$rc" -ne 0 ]]; then
+      echo "::warning::Could not look up tag ${tag}; not finalizing this run."
+      return 0
+    fi
+  done
+  rc=0
+  with_retry github_release_exists "v${RELEASE_VERSION}" || rc="$?"
+  case "$rc" in
+    0) ;;
+    1)
+      echo "v${RELEASE_VERSION} is tagged but has no GitHub Release; finishing the release."
+      NEEDS_FINALIZE="true"
+      ;;
+    3) echo "gh CLI or token unavailable; not checking the GitHub Release." >&2 ;;
+    *) echo "::warning::Could not look up the v${RELEASE_VERSION} GitHub Release; not finalizing this run." ;;
+  esac
 }
 
 # Validate lockstep versions up front.
@@ -147,6 +202,12 @@ for dir in "${PACKAGE_DIRS[@]}"; do
     echo "Expected lockstep versions, found ${RELEASE_VERSION} and ${VERSION} (${dir})" >&2
     exit 1
   fi
+done
+
+# The main tag plus one tag per package.
+RELEASE_TAGS=("v${RELEASE_VERSION}")
+for dir in "${PACKAGE_DIRS[@]}"; do
+  RELEASE_TAGS+=("$(pkg_field "$dir" name)-v${RELEASE_VERSION}")
 done
 
 emit() {
@@ -181,29 +242,11 @@ if [[ "$MODE" == "check" ]]; then
       exit 2
     fi
   done
-  # Everything is on npm but the release tag or the GitHub Release is missing
+  # Everything is on npm but a release tag or the GitHub Release is missing
   # (e.g. a previous run failed after publishing): finish the release.
   NEEDS_FINALIZE="false"
   if [[ "$SHOULD_PUBLISH" == "false" ]]; then
-    rc=0
-    remote_tag_exists "v${RELEASE_VERSION}" || rc="$?"
-    if [[ "$rc" -eq 1 ]]; then
-      echo "v${RELEASE_VERSION} is published but not tagged; finishing the release."
-      NEEDS_FINALIZE="true"
-    elif [[ "$rc" -eq 2 ]]; then
-      exit 2
-    else
-      rc=0
-      github_release_exists "v${RELEASE_VERSION}" || rc="$?"
-      case "$rc" in
-        1)
-          echo "v${RELEASE_VERSION} is tagged but has no GitHub Release; finishing the release."
-          NEEDS_FINALIZE="true"
-          ;;
-        2) exit 2 ;;
-        3) echo "gh CLI or token unavailable; not checking the GitHub Release." >&2 ;;
-      esac
-    fi
+    detect_finalize
   fi
   emit "should_publish=${SHOULD_PUBLISH}"
   emit "needs_finalize=${NEEDS_FINALIZE}"
@@ -246,42 +289,51 @@ for dir in ${TO_PUBLISH[@]+"${TO_PUBLISH[@]}"}; do
 done
 
 # Tags and the GitHub Release are (re)created whenever missing, also when an
-# earlier run published the packages but failed before this point. Tags point
-# at the commit that shipped the version: HEAD when this run published, else
-# (recovery) npm's recorded gitHead, else the last commit that set this
-# version in a package manifest. Never blindly the current HEAD, which may
-# already contain later, unreleased work.
-if [[ ${#TO_PUBLISH[@]} -gt 0 ]]; then
-  RELEASE_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
-else
-  RELEASE_COMMIT="$(registry_git_head "$(pkg_field "${PACKAGE_DIRS[0]}" name)" "$RELEASE_VERSION")"
-  if [[ -z "$RELEASE_COMMIT" ]] || ! git -C "$ROOT_DIR" cat-file -e "${RELEASE_COMMIT}^{commit}" 2>/dev/null; then
-    RELEASE_COMMIT="$(git -C "$ROOT_DIR" log -1 --format=%H \
-      -S"\"version\": \"${RELEASE_VERSION}\"" -- ':(glob)packages/*/package.json')"
-  fi
-  if [[ -z "$RELEASE_COMMIT" ]]; then
-    echo "Cannot find the commit that shipped ${RELEASE_VERSION}; tag it manually." >&2
-    exit 1
-  fi
-fi
-echo "Release commit for v${RELEASE_VERSION}: ${RELEASE_COMMIT}"
-
-git config user.name "github-actions[bot]"
-git config user.email "github-actions[bot]@users.noreply.github.com"
-RELEASE_TAGS=("v${RELEASE_VERSION}")
-for dir in "${PACKAGE_DIRS[@]}"; do
-  RELEASE_TAGS+=("$(pkg_field "$dir" name)-v${RELEASE_VERSION}")
-done
+# earlier run published the packages but failed before this point.
+TAGS_TO_CREATE=()
 for TAG in "${RELEASE_TAGS[@]}"; do
-  git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || git tag "$TAG" "$RELEASE_COMMIT"
+  git -C "$ROOT_DIR" rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || TAGS_TO_CREATE+=("$TAG")
 done
-# Push only this release's tags (never every local tag).
-git push origin "${RELEASE_TAGS[@]/#/refs/tags/}"
 
-if command -v gh >/dev/null 2>&1 && [[ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]]; then
-  export GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
-  gh release view "v${RELEASE_VERSION}" >/dev/null 2>&1 ||
-    gh release create "v${RELEASE_VERSION}" --generate-notes
-else
-  echo "gh CLI or token unavailable; skipping GitHub Release creation." >&2
+# Only resolved when a tag must be created (not e.g. when only the GitHub
+# Release is missing). Tags point at the commit that shipped the version:
+# HEAD when this run published, else (recovery) npm's recorded gitHead, else
+# the last commit that set this version in a package manifest. Never blindly
+# the current HEAD, which may already contain later, unreleased work.
+if [[ ${#TAGS_TO_CREATE[@]} -gt 0 ]]; then
+  if [[ ${#TO_PUBLISH[@]} -gt 0 ]]; then
+    RELEASE_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
+  else
+    RELEASE_COMMIT="$(registry_git_head "$(pkg_field "${PACKAGE_DIRS[0]}" name)" "$RELEASE_VERSION")"
+    if [[ -z "$RELEASE_COMMIT" ]] || ! git -C "$ROOT_DIR" cat-file -e "${RELEASE_COMMIT}^{commit}" 2>/dev/null; then
+      RELEASE_COMMIT="$(git -C "$ROOT_DIR" log -1 --format=%H \
+        -S"\"version\": \"${RELEASE_VERSION}\"" -- ':(glob)packages/*/package.json')"
+    fi
+    if [[ -z "$RELEASE_COMMIT" ]]; then
+      echo "Cannot find the commit that shipped ${RELEASE_VERSION}; tag it manually." >&2
+      exit 1
+    fi
+  fi
+  echo "Release commit for v${RELEASE_VERSION}: ${RELEASE_COMMIT}"
+  for TAG in "${TAGS_TO_CREATE[@]}"; do
+    git -C "$ROOT_DIR" tag "$TAG" "$RELEASE_COMMIT"
+  done
 fi
+# Push only this release's tags (never every local tag); tags that already
+# exist on origin are a no-op.
+git -C "$ROOT_DIR" push origin "${RELEASE_TAGS[@]/#/refs/tags/}"
+
+rc=0
+with_retry github_release_exists "v${RELEASE_VERSION}" || rc="$?"
+case "$rc" in
+  0) echo "GitHub Release v${RELEASE_VERSION} already exists." ;;
+  1)
+    (cd "$ROOT_DIR" && GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}" \
+      gh release create "v${RELEASE_VERSION}" --generate-notes)
+    ;;
+  3) echo "gh CLI or token unavailable; skipping GitHub Release creation." >&2 ;;
+  *)
+    echo "Could not look up the v${RELEASE_VERSION} GitHub Release; create it manually." >&2
+    exit 1
+    ;;
+esac
