@@ -46,7 +46,7 @@
     "format": "biome format --write .",
     "test": "bun test --timeout 10000 packages && bun run --cwd tests test",
     "gen:types": "bun run scripts/generate-types.ts",
-    "check:openapi": "bun run scripts/generate-types.ts --check && bun test --timeout 10000 packages/sdk-core/test/contract-drift.test.ts",
+    "check:openapi": "bun run scripts/generate-types.ts --check && bun test --timeout 10000 packages/sdk-core/test/contract-drift.test.ts packages/sdk-core/test/openapi-generator.test.ts",
     "sync:openapi": "bun run scripts/sync-openapi.ts",
     "check:pack": "bun run scripts/check-pack.ts",
     "size": "bun run scripts/size-report.ts",

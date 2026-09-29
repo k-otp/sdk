@@ -49,8 +49,10 @@ const load = async (source: string): Promise<string> => {
     return response.text();
   }
   const resolved = path.resolve(source);
-  const info = await stat(resolved).catch(() =>
-    die(`--from ${source}: ${resolved} does not exist`),
+  const info = await stat(resolved).catch((error: unknown) =>
+    die(
+      `--from ${source}: cannot read ${resolved} (${error instanceof Error ? error.message : String(error)})`,
+    ),
   );
   const file = info.isDirectory()
     ? path.join(resolved, CHECKOUT_SPEC_PATH)
