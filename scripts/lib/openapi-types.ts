@@ -145,6 +145,9 @@ const RESERVED_TYPE_NAMES = new Set([
     "symbol",
     "undefined",
   ],
+  // Global types the generated module references (`Record<string, never>`)
+  // or that a reader expects unshadowed.
+  ...["Array", "Record", "Partial", "Required", "Readonly", "Pick", "Omit"],
   // Declared by the generated module itself.
   "OpenApiOperations",
   "OPENAPI_VERSION",
@@ -262,7 +265,13 @@ export class OpenApiTypeRenderer {
     if (Array.isArray(schema.enum)) {
       return schema.enum.map((value) => JSON.stringify(value)).join(" | ");
     }
-    const unionKey = schema.oneOf !== undefined ? "oneOf" : "anyOf";
+    for (const key of ["oneOf", "anyOf", "allOf"]) {
+      if (key in schema && !Array.isArray(schema[key])) {
+        throw new Error(`Unsupported schema at ${at}: ${key} must be an array`);
+      }
+    }
+    // `oneOf` wins when both are present (as `oneOf ?? anyOf` did).
+    const unionKey = Array.isArray(schema.oneOf) ? "oneOf" : "anyOf";
     const union = schema[unionKey];
     if (Array.isArray(union)) {
       return union
@@ -398,7 +407,8 @@ const jsonRequestBody = (
 /**
  * Status and JSON schema of the first 2xx response. A response without
  * `content` (e.g. 204) has no schema; a response WITH content must be
- * `application/json` with a schema.
+ * `application/json` with a schema. A response `$ref` or a non-object
+ * response is rejected rather than read as "no body".
  */
 const successResponse = (
   operation: JsonObject,
@@ -410,9 +420,13 @@ const successResponse = (
     .sort()[0];
   if (status === undefined) throw new Error(`${where}: no 2xx response`);
   const response = responses[status];
-  if (!isObject(response) || response.content === undefined) {
-    return { status, schema: undefined };
+  if (!isObject(response)) {
+    throw new Error(`${where}: ${status} response must be an object`);
   }
+  if (response.$ref !== undefined) {
+    throw new Error(`${where}: ${status} response $ref is not supported`);
+  }
+  if (response.content === undefined) return { status, schema: undefined };
   const media = isObject(response.content)
     ? response.content["application/json"]
     : undefined;
@@ -457,6 +471,7 @@ type OperationEntry = {
   path: string;
   method: (typeof HTTP_METHODS)[number];
   operation: JsonObject;
+  parameters: JsonObject[];
   where: string;
   key: string;
 };
@@ -474,7 +489,10 @@ const eachOperation = (doc: OpenApiDocument): OperationEntry[] => {
         throw new Error(`${where}: duplicate operation name "${key}"`);
       }
       keys.add(key);
-      out.push({ path, method, operation, where, key });
+      const parameters = (
+        Array.isArray(operation.parameters) ? operation.parameters : []
+      ) as JsonObject[];
+      out.push({ path, method, operation, parameters, where, key });
     }
   }
   return out;
@@ -486,10 +504,9 @@ export const summarizeOperations = (
 ): OperationSummary[] => {
   const operations: OperationSummary[] = [];
   const globalSecurity = Array.isArray(doc.security) ? doc.security : [];
-  for (const { path, method, operation, where } of eachOperation(doc)) {
-    const parameters = (
-      Array.isArray(operation.parameters) ? operation.parameters : []
-    ) as JsonObject[];
+  for (const { path, method, operation, parameters, where } of eachOperation(
+    doc,
+  )) {
     const params = (location: string) =>
       parameters
         .filter((parameter) => parameter.in === location)
@@ -498,8 +515,6 @@ export const summarizeOperations = (
           required: parameter.required === true,
         }));
     const json = jsonRequestBody(operation, where);
-    const body = json?.body;
-    const bodySchema = json?.media.schema;
     const security = (
       Array.isArray(operation.security) ? operation.security : globalSecurity
     ) as JsonObject[];
@@ -511,12 +526,13 @@ export const summarizeOperations = (
       pathParams: params("path"),
       queryParams: params("query"),
       headerParams: params("header"),
-      ...(body && bodySchema !== undefined
+      ...(json
         ? {
             requestBody: {
-              required: body.required === true,
+              required: json.body.required === true,
               requiredFields: [
-                ...((resolve(doc, bodySchema).required as string[]) ?? []),
+                ...((resolve(doc, json.media.schema as Json)
+                  .required as string[]) ?? []),
               ],
             },
           }
@@ -585,10 +601,14 @@ export const renderOpenApiTypes = (doc: OpenApiDocument): string => {
     "/** Wire-level request/response types for every OpenAPI operation, keyed by operation name. */",
     "export interface OpenApiOperations {",
   );
-  for (const { path, method, operation, where, key } of eachOperation(doc)) {
-    const parameters = (
-      Array.isArray(operation.parameters) ? operation.parameters : []
-    ) as JsonObject[];
+  for (const {
+    path,
+    method,
+    operation,
+    parameters,
+    where,
+    key,
+  } of eachOperation(doc)) {
     const body = jsonRequestBody(operation, where)?.media;
     const ok = successResponse(operation, where);
     const typeOf = (

@@ -137,7 +137,58 @@ describe("openapi generator", () => {
     expect(renderOpenApiTypes(spec)).toContain("response: undefined;");
   });
 
-  test.each(["string", "default", "OpenApiOperations"])(
+  test("a 2xx response $ref is rejected, not read as no body", () => {
+    const spec = doc({
+      paths: {
+        "/ping": {
+          get: {
+            operationId: "otp.ping",
+            responses: { "200": { $ref: "#/components/responses/Ok" } },
+          },
+        },
+      },
+    });
+    expect(() => renderOpenApiTypes(spec)).toThrow(
+      "GET /ping (otp.ping): 200 response $ref is not supported",
+    );
+  });
+
+  test("a non-object 2xx response is rejected", () => {
+    const spec = doc({
+      paths: {
+        "/ping": { get: { operationId: "otp.ping", responses: { "200": 1 } } },
+      },
+    });
+    expect(() => renderOpenApiTypes(spec)).toThrow(
+      "GET /ping (otp.ping): 200 response must be an object",
+    );
+  });
+
+  test.each(["oneOf", "anyOf", "allOf"])(
+    "a non-array %s is rejected",
+    (key) => {
+      const spec = doc({ schemas: { Bad: { [key]: { type: "string" } } } });
+      expect(() => renderOpenApiTypes(spec)).toThrow(
+        `Unsupported schema at components.schemas.Bad: ${key} must be an array`,
+      );
+    },
+  );
+
+  test("oneOf wins over anyOf when both are present", () => {
+    const spec = doc({
+      schemas: {
+        Pick1: {
+          oneOf: [{ type: "string" }, { type: "number" }],
+          anyOf: [{ type: "boolean" }],
+        },
+      },
+    });
+    expect(renderOpenApiTypes(spec)).toContain(
+      "export type Pick1 = string | number;",
+    );
+  });
+
+  test.each(["string", "default", "OpenApiOperations", "Record", "Array"])(
     "reserved component name %s is rejected",
     (name) => {
       const spec = doc({ schemas: { [name]: { type: "string" } } });
