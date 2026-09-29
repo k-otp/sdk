@@ -44,8 +44,8 @@ export type OtpProviderProps = {
 export const OtpProvider = (props: OtpProviderProps): ReactElement => {
   // Created lazily, so switching from `client` to `options` after mount
   // still yields a client instead of publishing `null`.
-  // Neither `client` nor `options` (e.g. from untyped JS) throws the same
-  // descriptive TypeError as the Vue and Svelte adapters.
+  // Passing neither `client` nor `options` (e.g. from untyped JS) throws the
+  // same descriptive TypeError as the Vue and Svelte adapters.
   const owned = useRef<OtpClientLike | null>(null);
   if (!props.client && !owned.current) {
     owned.current = toOtpClient(props.options);
