@@ -16,6 +16,37 @@ const examplesDir = path.join(root, "examples");
 const STEPS = ["typecheck", "build", "smoke"] as const;
 /** A hung step (e.g. a smoke server that never closes) fails instead of stalling CI. */
 const STEP_TIMEOUT_MS = 5 * 60_000;
+/** After the step exits, leftover grandchildren may keep the pipes open. */
+const PIPE_DRAIN_MS = 5_000;
+
+/** Kills the step's whole process group (it runs detached, as group leader). */
+const killGroup = (pid: number): void => {
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch {
+    // ESRCH: the group is already gone.
+  }
+};
+
+/** Reads a pipe, giving up `PIPE_DRAIN_MS` after `exited` settles. */
+const drain = async (
+  text: Promise<string>,
+  exited: Promise<unknown>,
+): Promise<string> => {
+  await exited;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<string>((resolve) => {
+    timer = setTimeout(
+      () => resolve("[output cut: the pipe stayed open after the step exited]"),
+      PIPE_DRAIN_MS,
+    );
+  });
+  try {
+    return await Promise.race([text, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 let failed = false;
 for (const entry of await readdir(examplesDir, { withFileTypes: true })) {
@@ -35,20 +66,34 @@ for (const entry of await readdir(examplesDir, { withFileTypes: true })) {
   }
   for (const step of STEPS) {
     if (!scripts[step]) continue;
+    const started = performance.now();
     const child = Bun.spawn(["bun", "run", step], {
       cwd: dir,
       stdout: "pipe",
       stderr: "pipe",
-      timeout: STEP_TIMEOUT_MS,
+      // Own process group, so a timeout also kills grandchildren (vite, node).
+      detached: true,
     });
-    const [stdout, stderr, code] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-      child.exited,
+    const timer = setTimeout(() => killGroup(child.pid), STEP_TIMEOUT_MS);
+    // Start reading right away (a full pipe would block the child).
+    const stdoutText = new Response(child.stdout).text();
+    const stderrText = new Response(child.stderr).text();
+    const code = await child.exited;
+    clearTimeout(timer);
+    const elapsed = performance.now() - started;
+    // Leftovers (e.g. a server a smoke step never closed) must not linger.
+    killGroup(child.pid);
+    const [stdout, stderr] = await Promise.all([
+      drain(stdoutText, child.exited),
+      drain(stderrText, child.exited),
     ]);
     let status = code === 0 ? "ok" : "FAILED";
     if (code !== 0 && child.signalCode !== null) {
-      status += ` (killed by ${child.signalCode}; timeout ${STEP_TIMEOUT_MS / 1000}s)`;
+      status += ` (killed by ${child.signalCode}`;
+      if (elapsed >= STEP_TIMEOUT_MS) {
+        status += `; timeout ${STEP_TIMEOUT_MS / 1000}s`;
+      }
+      status += ")";
     }
     console.log(`[examples] ${entry.name} ${step}: ${status}`);
     // Also show warnings of successful steps (vite, tsc, svelte-check).
@@ -58,7 +103,7 @@ for (const entry of await readdir(examplesDir, { withFileTypes: true })) {
       if (output) console.log(output);
       break;
     }
-    if (/\bwarn(ing)?\b/i.test(output)) console.log(output);
+    if (/\bwarn(ings?)?\b/i.test(output)) console.log(output);
   }
 }
 process.exitCode = failed ? 1 : 0;

@@ -11,8 +11,10 @@ const root = path.resolve(import.meta.dir, "..");
 // The locally installed binary: never let `bun x` fetch ttsc from the registry.
 const ttsc = path.join(root, "node_modules", ".bin", "ttsc");
 if (!(await Bun.file(ttsc).exists())) {
-  console.error("[typecheck] ttsc is not installed. Run `bun install` first.");
-  process.exit(1);
+  // Throwing (not process.exit) lets the message flush and exits non-zero.
+  throw new Error(
+    "[typecheck] ttsc is not installed. Run `bun install` first.",
+  );
 }
 
 const projects = [

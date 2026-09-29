@@ -144,7 +144,17 @@ for (const entry of await readdir(path.join(root, "packages"), {
   const dir = `packages/${entry.name}`;
   if (!(await Bun.file(path.join(root, dir, "package.json")).exists()))
     continue;
-  const manifest = await readManifest(dir);
+  let manifest: Manifest;
+  try {
+    manifest = await readManifest(dir);
+  } catch (error) {
+    // Report it with the other failures instead of aborting the discovery.
+    fail(
+      dir,
+      `invalid package.json (${error instanceof Error ? error.message : String(error)})`,
+    );
+    continue;
+  }
   if (manifest.private) continue;
   if (!PACKAGES.includes(dir)) {
     fail(manifest.name, `${dir} is publishable but missing from PACKAGES`);

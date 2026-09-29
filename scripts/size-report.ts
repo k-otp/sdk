@@ -63,6 +63,7 @@ const kb = (bytes: number): string => `${(bytes / 1024).toFixed(2)} kB`;
  * `dist/` file's package, like they would in an app.
  */
 const bundle = async (
+  label: string,
   entry: string,
   external: string[] = [],
 ): Promise<Buffer> => {
@@ -74,10 +75,11 @@ const bundle = async (
     external,
   });
   if (!result.success) {
-    throw new AggregateError(result.logs, `Bun.build failed for ${entry}`);
+    const logs = result.logs.map((log) => `  ${String(log)}`).join("\n");
+    throw new Error(`Bun.build failed for ${label} (${entry}):\n${logs}`);
   }
   if (result.outputs.length === 0) {
-    throw new Error("Bun.build produced no output");
+    throw new Error(`Bun.build produced no output for ${label}`);
   }
   return Buffer.concat(
     await Promise.all(
@@ -104,11 +106,15 @@ const reexportAll = async (
   name: string,
   file: string,
 ): Promise<string> => {
+  const source = await Bun.file(await built(file)).text();
+  // `export *` skips the default export, which would then go unmeasured.
+  if (/\bexport\s+default\b|\bas\s+default\b/.test(source)) {
+    throw new Error(
+      `${path.relative(root, file)} has a default export, which \`export *\` does not measure`,
+    );
+  }
   const entry = path.join(work, `${name}.js`);
-  await writeFile(
-    entry,
-    `export * from ${JSON.stringify(await built(file))};\n`,
-  );
+  await writeFile(entry, `export * from ${JSON.stringify(file)};\n`);
   return entry;
 };
 
@@ -116,9 +122,11 @@ const work = await mkdtemp(path.join(tmpdir(), "k-otp-size-"));
 let failed = false;
 try {
   const esm = await bundle(
+    "@k-otp/sdk-core ESM",
     await reexportAll(work, "core", path.join(coreDir, "dist/index.js")),
   );
   const headless = await bundle(
+    "@k-otp/sdk-core/headless ESM",
     await reexportAll(work, "headless", path.join(coreDir, "dist/headless.js")),
   );
   const iife = Buffer.from(
@@ -144,7 +152,7 @@ try {
     rows.push(
       [
         `${adapter.name} ESM (adapter only)`,
-        await bundle(adapterEntry, [
+        await bundle(`${adapter.name} (adapter only)`, adapterEntry, [
           ...framework,
           "@k-otp/sdk-core",
           "@k-otp/sdk-core/headless",
@@ -153,7 +161,7 @@ try {
       ],
       [
         `${adapter.name} ESM (+ sdk-core, ${adapter.framework[0]} external)`,
-        await bundle(adapterEntry, framework),
+        await bundle(`${adapter.name} (+ sdk-core)`, adapterEntry, framework),
         BUDGETS.adapterWithCore,
       ],
     );
