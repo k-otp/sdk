@@ -11,8 +11,11 @@ await copyFile(
 );
 try {
   await copyFile(bundlePath(), new URL("k-otp.iife.min.js", out));
-} catch {
-  console.error("Build the SDK first: bun run build (repository root)");
+} catch (error) {
+  const reason = error instanceof Error ? error.message : String(error);
+  console.error(
+    `Could not copy the CDN bundle (${reason}). Build the SDK first: bun run build (repository root)`,
+  );
   process.exit(1);
 }
 console.log(`built ${fileURLToPath(out)}`);

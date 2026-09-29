@@ -44,6 +44,9 @@ const post = async (path: string, body: unknown) => {
 
 try {
   assert.equal((await post("/api/otp/send", "{not json")).status, 400);
+  // An oversize body gets the 400 (drained), not a connection reset.
+  const huge = await post("/api/otp/send", `"${"x".repeat(50_000)}"`);
+  assert.deepEqual(huge, { status: 400, body: { error: "INVALID_BODY" } });
   assert.equal(
     (await post("/api/otp/send", { phoneNumber: "abc" })).status,
     400,

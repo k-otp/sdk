@@ -52,9 +52,24 @@
         return reply({ issueId: body.issueId, verified, reasonCode: verified ? undefined : "MISMATCH", attemptsRemaining: verified ? 5 : 4, expiresAt: new Date(now + 60000).toISOString(), verifiedAt: verified ? new Date(now).toISOString() : undefined });
       };
 
-      const client = PUBLIC_KEY
-        ? KOtp.createOtpClient({ apiKey: PUBLIC_KEY })
-        : KOtp.createOtpClient({ apiKey: "pk_mock", fetch: mockFetch });
+      const sendForm = document.getElementById("send");
+      const verifyForm = document.getElementById("verify");
+      const status = document.getElementById("status");
+      const sendButton = sendForm.querySelector("button");
+      const verifyButton = verifyForm.querySelector("button");
+
+      // A configuration mistake (e.g. an sk_ key in PUBLIC_KEY) throws here:
+      // show it on the page instead of leaving a silently dead form.
+      let client;
+      try {
+        client = PUBLIC_KEY
+          ? KOtp.createOtpClient({ apiKey: PUBLIC_KEY })
+          : KOtp.createOtpClient({ apiKey: "pk_mock", fetch: mockFetch });
+      } catch (error) {
+        sendButton.disabled = true;
+        status.textContent = `Configuration error: ${error?.message ?? error}`;
+        throw error;
+      }
       document.getElementById("mode").textContent = PUBLIC_KEY ? "" : "Mock mode: the code is 123456.";
 
       // The same headless flow the React/Vue/Svelte adapters use: one
@@ -62,12 +77,6 @@
       // the default 30 s resend cooldown (plus the server's retryAfterMs) and
       // verify state.
       const flow = KOtp.createOtpFlow(client, { idempotencyKeyPrefix: "signup" });
-
-      const sendForm = document.getElementById("send");
-      const verifyForm = document.getElementById("verify");
-      const status = document.getElementById("status");
-      const sendButton = sendForm.querySelector("button");
-      const verifyButton = verifyForm.querySelector("button");
 
       // Shared by both operations.
       const describeCommonError = (error) => {
@@ -80,14 +89,19 @@
             return undefined;
         }
       };
+      // Specific codes first: TOO_MANY_REQUESTS (429) is also `retryable`.
       const describeSendError = (error) => {
         if (error.code === "PAYMENT_REQUIRED") return "Sending is temporarily unavailable.";
+        const common = describeCommonError(error);
+        if (common) return common;
         if (error.retryable) return "Could not confirm the code was sent. Retrying is safe.";
-        return describeCommonError(error) ?? `Could not send the code (${error.code}).`;
+        return `Could not send the code (${error.code}).`;
       };
       const describeVerifyError = (error) => {
+        const common = describeCommonError(error);
+        if (common) return common;
         if (error.retryable) return "Could not check the code. Please try again.";
-        return describeCommonError(error) ?? `Could not check the code (${error.code}).`;
+        return `Could not check the code (${error.code}).`;
       };
 
       const sendLabel = (s, seconds) => {
@@ -99,9 +113,12 @@
 
       const statusText = (s) => {
         if (s.verified) return "Verified!";
-        // `s.error` is the latest error of either operation: word it per operation.
-        if (s.error && s.error === s.verifyState.error) return describeVerifyError(s.error);
-        if (s.error) return describeSendError(s.error);
+        // `s.error` is the latest error of either operation: word it per
+        // operation. Match it against the send state (a verify retry resets
+        // verifyState to loading while `s.error` still holds the verify error).
+        if (s.error) {
+          return s.error === s.issueState.error ? describeSendError(s.error) : describeVerifyError(s.error);
+        }
         if (s.reasonCode === "MISMATCH") return `Wrong code, ${s.attemptsRemaining} attempts left.`;
         if (s.reasonCode) return `This code can no longer be used (${s.reasonCode}). Request a new one.`;
         return s.issueId ? "Code sent." : "";

@@ -33,7 +33,18 @@ type PendingOtp = {
 const SESSION_TTL_MS = 10 * 60_000;
 const MAX_SESSIONS = 10_000;
 
-class InvalidBodyError extends Error {}
+class InvalidBodyError extends Error {
+  /** Ask the client to close the connection after the 400 reply. */
+  readonly closeConnection: boolean;
+  constructor(message: string, closeConnection = false) {
+    super(message);
+    this.closeConnection = closeConnection;
+  }
+}
+
+const MAX_BODY_BYTES = 10_000;
+/** An oversize body is drained (so the client reads the 400) up to this cap. */
+const MAX_DRAIN_BYTES = 1_000_000;
 
 /** Errors after which the send may or may not have happened. */
 const AMBIGUOUS = new Set([
@@ -50,11 +61,17 @@ const PHONE = /^01\d{8,9}$/;
 const readJson = async (
   req: IncomingMessage,
 ): Promise<Record<string, unknown>> => {
-  let raw = "";
+  const chunks: Buffer[] = [];
+  let size = 0;
+  // Keep reading an oversize body instead of breaking out of the loop: that
+  // destroys the socket, and the client would see a reset instead of the 400.
   for await (const chunk of req) {
-    raw += chunk;
-    if (raw.length > 10_000) throw new InvalidBodyError("body too large");
+    size += (chunk as Buffer).length;
+    if (size > MAX_DRAIN_BYTES) break; // give up: the socket is reset
+    if (size <= MAX_BODY_BYTES) chunks.push(chunk as Buffer);
   }
+  if (size > MAX_BODY_BYTES) throw new InvalidBodyError("body too large", true);
+  const raw = Buffer.concat(chunks).toString("utf8");
   let parsed: unknown;
   try {
     parsed = raw ? JSON.parse(raw) : {};
@@ -189,7 +206,12 @@ export const createHandler = (otp: OtpServerClient) => {
         body = await readJson(req);
       } catch (error) {
         if (error instanceof InvalidBodyError) {
-          return send(res, 400, { error: "INVALID_BODY" });
+          return send(
+            res,
+            400,
+            { error: "INVALID_BODY" },
+            error.closeConnection ? { connection: "close" } : {},
+          );
         }
         throw error;
       }
