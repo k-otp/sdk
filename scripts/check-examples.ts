@@ -19,6 +19,15 @@ const STEP_TIMEOUT_MS = 5 * 60_000;
 /** After the step exits, leftover grandchildren may keep the pipes open. */
 const PIPE_DRAIN_MS = 5_000;
 
+/**
+ * A line reporting a warning ("warn", "warning", "3 warnings"), ignoring the
+ * `$ command` echo of `bun run` (e.g. `--fail-on-warnings`) and zero counts
+ * such as svelte-check's "0 WARNINGS".
+ */
+const isWarningLine = (line: string): boolean =>
+  !line.startsWith("$ ") &&
+  /\bwarn(ings?)?\b/i.test(line.replace(/\b0 warnings?\b/gi, ""));
+
 /** Kills the step's whole process group (it runs detached, as group leader). */
 const killGroup = (pid: number): void => {
   try {
@@ -103,7 +112,7 @@ for (const entry of await readdir(examplesDir, { withFileTypes: true })) {
       if (output) console.log(output);
       break;
     }
-    if (/\bwarn(ings?)?\b/i.test(output)) console.log(output);
+    if (output.split("\n").some(isWarningLine)) console.log(output);
   }
 }
 process.exitCode = failed ? 1 : 0;
