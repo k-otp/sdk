@@ -534,6 +534,43 @@ describe("parity: issue -> verify flow", () => {
     expect(trace.keys).toEqual(["flow-key-1", "flow-key-2"]);
   });
 
+  test("a 429 verify starts a verify cooldown with the rate-limit data", async () => {
+    const trace = (await parity(async (driver) => {
+      const { harness } = mount(driver, {
+        handlers: [
+          () => json(200, issueOutput),
+          () =>
+            errorEnvelope(429, "TOO_MANY_REQUESTS", "Too Many Requests", {
+              limit: "perKey",
+              policy: "platform",
+              retryAfterMs: 1_500,
+            }),
+        ],
+      });
+      await harness.run((api) => api.send(sendInput));
+      const limited = await harness.run((api) => api.verifyCode("123456"));
+      const afterLimit = harness.snapshot().flow;
+      const skipped = await harness.run((api) => api.verifyCode("123456"));
+      return { limited, afterLimit, skipped };
+    })) as Record<string, Record<string, unknown>>;
+    expect(trace.limited?.error).toMatchObject({
+      otpApiError: {
+        code: "TOO_MANY_REQUESTS",
+        status: 429,
+        retryAfterMs: 1_500,
+        data: { limit: "perKey", policy: "platform", retryAfterMs: 1_500 },
+      },
+      retryable: true,
+    });
+    expect(trace.afterLimit).toMatchObject({
+      verifyCooldownRemainingMs: 1_500,
+      verifyCooldownUntil: NOW + 1_500,
+      canVerify: false,
+      cooldownRemainingMs: 30_000,
+    });
+    expect(trace.skipped?.skipped).toBe("cooldown");
+  });
+
   test("reset clears the flow but keeps the cooldown", async () => {
     const trace = (await parity(async (driver) => {
       const { harness } = mount(driver, {

@@ -312,6 +312,80 @@ describe("createOtpFlow", () => {
     expect(flow.getState().canSend).toBe(true);
   });
 
+  test("a rate-limited verify starts a verify cooldown, not a send cooldown", async () => {
+    let clock = 0;
+    let verifies = 0;
+    const { flow, calls } = setup(
+      (r) => {
+        if (r.url.pathname.endsWith("/issue")) return json(200, issueOutput);
+        verifies++;
+        return verifies === 1
+          ? errorEnvelope(
+              429,
+              "TOO_MANY_REQUESTS",
+              "Too Many Requests",
+              { limit: "perKey", policy: "platform", retryAfterMs: 1500 },
+              { "retry-after": "2" },
+            )
+          : json(200, verifyOutput);
+      },
+      { now: () => clock },
+    );
+    await flow.send(sendInput);
+    const limited = await flow.verify("123456");
+    expect(limited.error?.code).toBe("TOO_MANY_REQUESTS");
+    expect(limited.error?.retryable).toBe(true);
+    expect(limited.error?.retryAfterMs).toBe(1500);
+    expect(limited.error?.data).toEqual({
+      limit: "perKey",
+      policy: "platform",
+      retryAfterMs: 1500,
+    });
+    let state = flow.getState();
+    expect(state.verifyCooldownRemainingMs).toBe(1500);
+    expect(state.verifyCooldownUntil).toBe(1500);
+    expect(state.canVerify).toBe(false);
+    expect(state.canSend).toBe(true);
+    expect(state.cooldownRemainingMs).toBe(0);
+    expect(await flow.verify("123456")).toEqual({
+      data: undefined,
+      error: undefined,
+      skipped: "cooldown",
+    });
+    clock = 1500;
+    state = flow.getState();
+    expect(state.verifyCooldownRemainingMs).toBe(0);
+    expect(state.verifyCooldownUntil).toBeUndefined();
+    expect(state.canVerify).toBe(true);
+    expect((await flow.verify("123456")).data).toEqual(verifyOutput);
+    expect(
+      calls.filter((c) => c.url.pathname.endsWith("/verify")),
+    ).toHaveLength(2);
+  });
+
+  test("ticks verifyCooldownRemainingMs while subscribed", async () => {
+    const { flow } = setup((r) =>
+      r.url.pathname.endsWith("/issue")
+        ? json(200, issueOutput)
+        : errorEnvelope(429, "TOO_MANY_REQUESTS", "slow down", {
+            limit: "perKey",
+            policy: "key",
+            retryAfterMs: 120,
+          }),
+    );
+    const updates: number[] = [];
+    const unsubscribe = flow.subscribe(() =>
+      updates.push(flow.getState().verifyCooldownRemainingMs),
+    );
+    await flow.send(sendInput);
+    await flow.verify("123456");
+    expect(flow.getState().canVerify).toBe(false);
+    await Bun.sleep(200);
+    unsubscribe();
+    expect(updates.at(-1)).toBe(0);
+    expect(flow.getState().canVerify).toBe(true);
+  });
+
   test("skips verify before any send and send while busy", async () => {
     const { flow } = setup((r) => hangUntilAborted(r.signal));
     expect(await flow.verify("123456")).toEqual({

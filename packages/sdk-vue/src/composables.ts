@@ -149,6 +149,8 @@ export type UseOtpFlowReturn = {
   error: ComputedRef<OtpApiError | undefined>;
   idempotencyKey: ComputedRef<string | undefined>;
   cooldownRemainingMs: ComputedRef<number>;
+  /** Remaining verify cooldown after a rate-limited (429) verify, in ms. */
+  verifyCooldownRemainingMs: ComputedRef<number>;
   canSend: ComputedRef<boolean>;
   canVerify: ComputedRef<boolean>;
   send: OtpFlowController["send"];
@@ -183,6 +185,7 @@ export const useOtpFlow = (
     error: pick("error"),
     idempotencyKey: pick("idempotencyKey"),
     cooldownRemainingMs: pick("cooldownRemainingMs"),
+    verifyCooldownRemainingMs: pick("verifyCooldownRemainingMs"),
     canSend: pick("canSend"),
     canVerify: pick("canVerify"),
     send: flow.send,

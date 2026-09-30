@@ -194,7 +194,11 @@ export const createOtpOperation = <TInput, TResult>(
 
 /** Operation of an issue -> verify flow that was not started. */
 export type OtpFlowSkipReason =
-  /** A resend cooldown (local or server `retryAfterMs`) is active. */
+  /**
+   * A cooldown is active: for `send`/`resend` the resend cooldown (local or
+   * server `retryAfterMs`), for `verify` the server `retryAfterMs` of a
+   * rate-limited (429) or unavailable (503) verify.
+   */
   | "cooldown"
   /**
    * The same operation is already in flight (for `verify`, also while a
@@ -266,6 +270,14 @@ export type OtpFlowState = {
   readonly cooldownUntil: number | undefined;
   /** Remaining cooldown in ms when this snapshot was taken (ticks ~1/s). */
   readonly cooldownRemainingMs: number;
+  /**
+   * Epoch ms until which `verify` is blocked: the server `retryAfterMs` of a
+   * rate-limited (429) or unavailable (503) verify. Independent of the send
+   * cooldown, since the API rate-limits each operation separately.
+   */
+  readonly verifyCooldownUntil: number | undefined;
+  /** Remaining verify cooldown in ms (ticks ~1/s like `cooldownRemainingMs`). */
+  readonly verifyCooldownRemainingMs: number;
   /** `send`/`resend` would start a request now. */
   readonly canSend: boolean;
   /** `verify` would start a request now. */
@@ -284,15 +296,16 @@ export type OtpFlowController = {
   resend: (options?: OtpRequestOptions) => Promise<OtpFlowResult<IssueResult>>;
   /**
    * Verifies `code` against the latest `issueId`. Skipped while a `send` is
-   * in flight and after a terminal outcome (see {@link OtpFlowSkipReason}).
+   * in flight, during a verify cooldown and after a terminal outcome (see
+   * {@link OtpFlowSkipReason}).
    */
   verify: (
     code: string,
     options?: OtpRequestOptions,
   ) => Promise<OtpFlowResult<VerifyResult>>;
   /**
-   * Aborts in-flight calls and clears the flow. The cooldown is kept, since
-   * server-side rate limits do not reset either.
+   * Aborts in-flight calls and clears the flow. The cooldowns are kept,
+   * since server-side rate limits do not reset either.
    */
   reset: () => void;
   /** Aborts in-flight calls (e.g. on unmount) and notifies subscribers. */
@@ -364,10 +377,13 @@ export const createOtpFlow = (
   let verifyResult: VerifyResult | undefined;
   let lastError: OtpApiError | undefined;
   let cooldownUntil: number | undefined;
+  let verifyCooldownUntil: number | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
-  const remaining = (): number =>
-    cooldownUntil === undefined ? 0 : Math.max(0, cooldownUntil - now());
+  const left = (until: number | undefined): number =>
+    until === undefined ? 0 : Math.max(0, until - now());
+  const remaining = (): number => left(cooldownUntil);
+  const verifyRemaining = (): number => left(verifyCooldownUntil);
 
   /** The current code was verified or can no longer be used. */
   const isTerminal = (): boolean =>
@@ -380,6 +396,7 @@ export const createOtpFlow = (
     const issue = issueOp.getState();
     const verify = verifyOp.getState();
     const cooldownRemainingMs = remaining();
+    const verifyCooldownRemainingMs = verifyRemaining();
     const verified = verifyResult?.verified === true;
     const reasonCode = verifyResult?.verified
       ? undefined
@@ -398,11 +415,15 @@ export const createOtpFlow = (
       idempotencyKey: pending?.key,
       cooldownUntil: cooldownRemainingMs > 0 ? cooldownUntil : undefined,
       cooldownRemainingMs,
+      verifyCooldownUntil:
+        verifyCooldownRemainingMs > 0 ? verifyCooldownUntil : undefined,
+      verifyCooldownRemainingMs,
       canSend: !issue.isLoading && cooldownRemainingMs === 0,
       canVerify:
         issued !== undefined &&
         !verify.isLoading &&
         !issue.isLoading &&
+        verifyCooldownRemainingMs === 0 &&
         !isTerminal(),
     };
   };
@@ -421,12 +442,17 @@ export const createOtpFlow = (
     scheduleTicker();
   };
 
-  /** Refreshes `cooldownRemainingMs` about once a second while observed. */
+  /**
+   * Refreshes `cooldownRemainingMs`/`verifyCooldownRemainingMs` about once a
+   * second while observed, landing exactly on each cooldown's end.
+   */
   function scheduleTicker(): void {
     if (timer !== undefined || emitter.listeners.size === 0) return;
-    const ms = remaining();
-    if (ms <= 0) return;
-    timer = setTimeout(tick, ms % 1000 || 1000);
+    const delays = [remaining(), verifyRemaining()]
+      .filter((ms) => ms > 0)
+      .map((ms) => ms % 1000 || 1000);
+    if (delays.length === 0) return;
+    timer = setTimeout(tick, Math.min(...delays));
   }
 
   const notify = (): void => {
@@ -435,13 +461,22 @@ export const createOtpFlow = (
     scheduleTicker();
   };
 
-  const startCooldown = (ms: number | undefined): void => {
-    if (!ms || ms <= 0) return;
+  /** Extends a cooldown end; restarts the ticker when it moved. */
+  const extend = (
+    current: number | undefined,
+    ms: number | undefined,
+  ): number | undefined => {
+    if (!ms || ms <= 0) return current;
     const until = now() + ms;
-    if (cooldownUntil === undefined || until > cooldownUntil) {
-      cooldownUntil = until;
-      stopTicker();
-    }
+    if (current !== undefined && until <= current) return current;
+    stopTicker();
+    return until;
+  };
+  const startCooldown = (ms: number | undefined): void => {
+    cooldownUntil = extend(cooldownUntil, ms);
+  };
+  const startVerifyCooldown = (ms: number | undefined): void => {
+    verifyCooldownUntil = extend(verifyCooldownUntil, ms);
   };
 
   /**
@@ -506,6 +541,7 @@ export const createOtpFlow = (
       return skip("busy");
     }
     if (isTerminal()) return skip("terminal");
+    if (verifyRemaining() > 0) return skip("cooldown");
     const current = generation;
     const target = issued;
     const promise = verifyOp.run(
@@ -518,6 +554,7 @@ export const createOtpFlow = (
     if (current !== generation || issued !== target) return result;
     if (result.error) {
       lastError = result.error;
+      startVerifyCooldown(result.error.retryAfterMs);
     } else {
       lastError = undefined;
       verifyResult = result.data;
@@ -538,7 +575,11 @@ export const createOtpFlow = (
   return {
     getState: () => {
       // Unobserved readers (no ticker running) still get a fresh cooldown.
-      if (emitter.listeners.size === 0 && snapshot.cooldownRemainingMs > 0) {
+      if (
+        emitter.listeners.size === 0 &&
+        (snapshot.cooldownRemainingMs > 0 ||
+          snapshot.verifyCooldownRemainingMs > 0)
+      ) {
         snapshot = build();
       }
       return snapshot;
