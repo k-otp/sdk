@@ -28,3 +28,6 @@ coverage
 !.vscode/extensions.json
 .DS_Store
 tests/.svelte-tmp-*
+
+# Local Claude Code state (agent worktrees)
+.claude/
