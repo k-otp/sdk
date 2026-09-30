@@ -133,14 +133,16 @@ Returns the state plus `send(input)`, `resend()`, `verify(code)`, `reset()`:
 | `isLoading`, `issueState`, `verifyState` | Loading flag and per-operation state. |
 | `idempotencyKey` | Key of the current send attempt, kept after ambiguous failures. |
 | `cooldownRemainingMs`, `cooldownUntil`, `canSend` | Resend cooldown (updates about once a second). |
+| `verifyCooldownRemainingMs`, `verifyCooldownUntil` | Verify cooldown after a rate-limited (429) verify. |
 | `canVerify` | A code can be verified now. |
 
 Key handling: a key is generated per send attempt and **reused** when `send`
 is called again with the same input after an ambiguous failure (`TIMEOUT`,
 `NETWORK_ERROR`, 5xx, 429, `ABORTED`); it is dropped after a success or a
 definitive error (400/401/402/403/409), so the next send is a new attempt.
-Server `retryAfterMs` (429/503) starts a cooldown just like
-`resendCooldownMs`. Actions that cannot run resolve with
+Server `retryAfterMs` (429/503) on `send` starts a cooldown just like
+`resendCooldownMs`; on `verify` it starts the separate verify cooldown
+(`canVerify` is `false` until it ends). Actions that cannot run resolve with
 `{ skipped: "cooldown" | "busy" | "no-issue" | "no-previous-send" | "terminal" }`.
 Options are read when the flow is created.
 

@@ -60,9 +60,15 @@ const { verified, reasonCode } = await otp.verify({ issueId, code: "123456" });
   `EXPIRED`, `ALREADY_VERIFIED`, `REPLACED`, `NOT_FOUND`)로 반환됩니다.
 - 어댑터의 `useOtpFlow`/플로우 스토어는 발송 시도마다 멱등키를 만들고, 모호한 실패(타임아웃, 네트워크,
   5xx, 429) 후 같은 입력으로 다시 보내면 같은 키를 재사용합니다. 429의 `retryAfterMs`와 로컬
-  `resendCooldownMs`로 재발송 쿨다운을 관리합니다.
+  `resendCooldownMs`로 재발송 쿨다운을 관리하고, `verify`가 429를 받으면 별도의 검증 쿨다운
+  (`verifyCooldownRemainingMs`, 그동안 `canVerify: false`)을 적용합니다.
 - 그 밖의 실패는 모두 `OtpApiError`(`code`, `status`, `requestId`, `data`, `retryAfterMs`,
   `retryable`)로 정규화됩니다. 잔액 부족은 `PAYMENT_REQUIRED`(402, `data.code`)입니다.
+- `issue`/`verify`는 API 키별 레이트 리밋이 적용됩니다(API 1.3.1). 초과하면 재시도 가능한
+  `TOO_MANY_REQUESTS`(429)로 거절되며, `retryAfterMs`(본문 `data.retryAfterMs`, 없으면
+  `Retry-After` 헤더)만큼 기다린 뒤 같은 멱등키로 재시도하세요. `data.limit`(`perKey`, `perIp`,
+  `perPhone`)과 `data.policy`(`key`: 키 자체 정책, `platform`: 플랫폼 기본값 또는 상한)로 어떤
+  제한인지 알 수 있습니다. 거절된 요청은 한도나 검증 시도 횟수를 소모하지 않습니다.
 
 ## 문서
 
@@ -70,7 +76,7 @@ const { verified, reasonCode } = await otp.verify({ issueId, code: "123456" });
 - [발급 -> 검증 UX(쿨다운, 재발송, 재시도, 402/429)](./docs/issue-verify-ux.md)
 - 프레임워크 가이드: [React](./docs/react.md), [Vue](./docs/vue.md), [Svelte](./docs/svelte.md)
 - [예제](./examples) (vanilla/CDN, React, Vue, Svelte, Node 서버)
-- [오류, 재시도, 멱등성](./docs/errors-and-retries.md)
+- [오류, 재시도, 레이트 리밋(429), 멱등성](./docs/errors-and-retries.md)
 - [보안: 키 종류와 Origin 허용 목록](./docs/security.md)
 - [릴리스](./docs/releasing.md)
 - API 레퍼런스: [`sdk-core`](./packages/sdk-core/README.md), [`sdk-server`](./packages/sdk-server/README.md), [`sdk-react`](./packages/sdk-react/README.md), [`sdk-vue`](./packages/sdk-vue/README.md), [`sdk-svelte`](./packages/sdk-svelte/README.md)

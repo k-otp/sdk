@@ -122,13 +122,15 @@ Options: `resendCooldownMs` (default `30000`; `0` disables it), `idempotencyKeyP
 `createIdempotencyKey`, `client`. Returns computed refs `issueId`,
 `expiresAt`, `attemptsRemaining`, `verified`, `reasonCode`, `loading`,
 `sending`, `verifying`, `error`, `idempotencyKey`, `cooldownRemainingMs`,
-`canSend`, `canVerify`, the full snapshot as `state`, and the actions
+`verifyCooldownRemainingMs`, `canSend`, `canVerify`, the full snapshot as `state`, and the actions
 `send(input)`, `resend()`, `verify(code)`, `reset()`.
 
 The flow reuses the idempotency key when `send` is called again with the same
 input after an ambiguous failure (`TIMEOUT`, `NETWORK_ERROR`, 5xx, 429,
 `ABORTED`) and drops it after a success or a definitive error. Server
-`retryAfterMs` starts a cooldown like `resendCooldownMs`. Actions that cannot
+`retryAfterMs` (429/503) on `send` starts a cooldown like `resendCooldownMs`;
+on `verify` it starts a separate verify cooldown
+(`verifyCooldownRemainingMs`, `canVerify` is `false`). Actions that cannot
 run resolve with `{ skipped: "cooldown" | "busy" | "no-issue" |
 "no-previous-send" | "terminal" }`. See the
 [issue -> verify UX guide](../../docs/issue-verify-ux.md).

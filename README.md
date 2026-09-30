@@ -66,7 +66,7 @@ Static site:
 - [Issue -> verify UX (cooldown, resend, retries, 402/429)](./docs/issue-verify-ux.md)
 - Framework guides: [React](./docs/react.md), [Vue](./docs/vue.md), [Svelte](./docs/svelte.md)
 - [Examples](./examples) (vanilla/CDN, React, Vue, Svelte, Node server)
-- [Errors, retries and idempotency](./docs/errors-and-retries.md)
+- [Errors, retries, rate limits (429) and idempotency](./docs/errors-and-retries.md)
 - [Security: key types and the Origin allowlist](./docs/security.md)
 - Troubleshooting: `NETWORK_ERROR` in the browser but the same key works with
   curl? The page origin is missing from the `pk_` key's `allowedOrigins`

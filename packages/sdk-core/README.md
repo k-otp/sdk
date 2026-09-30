@@ -96,7 +96,9 @@ key in a browser, no `fetch`) throw a `TypeError`.
 
 `input`: `phoneNumber`, `purpose`, **`idempotencyKey` (required)**, and optional
 `channel` (`"sms"` | `"alimtalk"`), `templateId`, `templateVariables`, `from`,
-`messageType`, `cost`, `metadata`, `expiresInSec`, `maxAttempts`.
+`messageType`, `metadata`, `expiresInSec`, `maxAttempts`. `cost` is still
+accepted but deprecated: the API decides the charged credit from the channel
+and message type and ignores it for billing.
 Resolves `{ issueId, expiresAt, attemptsRemaining, queuedAt }`.
 
 The key is trimmed and validated (1-128 visible ASCII characters) before any
@@ -129,8 +131,9 @@ class OtpApiError extends Error {
   code: OtpApiErrorCode;   // see below
   status: number;          // HTTP status, 0 when no response was received
   requestId?: string;      // X-Request-Id (else request-id / cf-ray), when readable
-  data?: unknown;          // e.g. { code: "INSUFFICIENT_CREDIT" } for 402
-  retryAfterMs?: number;   // from Retry-After or the error body
+  data?: unknown;          // e.g. { code: "INSUFFICIENT_CREDIT" } for 402,
+                           // { limit, policy, retryAfterMs } for 429
+  retryAfterMs?: number;   // data.retryAfterMs, else Retry-After (429, some 503s)
   retryable: boolean;      // TOO_MANY_REQUESTS, INTERNAL_SERVER_ERROR, SERVICE_UNAVAILABLE, TIMEOUT, NETWORK_ERROR
 }
 ```
@@ -175,7 +178,8 @@ const unsubscribe = flow.subscribe(() => render(flow.getState()));
 await flow.send({ phoneNumber, purpose: "signup" }); // { data } | { error } | { skipped }
 await flow.verify(code);
 flow.getState(); // issueId, verified, reasonCode, error, canSend, canVerify,
-                 // cooldownRemainingMs (ticks ~1/s while subscribed), idempotencyKey, ...
+                 // cooldownRemainingMs (ticks ~1/s while subscribed),
+                 // verifyCooldownRemainingMs, idempotencyKey, ...
 ```
 
 - One idempotency key per send attempt; the same key is reused when `send`
@@ -184,11 +188,14 @@ flow.getState(); // issueId, verified, reasonCode, error, canSend, canVerify,
   definitive error or changed input.
 - Cooldown: `resendCooldownMs` (default `DEFAULT_RESEND_COOLDOWN_MS`, 30 s)
   after each successful send, and the server's `retryAfterMs` on 429/503.
+  A 429/503 on `verify` starts a separate verify cooldown
+  (`verifyCooldownRemainingMs`; `canVerify` is false and `verify` is skipped
+  with `"cooldown"` until it ends).
 - Actions never reject for API errors; blocked actions resolve with
   `{ skipped: "cooldown" | "busy" | "no-issue" | "no-previous-send" | "terminal" }`.
 - `verified: false` with `EXPIRED`, `MAX_ATTEMPTS`, `REPLACED`, `NOT_FOUND`
   or `ALREADY_VERIFIED` is terminal for that code (`canVerify` becomes false).
-- `reset()` clears the flow but keeps the cooldown; `abort()` cancels
+- `reset()` clears the flow but keeps the cooldowns; `abort()` cancels
   in-flight requests (e.g. when your view is torn down).
 
 `createOtpOperation(execute)` is the single-operation building block

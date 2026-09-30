@@ -61,10 +61,15 @@ code: `verify` on the old `issueId` then returns `reasonCode: "REPLACED"`.
 - A **server cooldown** wins when it is longer: on `429 TOO_MANY_REQUESTS`
   (and on 503 with `Retry-After`), `error.retryAfterMs` tells you how long to
   wait. The flow helpers start a cooldown of `retryAfterMs` automatically.
+- The API rate-limits `issue` and `verify` separately, so a 429 on `verify`
+  starts a **verify cooldown** instead (`verifyCooldownRemainingMs`,
+  `verifyCooldownUntil`): `canVerify` stays `false` and `verify` resolves
+  with `{ skipped: "cooldown" }` until it ends. Sending a new code is not
+  blocked by it.
 - Show the remaining time (`cooldownRemainingMs`, which ticks about once a
   second while the UI is subscribed) and keep the button disabled until it
   reaches zero. Calls made anyway resolve with `{ skipped: "cooldown" }`.
-- `reset()` clears the flow but keeps the cooldown, since server-side rate
+- `reset()` clears the flow but keeps both cooldowns, since server-side rate
   limits do not reset either.
 
 ## 402 Payment required
@@ -80,10 +85,17 @@ It is not the end user's fault:
 
 ## 429 Too many requests
 
-- Honor `error.retryAfterMs` (from `Retry-After` or the error body); fall
-  back to a sensible default (e.g. 30 s) when it is missing.
-- Keep the same idempotency key for the retry of the same attempt.
-- Tell the user when they can try again instead of a generic error.
+- Honor `error.retryAfterMs` (the error body's `data.retryAfterMs`, else
+  `Retry-After`); fall back to a sensible default (e.g. 30 s) only when it
+  is missing.
+- Keep the same idempotency key for the retry of the same attempt. Rejected
+  requests do not count against the limit or use up a verification attempt.
+- Tell the user when they can try again instead of a generic error: show
+  `cooldownRemainingMs` next to the send button and
+  `verifyCooldownRemainingMs` next to the verify button.
+- `error.data.limit` (`perKey`, `perIp`, `perPhone`) and `error.data.policy`
+  (`key` or `platform`) tell you which limit applied; log them. See
+  [errors and retries](./errors-and-retries.md#rate-limits-429).
 
 ## Other errors
 

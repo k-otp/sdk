@@ -10,8 +10,8 @@ All SDK methods reject with `OtpApiError`:
 | `status` | HTTP status, or `0` when no HTTP response was received (timeout, network, abort). |
 | `message` | Server message, or a descriptive client message. |
 | `requestId` | `X-Request-Id` response header (sent on every API response, exposed to allowed browser origins), else `request-id` / `cf-ray`. Include it in support requests. |
-| `data` | Error payload. For 402: `{ code: "INSUFFICIENT_CREDIT" \| "OVERDRAFT_LIMIT_EXCEEDED" }`. |
-| `retryAfterMs` | From a `Retry-After` header (seconds or HTTP date) or `data.retryAfterMs` / `data.retryAfter`, when present. |
+| `data` | Error payload. For 402: `{ code: "INSUFFICIENT_CREDIT" \| "OVERDRAFT_LIMIT_EXCEEDED" }`. For 429: `{ limit: "perKey" \| "perIp" \| "perPhone", policy: "key" \| "platform", retryAfterMs }` (`OtpRateLimitedData`). |
+| `retryAfterMs` | Wait before retrying, in ms: the body's `data.retryAfterMs` (exact), else the `Retry-After` header (seconds or HTTP date), else `data.retryAfter` (seconds). Set on every 429 and on 503 when the server sends a wait. |
 | `retryable` | `true` for the codes marked below. |
 | `cause` | The underlying error (e.g. the fetch `TypeError`). |
 
@@ -23,7 +23,7 @@ All SDK methods reject with `OtpApiError`:
 | `FORBIDDEN` | 403 | no | Missing scope, `pk_` key on a server-only operation, or `Origin` not in the key's allowlist. |
 | `NOT_FOUND` | 404 | no | Unknown issue/template for this app. |
 | `CONFLICT` | 409 | no | Idempotency key reused with a different payload, or the replayed issue was since replaced. |
-| `TOO_MANY_REQUESTS` | 429 | yes | Rate limited; honor `retryAfterMs`. |
+| `TOO_MANY_REQUESTS` | 429 | yes | A rate limit of the API key on `issue`/`verify` (see [rate limits](#rate-limits-429)); honor `retryAfterMs`. |
 | `INTERNAL_SERVER_ERROR` | 500, other 5xx | yes | Unexpected server error. |
 | `SERVICE_UNAVAILABLE` | 502, 503, 504 | yes | Dependency or gateway unavailable, or an earlier attempt with the same idempotency key is still being resolved. |
 | `TIMEOUT` | 0 (or 408) | yes | No response within `timeoutMs`. |
@@ -102,6 +102,39 @@ async function issueWithRetry(otp, input, attempts = 3) {
 a retry after an ambiguous success resolves with `reasonCode:
 "ALREADY_VERIFIED"`, which you can treat as success when the first attempt's
 outcome was unknown. Note that each wrong code consumes an attempt.
+
+## Rate limits (429)
+
+Since API 1.3.1, `issue` and `verify` enforce the API key's rate-limit
+policy. `pk_` keys also get a platform default for the rules they do not set,
+and every key is capped at a platform ceiling. An exceeded rule rejects with
+`TOO_MANY_REQUESTS` (429), a `Retry-After` header (whole seconds, rounded up)
+and this error data:
+
+```ts
+import { isOtpApiError, type OtpRateLimitedData } from "@k-otp/sdk-core";
+
+if (isOtpApiError(error) && error.code === "TOO_MANY_REQUESTS") {
+  const data = error.data as OtpRateLimitedData | undefined;
+  data?.limit;        // "perKey" (issue and verify), "perIp" / "perPhone" (issue only)
+  data?.policy;       // "key" (your key's own policy) or "platform" (default or ceiling)
+  error.retryAfterMs; // data.retryAfterMs (exact ms), else Retry-After
+}
+```
+
+- Wait `error.retryAfterMs` before retrying (the recipe above does). Fall
+  back to a default only when it is missing, e.g. a 429 from a proxy in
+  front of the API.
+- Rejected requests do not count against the limit, and a rejected `verify`
+  does not use up a verification attempt. Retry `issue` with the same
+  idempotency key.
+- Repeated `policy: "key"` rejections on legitimate traffic mean the key's
+  own limits are too tight; `policy: "platform"` means a platform default
+  or ceiling applied.
+- The flow helpers turn the wait into a cooldown: on `send` the resend
+  cooldown (`cooldownRemainingMs`), on `verify` a separate verify cooldown
+  (`verifyCooldownRemainingMs`, `canVerify: false`). See
+  [issue -> verify UX](./issue-verify-ux.md).
 
 ## Verification results are not errors
 

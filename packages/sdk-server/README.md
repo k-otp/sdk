@@ -113,7 +113,10 @@ filters while paging (the helpers do this for you). Breaking out of a
 ### Errors
 
 Rejections are `OtpApiError` with the same codes, `status`, `requestId`,
-`data` and `retryAfterMs` as sdk-core. See
+`data` and `retryAfterMs` as sdk-core. `issue` and `verify` are rate-limited
+per API key: an exceeded limit rejects with `TOO_MANY_REQUESTS` (429,
+retryable), `retryAfterMs` and `data: { limit, policy, retryAfterMs }`
+(`OtpRateLimitedData`). See
 [errors and retries](../../docs/errors-and-retries.md).
 
 ## Runtime notes
