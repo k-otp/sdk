@@ -238,7 +238,7 @@ const isWait = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
 
 /** `data.retryAfterMs`, else `Retry-After`, else `data.retryAfter` (s). */
-const retryAfterFromBody = (
+const resolveRetryAfterMs = (
   data: unknown,
   headers: HeaderBag,
 ): number | undefined => {
@@ -281,7 +281,7 @@ export const otpErrorFromResponse = (
     data,
     // `data.retryAfterMs` is exact; `Retry-After` is the same wait rounded up
     // to whole seconds, and the only one a gateway or older API may send.
-    retryAfterMs: retryAfterFromBody(data, headers),
+    retryAfterMs: resolveRetryAfterMs(data, headers),
   });
 };
 

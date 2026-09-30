@@ -149,7 +149,7 @@ export type UseOtpFlowReturn = {
   error: ComputedRef<OtpApiError | undefined>;
   idempotencyKey: ComputedRef<string | undefined>;
   cooldownRemainingMs: ComputedRef<number>;
-  /** Remaining verify cooldown after a rate-limited (429) verify, in ms. */
+  /** Remaining verify cooldown after a verify answered with a retry hint (429, or 503 with `Retry-After`), in ms. */
   verifyCooldownRemainingMs: ComputedRef<number>;
   canSend: ComputedRef<boolean>;
   canVerify: ComputedRef<boolean>;
