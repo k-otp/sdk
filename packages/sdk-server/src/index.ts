@@ -29,6 +29,7 @@ export {
   type OtpOperation,
   type OtpOverallStatus,
   type OtpPaymentRequiredData,
+  type OtpRateLimitedData,
   type OtpRequestEndInfo,
   type OtpRequestOptions,
   type OtpTelemetryHooks,

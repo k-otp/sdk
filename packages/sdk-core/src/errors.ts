@@ -6,7 +6,10 @@
  * failure, abort, or a client-side validation failure before any request).
  */
 
-import type { IssueOtpPaymentErrorData } from "./generated/openapi";
+import type {
+  IssueOtpPaymentErrorData,
+  OtpRateLimitErrorData,
+} from "./generated/openapi";
 
 /** All normalized error codes. */
 export const OTP_API_ERROR_CODES = [
@@ -33,6 +36,20 @@ export type OtpApiErrorCode = (typeof OTP_API_ERROR_CODES)[number];
  */
 export type OtpPaymentRequiredData = {
   code: IssueOtpPaymentErrorData["code"] | (string & {});
+};
+
+/**
+ * `data` of a 429 TOO_MANY_REQUESTS error from `issue`/`verify`: the generated
+ * wire type, open to rules and policies a newer API version may add. The wait
+ * is also normalized into {@link OtpApiError.retryAfterMs}.
+ */
+export type OtpRateLimitedData = {
+  /** Rule that rejected the request (`perKey`, `perIp`, `perPhone`). */
+  limit: OtpRateLimitErrorData["limit"] | (string & {});
+  /** `key` (the key's own policy) or `platform` (default or ceiling). */
+  policy: OtpRateLimitErrorData["policy"] | (string & {});
+  /** Milliseconds until a retry can be admitted. */
+  retryAfterMs: number;
 };
 
 export type OtpApiErrorOptions = {
@@ -64,9 +81,17 @@ export class OtpApiError extends Error {
   readonly status: number;
   /** Server request id (`x-request-id` / `request-id` / `cf-ray`), if exposed. */
   readonly requestId: string | undefined;
-  /** Error payload, e.g. {@link OtpPaymentRequiredData} for 402. */
+  /**
+   * Error payload, e.g. {@link OtpPaymentRequiredData} for 402 or
+   * {@link OtpRateLimitedData} for 429.
+   */
   readonly data: unknown;
-  /** Suggested wait before retrying (from `Retry-After` or the error body). */
+  /**
+   * Suggested wait before retrying, in ms: the error body's
+   * `data.retryAfterMs`, else the `Retry-After` header (seconds or HTTP
+   * date), else `data.retryAfter` (seconds). Set on 429 TOO_MANY_REQUESTS
+   * and, when the server sends one, on 503.
+   */
   readonly retryAfterMs: number | undefined;
 
   constructor(options: OtpApiErrorOptions) {
@@ -209,14 +234,19 @@ export const parseRetryAfter = (
   return Number.isNaN(date) ? undefined : Math.max(0, date - now);
 };
 
-const retryAfterFromBody = (data: unknown): number | undefined => {
-  if (!isRecord(data)) return undefined;
-  if (typeof data.retryAfterMs === "number" && data.retryAfterMs >= 0) {
-    return data.retryAfterMs;
-  }
-  if (typeof data.retryAfter === "number" && data.retryAfter >= 0) {
-    return Math.round(data.retryAfter * 1000);
-  }
+const isWait = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0;
+
+/** `data.retryAfterMs`, else `Retry-After`, else `data.retryAfter` (s). */
+const retryAfterFromBody = (
+  data: unknown,
+  headers: HeaderBag,
+): number | undefined => {
+  const body = isRecord(data) ? data : undefined;
+  if (isWait(body?.retryAfterMs)) return Math.ceil(body.retryAfterMs);
+  const header = parseRetryAfter(readHeader(headers, "retry-after"));
+  if (header !== undefined) return header;
+  if (isWait(body?.retryAfter)) return Math.round(body.retryAfter * 1000);
   return undefined;
 };
 
@@ -249,9 +279,9 @@ export const otpErrorFromResponse = (
     message,
     requestId: readRequestId(headers),
     data,
-    retryAfterMs:
-      parseRetryAfter(readHeader(headers, "retry-after")) ??
-      retryAfterFromBody(data),
+    // `data.retryAfterMs` is exact; `Retry-After` is the same wait rounded up
+    // to whole seconds, and the only one a gateway or older API may send.
+    retryAfterMs: retryAfterFromBody(data, headers),
   });
 };
 

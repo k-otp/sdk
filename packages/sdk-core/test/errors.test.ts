@@ -183,6 +183,56 @@ describe("Retry-After", () => {
     expect(seconds.retryAfterMs).toBe(2000);
   });
 
+  test("429 rate limit (1.3.1): exact data.retryAfterMs wins over the rounded header", async () => {
+    const error = await verify(() =>
+      errorEnvelope(
+        429,
+        "TOO_MANY_REQUESTS",
+        "Too Many Requests",
+        { limit: "perKey", policy: "key", retryAfterMs: 1500 },
+        { "retry-after": "2" },
+      ),
+    );
+    expect(error.code).toBe("TOO_MANY_REQUESTS");
+    expect(error.status).toBe(429);
+    expect(error.retryable).toBe(true);
+    expect(error.retryAfterMs).toBe(1500);
+    expect(error.data).toEqual({
+      limit: "perKey",
+      policy: "key",
+      retryAfterMs: 1500,
+    });
+    expect(error.toJSON().retryAfterMs).toBe(1500);
+  });
+
+  test("Retry-After header wins over the legacy data.retryAfter seconds", async () => {
+    const error = await verify(() =>
+      errorEnvelope(
+        429,
+        "TOO_MANY_REQUESTS",
+        "x",
+        { retryAfter: 9 },
+        {
+          "retry-after": "2",
+        },
+      ),
+    );
+    expect(error.retryAfterMs).toBe(2000);
+  });
+
+  test("429 without an envelope still maps to TOO_MANY_REQUESTS with Retry-After", async () => {
+    const error = await verify(
+      () =>
+        new Response("rate limited", {
+          status: 429,
+          headers: { "content-type": "text/plain", "retry-after": "4" },
+        }),
+    );
+    expect(error.code).toBe("TOO_MANY_REQUESTS");
+    expect(error.retryable).toBe(true);
+    expect(error.retryAfterMs).toBe(4000);
+  });
+
   test("absent when not provided", async () => {
     const error = await verify(() =>
       errorEnvelope(503, "SERVICE_UNAVAILABLE", "x"),

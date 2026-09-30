@@ -11,6 +11,7 @@ export {
   type OtpApiErrorCode,
   type OtpApiErrorOptions,
   type OtpPaymentRequiredData,
+  type OtpRateLimitedData,
   otpErrorCodeFromStatus,
   parseRetryAfter,
 } from "./errors";

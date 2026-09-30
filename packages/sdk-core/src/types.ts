@@ -15,6 +15,7 @@ import type {
   OtpBalanceOutput,
   OtpCreditLedgerItem,
   OtpDashboardIssue,
+  OtpRateLimitErrorData,
   TemplatePublicDetail,
   TemplateSummary,
   VerifyOtpInput,
@@ -37,6 +38,8 @@ export type VerifyResult = VerifyOtpOutput;
 export type VerifyReasonCode = NonNullable<VerifyOtpOutput["reasonCode"]>;
 export type OtpChannel = NonNullable<IssueOtpInput["channel"]>;
 export type PaymentRequiredData = IssueOtpPaymentErrorData;
+/** `data` of a 429 TOO_MANY_REQUESTS error from `issue`/`verify` (1.3.1+). */
+export type RateLimitedData = OtpRateLimitErrorData;
 
 export type GetStatusInput = OpenApiOperations["status"]["query"];
 export type GetStatusResult = GetIssueStatusOutput;

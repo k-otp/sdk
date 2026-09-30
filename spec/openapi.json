@@ -1,8 +1,8 @@
 {
   "info": {
     "title": "k-otp API",
-    "version": "1.2.0",
-    "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`.\n\n**Request id.** Every response carries `X-Request-Id` (also exposed to allowed browser origins via CORS).\nA request `X-Request-Id` matching `^[A-Za-z0-9._:-]{8,128}$` is echoed; otherwise the API generates one.\nQuote it when contacting support."
+    "version": "1.3.1",
+    "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`.\n\n**Rate limits.** `POST /issue` and `POST /verify` enforce the API key's rate-limit policy, a platform default for `pk_` keys and a platform ceiling.\nAn exceeded limit returns 429 `TOO_MANY_REQUESTS` with a `Retry-After` header (seconds) and `data.retryAfterMs`.\n\n**Request id.** Every response carries `X-Request-Id` (also exposed to allowed browser origins via CORS).\nA request `X-Request-Id` matching `^[A-Za-z0-9._:-]{8,128}$` is echoed; otherwise the API generates one.\nQuote it when contacting support."
   },
   "servers": [
     {
@@ -91,7 +91,8 @@
           },
           "cost": {
             "type": "number",
-            "description": "Credits to reserve and debit for this issue: an integer from 1 to 100000. Defaults to 1."
+            "description": "Deprecated and ignored for billing. The credit amount reserved and debited\nis always decided server-side from the channel and message type (SMS, LMS,\nAlimTalk) and cannot be overridden by any key type. Still accepted for\ncompatibility: when sent it must be an integer from 1 to 100000, and it\nremains part of the idempotency fingerprint.",
+            "deprecated": true
           },
           "metadata": {
             "$ref": "#/components/schemas/TrackMetadata",
@@ -151,6 +152,48 @@
           "queuedAt"
         ],
         "description": "Result of `POST /v1/issue`. The OTP code itself is never returned."
+      },
+      "OtpRateLimitErrorData": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "oneOf": [
+              {
+                "const": "perIp"
+              },
+              {
+                "const": "perKey"
+              },
+              {
+                "const": "perPhone"
+              }
+            ],
+            "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only) or `perPhone` (per\nrecipient number, issue only)."
+          },
+          "policy": {
+            "oneOf": [
+              {
+                "const": "key"
+              },
+              {
+                "const": "platform"
+              }
+            ],
+            "description": "`key`: the rate-limit policy configured on the API key. `platform`: a\nplatform limit, either the default for the key type (currently `pk_`\npublic keys) or the platform ceiling a key rule was capped at."
+          },
+          "retryAfterMs": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Milliseconds until a retry can be admitted.",
+            "example": 1500
+          }
+        },
+        "required": [
+          "limit",
+          "policy",
+          "retryAfterMs"
+        ],
+        "description": "Error data of a 429 TOO_MANY_REQUESTS response from `POST /v1/issue` or\n`POST /v1/verify`. The `Retry-After` response header carries the same wait\nin whole seconds (rounded up)."
       },
       "IssueOtpPaymentErrorData": {
         "type": "object",
@@ -1027,6 +1070,14 @@
           "minLength": 8,
           "maxLength": 128
         }
+      },
+      "RetryAfter": {
+        "description": "Seconds (rounded up, at least 1) until a retry can be admitted; the same wait as `data.retryAfterMs`. Exposed to allowed browser origins via CORS.",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     }
   },
@@ -1036,7 +1087,7 @@
       "post": {
         "operationId": "otp.issue",
         "summary": "Issue OTP and queue outbound delivery",
-        "description": "Generates a 6-digit OTP, applies quota admission, records the issue, and queues SMS or AlimTalk delivery. The plaintext code is never returned; only `issueId`, expiry, and attempt metadata are.\n\n**Idempotency.** An idempotency key is required, either in the `Idempotency-Key` header or the body `idempotencyKey` field (both must match when both are sent). A retry with the same key and payload returns the original response without re-sending or re-debiting. When the outcome of the first attempt is unknown (timeout, 503), retry only with the same key.\n\n**Replacement.** Issuing again for the same phone number and purpose (with a new key) marks the previous `issued` OTP as `replaced`.\n\n**Billing.** Credit is reserved at admission and finalized asynchronously after send processing; the response does not include balance or debit amounts. Quota rejection returns 402 with `data.code`.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.",
+        "description": "Generates a 6-digit OTP, applies quota admission, records the issue, and queues SMS or AlimTalk delivery. The plaintext code is never returned; only `issueId`, expiry, and attempt metadata are.\n\n**Idempotency.** An idempotency key is required, either in the `Idempotency-Key` header or the body `idempotencyKey` field (both must match when both are sent). A retry with the same key and payload returns the original response without re-sending or re-debiting. When the outcome of the first attempt is unknown (timeout, 503), retry only with the same key.\n\n**Replacement.** Issuing again for the same phone number and purpose (with a new key) marks the previous `issued` OTP as `replaced`.\n\n**Billing.** Credit is reserved at admission and finalized asynchronously after send processing; the response does not include balance or debit amounts. The charged amount is decided server-side per channel/message type (SMS, LMS, AlimTalk); the deprecated `cost` field is ignored for billing for every key type. Quota rejection returns 402 with `data.code`.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.\n\n**Rate limits.** The key's `perKey`, `perIp` and `perPhone` rules are enforced after validation. For `pk_` keys the platform default covers `perKey`/`perIp` the key does not set and its `perPhone` default always applies; `perKey`/`perIp` never exceed the platform ceiling. An exceeded rule returns 429 with `Retry-After` and `data.retryAfterMs`.",
         "tags": [
           "otp"
         ],
@@ -1094,7 +1145,8 @@
                   },
                   "cost": {
                     "type": "number",
-                    "description": "Credits to reserve and debit for this issue: an integer from 1 to 100000. Defaults to 1."
+                    "description": "Deprecated and ignored for billing. The credit amount reserved and debited\nis always decided server-side from the channel and message type (SMS, LMS,\nAlimTalk) and cannot be overridden by any key type. Still accepted for\ncompatibility: when sent it must be an integer from 1 to 100000, and it\nremains part of the idempotency fingerprint.",
+                    "deprecated": true
                   },
                   "metadata": {
                     "$ref": "#/components/schemas/TrackMetadata",
@@ -1165,7 +1217,7 @@
             }
           },
           "400": {
-            "description": "BAD_REQUEST: invalid payload, missing/blank idempotency key, header/body key mismatch, unknown template or template variables, or `expiresInSec`/`maxAttempts`/`cost` out of range.",
+            "description": "BAD_REQUEST: invalid payload, missing/blank idempotency key, header/body key mismatch, unknown template or template variables, or `expiresInSec`/`maxAttempts`/`cost` out of range (`cost` is still range-checked though it no longer affects billing).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1485,6 +1537,116 @@
               }
             }
           },
+          "429": {
+            "description": "TOO_MANY_REQUESTS: the API key exceeded a rate limit. `data.limit` names the rule (`perKey`, `perIp` or `perPhone`) and `data.policy` whether it came from the key's own policy (`key`) or a platform limit (`platform`: the default for `pk_` keys or the platform ceiling). Wait `data.retryAfterMs` milliseconds (the `Retry-After` header carries the same wait in seconds) before retrying; reuse the same idempotency key. Rejected requests do not consume the limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "TOO_MANY_REQUESTS"
+                        },
+                        "status": {
+                          "const": 429
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Too Many Requests"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "limit": {
+                              "oneOf": [
+                                {
+                                  "const": "perIp"
+                                },
+                                {
+                                  "const": "perKey"
+                                },
+                                {
+                                  "const": "perPhone"
+                                }
+                              ],
+                              "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only) or `perPhone` (per\nrecipient number, issue only)."
+                            },
+                            "policy": {
+                              "oneOf": [
+                                {
+                                  "const": "key"
+                                },
+                                {
+                                  "const": "platform"
+                                }
+                              ],
+                              "description": "`key`: the rate-limit policy configured on the API key. `platform`: a\nplatform limit, either the default for the key type (currently `pk_`\npublic keys) or the platform ceiling a key rule was capped at."
+                            },
+                            "retryAfterMs": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "description": "Milliseconds until a retry can be admitted.",
+                              "example": 1500
+                            }
+                          },
+                          "required": [
+                            "limit",
+                            "policy",
+                            "retryAfterMs"
+                          ],
+                          "description": "Error data of a 429 TOO_MANY_REQUESTS response from `POST /v1/issue` or\n`POST /v1/verify`. The `Retry-After` response header carries the same wait\nin whole seconds (rounded up)."
+                        }
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message",
+                        "data"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            }
+          },
           "500": {
             "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
             "content": {
@@ -1551,7 +1713,7 @@
             }
           },
           "503": {
-            "description": "SERVICE_UNAVAILABLE: introspection or a downstream dependency is unavailable, or an earlier attempt with this idempotency key is still being resolved. Retry later with the same key.",
+            "description": "SERVICE_UNAVAILABLE: introspection or a downstream dependency is unavailable, the rate limiter is unavailable for a `pk_` key (fail-closed, `Retry-After` set), or an earlier attempt with this idempotency key is still being resolved. Retry later with the same key.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1650,7 +1812,7 @@
       "post": {
         "operationId": "otp.verify",
         "summary": "Verify OTP code",
-        "description": "Checks a 6-digit `code` against `issueId` with one-time semantics. On success the issue transitions to `verified` and cannot be verified again. A wrong code consumes one attempt. Verification failures are returned as 200 with `verified: false` and a `reasonCode` (`MISMATCH`, `MAX_ATTEMPTS`, `EXPIRED`, `ALREADY_VERIFIED`, `REPLACED`, `NOT_FOUND`), not as HTTP errors.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.",
+        "description": "Checks a 6-digit `code` against `issueId` with one-time semantics. On success the issue transitions to `verified` and cannot be verified again. A wrong code consumes one attempt. Verification failures are returned as 200 with `verified: false` and a `reasonCode` (`MISMATCH`, `MAX_ATTEMPTS`, `EXPIRED`, `ALREADY_VERIFIED`, `REPLACED`, `NOT_FOUND`), not as HTTP errors.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.\n\n**Rate limits.** The key's `perKey` rule (for `pk_` keys the platform default when the key sets none), capped at the platform ceiling, is enforced after validation; an exceeded rule returns 429 with `Retry-After` and `data.retryAfterMs`.",
         "tags": [
           "otp"
         ],
@@ -2007,6 +2169,116 @@
               }
             }
           },
+          "429": {
+            "description": "TOO_MANY_REQUESTS: the API key exceeded a rate limit. `data.limit` names the rule (`perKey`) and `data.policy` whether it came from the key's own policy (`key`) or a platform limit (`platform`: the default for `pk_` keys or the platform ceiling). Wait `data.retryAfterMs` milliseconds (the `Retry-After` header carries the same wait in seconds) before retrying; rejected requests do not consume the limit or a verification attempt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "TOO_MANY_REQUESTS"
+                        },
+                        "status": {
+                          "const": 429
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Too Many Requests"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "limit": {
+                              "oneOf": [
+                                {
+                                  "const": "perIp"
+                                },
+                                {
+                                  "const": "perKey"
+                                },
+                                {
+                                  "const": "perPhone"
+                                }
+                              ],
+                              "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only) or `perPhone` (per\nrecipient number, issue only)."
+                            },
+                            "policy": {
+                              "oneOf": [
+                                {
+                                  "const": "key"
+                                },
+                                {
+                                  "const": "platform"
+                                }
+                              ],
+                              "description": "`key`: the rate-limit policy configured on the API key. `platform`: a\nplatform limit, either the default for the key type (currently `pk_`\npublic keys) or the platform ceiling a key rule was capped at."
+                            },
+                            "retryAfterMs": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "description": "Milliseconds until a retry can be admitted.",
+                              "example": 1500
+                            }
+                          },
+                          "required": [
+                            "limit",
+                            "policy",
+                            "retryAfterMs"
+                          ],
+                          "description": "Error data of a 429 TOO_MANY_REQUESTS response from `POST /v1/issue` or\n`POST /v1/verify`. The `Retry-After` response header carries the same wait\nin whole seconds (rounded up)."
+                        }
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message",
+                        "data"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            }
+          },
           "500": {
             "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
             "content": {
@@ -2073,7 +2345,7 @@
             }
           },
           "503": {
-            "description": "SERVICE_UNAVAILABLE: credential introspection or a downstream dependency is temporarily unavailable. Retry with backoff.",
+            "description": "SERVICE_UNAVAILABLE: introspection or a downstream dependency is unavailable, or the rate limiter is unavailable for a `pk_` key (fail-closed, `Retry-After` set). Retry with backoff.",
             "content": {
               "application/json": {
                 "schema": {
