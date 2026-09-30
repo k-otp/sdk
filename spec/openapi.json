@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "k-otp API",
-    "version": "1.3.1",
+    "version": "1.3.2",
     "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`.\n\n**Rate limits.** `POST /issue` and `POST /verify` enforce the API key's rate-limit policy, a platform default for `pk_` keys and a platform ceiling.\nAn exceeded limit returns 429 `TOO_MANY_REQUESTS` with a `Retry-After` header (seconds) and `data.retryAfterMs`.\n\n**Request id.** Every response carries `X-Request-Id` (also exposed to allowed browser origins via CORS).\nA request `X-Request-Id` matching `^[A-Za-z0-9._:-]{8,128}$` is echoed; otherwise the API generates one.\nQuote it when contacting support."
   },
   "servers": [
@@ -1078,6 +1078,14 @@
           "type": "integer",
           "minimum": 1
         }
+      },
+      "RetryAfterUnavailable": {
+        "description": "Seconds until a retry can be admitted. Set only when the rate limiter is unavailable and the request failed closed (`pk_` keys, or a rejected limiter input); absent for other 503 causes. Exposed to allowed browser origins via CORS.",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     }
   },
@@ -1774,6 +1782,9 @@
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/XRequestId"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfterUnavailable"
               }
             }
           }
@@ -2406,6 +2417,9 @@
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/XRequestId"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfterUnavailable"
               }
             }
           }
