@@ -8,6 +8,7 @@ import { part, segment, segments, sentPhone } from "./dom";
 import BoundCode from "./fixtures/BoundCode.svelte";
 import Custom from "./fixtures/Custom.svelte";
 import ImeHarness from "./fixtures/ImeHarness.svelte";
+import LocaleSwitch from "./fixtures/LocaleSwitch.svelte";
 import { createMockApi, flush, MOCK_CODE } from "./mock-api";
 import { mountSvelte } from "./svelte-mount";
 
@@ -259,6 +260,39 @@ describe("<OtpCodeInput /> (Svelte)", () => {
     expect(
       (document.querySelector('input[name="code"]') as HTMLInputElement).value,
     ).toBe("123456");
+  });
+
+  test('switching locale to and from "auto" after mount starts and stops the watcher', async () => {
+    document.documentElement.lang = "en";
+    try {
+      let setLocale!: (next: string) => void;
+      mount(LocaleSwitch, {
+        onSet: (set: (next: string) => void) => {
+          setLocale = set;
+        },
+      });
+      await flush();
+      const label = () =>
+        document
+          .querySelector('[data-k-otp="code-input"]')
+          ?.getAttribute("aria-label");
+      expect(label()).toBe("인증번호");
+      setLocale("auto");
+      await flush();
+      expect(label()).toBe("Verification code");
+      setLocale("ko");
+      await flush();
+      expect(label()).toBe("인증번호");
+      // Stopped: a lang change no longer matters.
+      document.documentElement.lang = "fr";
+      await flush();
+      expect(label()).toBe("인증번호");
+      setLocale("auto");
+      await flush();
+      expect(label()).toBe("Verification code");
+    } finally {
+      document.documentElement.lang = "";
+    }
   });
 
   test("is exported for direct use", () => {

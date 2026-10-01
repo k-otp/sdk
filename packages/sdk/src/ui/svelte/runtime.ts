@@ -474,7 +474,14 @@ type CodeInputModel = {
   group: (
     node: HTMLElement,
     options: { autoFocus: boolean; webOtp: boolean; locale?: unknown },
-  ) => { destroy: () => void };
+  ) => {
+    update: (options: {
+      autoFocus: boolean;
+      webOtp: boolean;
+      locale?: unknown;
+    }) => void;
+    destroy: () => void;
+  };
 };
 
 /** Model of a standalone `OtpCodeInput` (component init only). */
@@ -546,13 +553,22 @@ export const createOtpCodeInputModel = (options: {
         focusOtpCodeSegment(node, Math.min(current().length, length() - 1));
       }
       const controller = new AbortController();
-      const stopLocale =
-        groupOptions.locale === "auto"
-          ? watchOtpDocumentLocale((next) => {
-              detected = next;
-              detectedLocale.set(next);
-            })
-          : undefined;
+      let stopLocale: (() => void) | undefined;
+      let watchedLocale: unknown;
+      /** Starts or stops following `<html lang>` as `locale` changes. */
+      const followLocale = (locale: unknown): void => {
+        if (locale === watchedLocale) return;
+        watchedLocale = locale;
+        stopLocale?.();
+        stopLocale =
+          locale === "auto"
+            ? watchOtpDocumentLocale((next) => {
+                detected = next;
+                detectedLocale.set(next);
+              })
+            : undefined;
+      };
+      followLocale(groupOptions.locale);
       if (groupOptions.webOtp) {
         void receiveWebOtp({
           signal: controller.signal,
@@ -562,6 +578,7 @@ export const createOtpCodeInputModel = (options: {
         });
       }
       return {
+        update: (next) => followLocale(next.locale),
         destroy: () => {
           controller.abort();
           stopLocale?.();
