@@ -249,7 +249,10 @@ describe("publish-oidc.sh publish", () => {
   });
 
   test("a version npm already accepted (409, still in review) is not a failure", () => {
-    const r = run([], { STUB_NPM_PUBLISHED: "0", STUB_NPM_PUBLISH: "conflict" });
+    const r = run([], {
+      STUB_NPM_PUBLISHED: "0",
+      STUB_NPM_PUBLISH: "conflict",
+    });
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain("already submitted to npm");
   });
