@@ -567,8 +567,14 @@ export const createOtpCodeInputHandlers = (
     element.value = change.value[index] ?? "";
     commit(change.value, change.focus);
   };
+  /** A `sync()` was skipped while composing: replayed when it ends. */
+  let syncPending = false;
   const sync = (container?: ParentNode | null): void => {
-    if (composing) return;
+    if (composing) {
+      syncPending = true;
+      return;
+    }
+    syncPending = false;
     const value = options.getValue();
     segmentsOf(container ?? options.getContainer()).forEach(
       (segment, index) => {
@@ -577,6 +583,11 @@ export const createOtpCodeInputHandlers = (
         if (input.value !== digit) input.value = digit;
       },
     );
+  };
+  /** Ends a composition and reconciles the DOM with the current value. */
+  const endComposition = (): void => {
+    composing = false;
+    if (syncPending) sync();
   };
   return {
     input: (index, event) => {
@@ -592,20 +603,22 @@ export const createOtpCodeInputHandlers = (
       }
       composing = false;
       const element = elementOf(event);
-      if (!element) return;
       const last = composed;
       composed = undefined;
       if (
-        last?.index === index &&
-        element.value === (options.getValue()[index] ?? "")
+        element &&
+        !(
+          last?.index === index &&
+          element.value === (options.getValue()[index] ?? "")
+        )
       ) {
-        return; // the trailing input of a composition already applied
+        // (Skipped: the trailing input of a composition already applied.)
+        apply(index, element);
       }
-      apply(index, element);
+      // After applying the typed text, never before (it would be lost).
+      if (syncPending) sync();
     },
-    blur: () => {
-      composing = false;
-    },
+    blur: endComposition,
     compositionstart: () => {
       composing = true;
       composed = undefined;
@@ -613,9 +626,13 @@ export const createOtpCodeInputHandlers = (
     compositionend: (index, event) => {
       composing = false;
       const element = elementOf(event);
-      if (!element) return;
-      composed = { index };
-      apply(index, element);
+      if (element) {
+        composed = { index };
+        apply(index, element);
+      }
+      // The code may have changed while composing (WebOTP, reset, a
+      // controlled parent) without any render after this point.
+      if (syncPending) sync();
     },
     isComposing: () => composing,
     sync,
@@ -629,7 +646,7 @@ export const createOtpCodeInputHandlers = (
       const keyComposing = event.isComposing ?? native?.isComposing;
       if (keyComposing === true || event.key === "Process") return;
       // A key outside any composition ends a composition left open.
-      if (keyComposing === false) composing = false;
+      if (keyComposing === false) endComposition();
       if (composing) return;
       const value = options.getValue();
       const change = applyOtpCodeKey(

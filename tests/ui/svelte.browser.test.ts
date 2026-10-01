@@ -131,6 +131,34 @@ describe("Svelte IME and locale", () => {
     expect(document.activeElement).toBe(segment(1));
   });
 
+  test("a code change during a composition reaches the DOM when it ends", async () => {
+    const api = createMockApi();
+    let form!: OtpFormController;
+    mount(ImeHarness, {
+      client: api.client,
+      onForm: (captured: OtpFormController) => {
+        form = captured;
+      },
+    });
+    await flush();
+    form.configure({ autoSubmit: false });
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    await flush();
+    form.setCode("12");
+    await flush();
+    fireEvent.compositionStart(segment(2));
+    segment(2).value = "ａ";
+    fireEvent.input(segment(2), { isComposing: true });
+    form.setCode("98");
+    await flush();
+    expect(segment(0).value).toBe("1");
+    fireEvent.compositionEnd(segment(2));
+    await flush();
+    expect(form.getState().code).toBe("98");
+    expect(segments().map((s) => s.value)).toEqual(["9", "8", "", "", "", ""]);
+  });
+
   test('locale="auto" follows <html lang> after mount', async () => {
     const api = createMockApi();
     document.documentElement.lang = "en-GB";

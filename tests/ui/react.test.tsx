@@ -337,6 +337,42 @@ describe("<OtpForm /> preset (React)", () => {
     expect(segments().map((s) => s.value)).toEqual(["9", "", "", "", "", ""]);
   });
 
+  test("a code change during a composition reaches the DOM when it ends", async () => {
+    const api = createMockApi();
+    let form!: OtpFormController;
+    render(
+      <OtpForm.Root
+        client={api.client}
+        purpose="ime"
+        locale="en"
+        autoSubmit={false}
+      >
+        {(context) => {
+          form = context.form;
+          return context.state.issued ? <OtpForm.CodeField /> : null;
+        }}
+      </OtpForm.Root>,
+    );
+    form.setPhoneNumber("01012345678");
+    await act(async () => {
+      await form.send();
+    });
+    fireEvent.change(segment(0), { target: { value: "1" } });
+    fireEvent.change(segment(1), { target: { value: "2" } });
+    fireEvent.compositionStart(segment(2));
+    segment(2).value = "ａ";
+    fireEvent.input(segment(2), { isComposing: true });
+    act(() => form.setCode("98"));
+    // Composing: the DOM is left alone for now.
+    expect(segment(0).value).toBe("1");
+    // The composition ends without a digit: no state change, but the DOM
+    // catches up with the code.
+    fireEvent.compositionEnd(segment(2));
+    await settle();
+    expect(form.getState().code).toBe("98");
+    expect(segments().map((s) => s.value)).toEqual(["9", "8", "", "", "", ""]);
+  });
+
   test('locale="auto" follows <html lang> after mount; the default never does', async () => {
     const api = createMockApi();
     document.documentElement.lang = "en";

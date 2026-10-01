@@ -41,7 +41,16 @@ const setup = (initial = "") => {
     Array.from(container.querySelectorAll("input")).indexOf(
       document.activeElement as HTMLInputElement,
     );
-  return { handlers, segment, input, focused, value: () => value };
+  return {
+    handlers,
+    segment,
+    input,
+    focused,
+    value: () => value,
+    setValue: (next: string) => {
+      value = next;
+    },
+  };
 };
 
 describe("code input handlers: IME", () => {
@@ -100,6 +109,55 @@ describe("code input handlers: IME", () => {
     input(0, segment(0).value, false);
     expect(value()).toBe("123");
     expect(focused()).toBe(3);
+  });
+
+  test("a sync skipped during a composition is replayed when it ends", () => {
+    const state = setup("123456");
+    const { handlers, segment } = state;
+    handlers.sync();
+    handlers.compositionstart();
+    segment(2).value = "ａ";
+    // The code changes meanwhile (WebOTP, reset, a controlled parent).
+    state.setValue("");
+    handlers.sync();
+    expect(segment(0).value).toBe("1");
+    handlers.compositionend(2, {
+      currentTarget: segment(2),
+      target: segment(2),
+    });
+    expect([0, 1, 2, 3, 4, 5].map((i) => segment(i).value)).toEqual([
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+    ]);
+  });
+
+  test("a non-composing input after a skipped sync keeps the typed digit", () => {
+    const state = setup("12");
+    const { handlers, segment, input } = state;
+    handlers.sync();
+    handlers.compositionstart();
+    state.setValue("98");
+    handlers.sync();
+    // No compositionend: the next input says it is not composing.
+    input(2, "7", false);
+    expect(state.value()).toBe("987");
+    expect([0, 1, 2].map((i) => segment(i).value)).toEqual(["9", "8", "7"]);
+  });
+
+  test("blur also replays a skipped sync", () => {
+    const state = setup("12");
+    const { handlers, segment } = state;
+    handlers.sync();
+    handlers.compositionstart();
+    state.setValue("98");
+    handlers.sync();
+    handlers.blur();
+    expect(segment(0).value).toBe("9");
+    expect(segment(1).value).toBe("8");
   });
 
   test("sync() writes the value unless composing", () => {
