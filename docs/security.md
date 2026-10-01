@@ -2,8 +2,11 @@
 
 ## Never ship `sk_` keys to clients
 
-`sk_` secret keys can read issue history, balances and ledgers for your whole
-app and issue OTPs to any number. Keep them in server-side secrets (environment
+`sk_` secret keys can read issue history and issue OTPs to any number. Since
+API 1.4.0 they also read the organization-wide credit balance (shared by all of
+the organization's apps) and its credit ledger (top-ups and clawbacks, plus
+this app's debits), so a leaked key exposes organization-level balance
+information, not just one app's. Keep them in server-side secrets (environment
 variables, Workers secrets, a secret manager).
 
 - Never put an `sk_` key in browser code, mobile apps, public repositories,
