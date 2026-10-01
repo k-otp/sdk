@@ -9,7 +9,10 @@
  *   focus moves to the first code segment, a wrong code shows the attempts
  *   left and refocuses, the right code verifies and focuses the result;
  * - headless (custom CSS): the same flow with a pasted code, then "change
- *   number" returns to the phone step.
+ *   number" returns to the phone step;
+ * - keyboard: Tab / Shift+Tab walk the whole form (phone, send, the code
+ *   input as one tab stop, verify, resend, change number) without a trap;
+ * - IME: digits composed through an input method (CDP) are entered once.
  *
  *   bun run e2e:examples                          # all frameworks
  *   bun run e2e:examples --only react             # one framework
@@ -197,6 +200,83 @@ const headlessFlow = async (page: Page, base: string): Promise<void> => {
   );
 };
 
+/** Describes the focused element (`code-segment#2`, `send-button`, ...). */
+const focused = (page: Page): Promise<string> =>
+  page.evaluate(() => {
+    const element = document.activeElement as HTMLElement | null;
+    const part = element?.dataset?.kOtp ?? element?.tagName ?? "none";
+    return element?.dataset?.index ? `${part}#${element.dataset.index}` : part;
+  });
+
+const expectFocus = async (
+  page: Page,
+  key: "Tab" | "Shift+Tab" | undefined,
+  expected: string,
+): Promise<void> => {
+  if (key) await page.keyboard.press(key);
+  const actual = await focused(page);
+  if (actual !== expected) {
+    throw new Error(`${key ?? "focus"}: expected ${expected}, got ${actual}`);
+  }
+};
+
+const keyboardFlow = async (page: Page, base: string): Promise<void> => {
+  await page.goto(`${base}/?variant=preset&lang=en`);
+  await page.getByLabel("Phone number").focus();
+  await expectFocus(page, "Tab", "send-button");
+  await expectFocus(page, "Shift+Tab", "phone-input");
+  await page.keyboard.type("01012345678");
+  await page.keyboard.press("Enter");
+  await until(page, "code step", rootState("code"));
+  await until(page, "focus on segment 1", focusedSegment(0));
+  // Empty code: the code input is one stop, no trap.
+  await expectFocus(page, "Tab", "verify-button");
+  await expectFocus(page, "Tab", "send-button");
+  await expectFocus(page, "Tab", "edit-phone");
+  await expectFocus(page, "Shift+Tab", "send-button");
+  await expectFocus(page, "Shift+Tab", "verify-button");
+  await expectFocus(page, "Shift+Tab", "code-segment#0");
+  await expectFocus(page, "Shift+Tab", "phone-input");
+  await expectFocus(page, "Tab", "code-segment#0");
+  // Partly filled: Tab still leaves, also from an earlier segment.
+  await page.keyboard.type("12");
+  await expectFocus(page, undefined, "code-segment#2");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await expectFocus(page, undefined, "code-segment#0");
+  await expectFocus(page, "Tab", "verify-button");
+  await expectFocus(page, "Shift+Tab", "code-segment#2");
+  await expectFocus(page, "Shift+Tab", "phone-input");
+};
+
+/** Digits composed with an input method (CDP), as on IME keyboards. */
+const imeFlow = async (page: Page, base: string): Promise<void> => {
+  await page.goto(`${base}/?variant=preset&lang=en`);
+  await page.getByLabel("Phone number").fill("01012345678");
+  await page.keyboard.press("Enter");
+  await until(page, "code step", rootState("code"));
+  await until(page, "focus on segment 1", focusedSegment(0));
+  const cdp = await page.context().newCDPSession(page);
+  for (const digit of ["１", "２", "３"]) {
+    await cdp.send("Input.imeSetComposition", {
+      text: digit,
+      selectionStart: 1,
+      selectionEnd: 1,
+    });
+    await cdp.send("Input.insertText", { text: digit });
+  }
+  const values = await page.evaluate(() =>
+    Array.from(
+      document.querySelectorAll<HTMLInputElement>(
+        '[data-k-otp="code-segment"]',
+      ),
+      (segment) => segment.value,
+    ).join("|"),
+  );
+  if (values !== "1|2|3|||") throw new Error(`IME entered ${values}`);
+  await until(page, "focus on segment 4", focusedSegment(3));
+};
+
 /** Screenshots of a variant in the code step (and verified for the preset). */
 const capture = async (
   browser: Browser,
@@ -271,7 +351,7 @@ try {
         "--host",
         "127.0.0.1",
       ],
-      { cwd: dir, stdout: "ignore", stderr: "pipe" },
+      { cwd: dir, stdout: "ignore", stderr: "ignore" },
     );
     const base = `http://127.0.0.1:${port}`;
     try {
@@ -279,6 +359,8 @@ try {
       for (const [name, flow] of [
         ["preset", presetFlow],
         ["headless", headlessFlow],
+        ["keyboard", keyboardFlow],
+        ["ime", imeFlow],
       ] as const) {
         const context = await browser.newContext();
         const page = await context.newPage();
