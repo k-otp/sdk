@@ -268,7 +268,22 @@ for dir in ${TO_PUBLISH[@]+"${TO_PUBLISH[@]}"}; do
     exit 1
   fi
   echo "Publishing ${NAME}@${RELEASE_VERSION}"
-  npm publish "$TARBALL" --access public
+  # A version npm already accepted can stay invisible to the public registry
+  # while npm's automated review runs ("Validating"), so a later run re-tries
+  # it and npm answers 409. That version is already submitted: not a failure.
+  set +e
+  PUBLISH_OUT="$(npm publish "$TARBALL" --access public 2>&1)"
+  rc="$?"
+  set -e
+  echo "$PUBLISH_OUT"
+  if [[ "$rc" -ne 0 ]]; then
+    if grep -qE "E409|409 Conflict" <<<"$PUBLISH_OUT" \
+      && grep -qiE "cannot publish over (the )?previously (staged|published) version" <<<"$PUBLISH_OUT"; then
+      echo "::notice::${NAME}@${RELEASE_VERSION} was already submitted to npm (still in review or staged); skipping."
+    else
+      exit "$rc"
+    fi
+  fi
   rm -f "$TARBALL"
 done
 

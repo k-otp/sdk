@@ -88,6 +88,29 @@ if [[ "$1" == "api" ]]; then
 fi`,
 );
 
+// Only the publish path below uses these: `bun pm pack` writes a tarball into
+// --destination and prints its path; `npm publish` answers per STUB_NPM_PUBLISH.
+stub(
+  "bun",
+  `if [[ "$1" == "pm" && "$2" == "pack" ]]; then
+  dest="$4"; file="$dest/k-otp-sdk-${VERSION}.tgz"; : >"$file"; echo "$file"
+fi
+exit 0`,
+);
+stub(
+  "npm",
+  `case "\${STUB_NPM_PUBLISH:-ok}" in
+  conflict)
+    echo "npm error code E409" >&2
+    echo 'npm error 409 Conflict - PUT https://registry.npmjs.org/@k-otp%2fsdk - Cannot publish over previously staged version "${VERSION}".' >&2
+    exit 1 ;;
+  fail)
+    echo "npm error code E500" >&2
+    exit 1 ;;
+esac
+exit 0`,
+);
+
 type Env = Record<string, string>;
 
 const run = (args: string[], env: Env = {}) => {
@@ -215,5 +238,24 @@ describe("publish-oidc.sh recovery", () => {
     const r = run([]);
     expect(r.exitCode).toBe(0);
     expect(r.calls.some((c) => c.startsWith("gh release create"))).toBe(false);
+  });
+});
+
+describe("publish-oidc.sh publish", () => {
+  test("publishes an unpublished version", () => {
+    const r = run([], { STUB_NPM_PUBLISHED: "0" });
+    expect(r.exitCode).toBe(0);
+    expect(r.calls.some((c) => c.startsWith("npm publish"))).toBe(true);
+  });
+
+  test("a version npm already accepted (409, still in review) is not a failure", () => {
+    const r = run([], { STUB_NPM_PUBLISHED: "0", STUB_NPM_PUBLISH: "conflict" });
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("already submitted to npm");
+  });
+
+  test("any other publish error fails the run", () => {
+    const r = run([], { STUB_NPM_PUBLISHED: "0", STUB_NPM_PUBLISH: "fail" });
+    expect(r.exitCode).not.toBe(0);
   });
 });
