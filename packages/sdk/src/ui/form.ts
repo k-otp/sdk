@@ -345,6 +345,11 @@ export const createOtpForm = (
    */
   let retained: { key: string; input: string } | undefined;
   /**
+   * The key and exact input of the latest request the flow actually sent
+   * (never of a send the flow skipped), recorded when it starts.
+   */
+  let lastAttempt: { key: string; input: string } | undefined;
+  /**
    * Bumped by `abort()`, `reset()` and `editPhoneNumber()`: a response of a
    * request started before is dropped without callbacks or side effects.
    */
@@ -634,11 +639,9 @@ export const createOtpForm = (
       return skipped("cooldown");
     }
     lastSkip = undefined;
-    attemptPhone = phone;
     const started = epoch;
-    if (retained && retained.input === sendInput(phone.value)) {
-      reuseKey = retained.key;
-    }
+    const input = sendInput(phone.value);
+    if (retained && retained.input === input) reuseKey = retained.key;
     retained = undefined;
     const promise = flow.send({
       ...config.issue,
@@ -646,6 +649,15 @@ export const createOtpForm = (
       phoneNumber: phone.value,
     });
     reuseKey = undefined;
+    // Only a request that really went out names the number and owns a key
+    // (a skipped send leaves the flow idle).
+    const startedFlow = flow.getState();
+    if (startedFlow.issueState.isLoading) {
+      attemptPhone = phone;
+      if (startedFlow.idempotencyKey) {
+        lastAttempt = { key: startedFlow.idempotencyKey, input };
+      }
+    }
     // The flow is already "loading" synchronously.
     touch();
     const result = await promise;
@@ -730,10 +742,11 @@ export const createOtpForm = (
   const clearIssue = (): void => {
     epoch++;
     stopWebOtp();
+    // Keep the flow's pending key only with the input it was created for.
     const pendingKey = flow.getState().idempotencyKey;
     retained =
-      pendingKey && attemptPhone?.value && !options.flow
-        ? { key: pendingKey, input: sendInput(attemptPhone.value) }
+      pendingKey && lastAttempt?.key === pendingKey && !options.flow
+        ? lastAttempt
         : undefined;
     flow.reset();
     attemptPhone = undefined;

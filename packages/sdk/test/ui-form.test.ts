@@ -504,6 +504,46 @@ describe("createOtpForm", () => {
     expect(issues[2]?.idempotencyKey).not.toBe(issues[0]?.idempotencyKey);
   });
 
+  test("a retained key is never reused for another number (send skipped by cooldown)", async () => {
+    const { form, next, issues, tick } = setup({ resendCooldownMs: 0 });
+    next.issue.push(apiError("SERVICE_UNAVAILABLE", 503, 60_000));
+    form.setPhoneNumber("01011112222");
+    await form.send();
+    // The server wait blocks this send before any request goes out.
+    form.setPhoneNumber("01033334444");
+    expect((await form.send()).skipped).toBe("cooldown");
+    form.reset();
+    tick(61_000);
+    form.setPhoneNumber("01033334444");
+    await form.send();
+    expect(issues.map((i) => i.phoneNumber)).toEqual([
+      "01011112222",
+      "01033334444",
+    ]);
+    expect(issues[1]?.idempotencyKey).not.toBe(issues[0]?.idempotencyKey);
+  });
+
+  test("a retained key is not reused when purpose or issue fields changed", async () => {
+    const { form, next, issues } = setup();
+    next.issue.push(apiError("TIMEOUT", 0));
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    // The settings change before "change number" (frameworks call configure
+    // on every render).
+    form.configure({ purpose: "login" });
+    form.editPhoneNumber();
+    await form.send();
+    expect(issues[1]?.idempotencyKey).not.toBe(issues[0]?.idempotencyKey);
+    next.issue.push(apiError("TIMEOUT", 0));
+    form.editPhoneNumber();
+    form.setPhoneNumber("01099998888");
+    await form.send();
+    form.configure({ issue: { templateId: "otp_login_kr" } });
+    form.editPhoneNumber();
+    await form.send();
+    expect(issues[3]?.idempotencyKey).not.toBe(issues[2]?.idempotencyKey);
+  });
+
   test("an ambiguous send keeps its key across change number", async () => {
     const { form, next, issues } = setup();
     next.issue.push(apiError("TIMEOUT", 0));
