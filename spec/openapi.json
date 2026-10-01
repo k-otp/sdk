@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "k-otp API",
-    "version": "1.3.2",
+    "version": "1.4.0",
     "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`.\n\n**Rate limits.** `POST /issue` and `POST /verify` enforce the API key's rate-limit policy, a platform default for `pk_` keys and a platform ceiling.\nAn exceeded limit returns 429 `TOO_MANY_REQUESTS` with a `Retry-After` header (seconds) and `data.retryAfterMs`.\n\n**Request id.** Every response carries `X-Request-Id` (also exposed to allowed browser origins via CORS).\nA request `X-Request-Id` matching `^[A-Za-z0-9._:-]{8,128}$` is echoed; otherwise the API generates one.\nQuote it when contacting support."
   },
   "servers": [
@@ -793,13 +793,19 @@
           "entryType": {
             "$ref": "#/components/schemas/OtpCreditLedgerEntryType"
           },
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Attribution app. Always the calling app for `debit`/`refund`; present on\norganization-wallet `credit`/`clawback` entries only when the purchase was\nattributed to an app."
+          },
           "amountDelta": {
             "$ref": "#/components/schemas/OtpCreditSignedValue",
             "description": "Signed wallet delta: debit and clawback are negative; credit and refund are positive."
           },
           "balanceAfter": {
             "$ref": "#/components/schemas/OtpCreditSignedValue",
-            "description": "May be negative when the tenant's quota policy permits overdraft."
+            "description": "Wallet balance after the entry (the organization wallet when shared). May\nbe negative when the quota policy permits overdraft. Entries of other apps\nof the organization are not listed, so consecutive `balanceAfter` values\ncan differ by more than `amountDelta`."
           },
           "currency": {
             "type": "string",
@@ -856,7 +862,20 @@
         "type": "object",
         "properties": {
           "appId": {
-            "type": "string"
+            "type": "string",
+            "description": "The calling app."
+          },
+          "walletId": {
+            "type": "string",
+            "description": "`org:<organizationId>` for the organization wallet; `app:<appId>` for a legacy per-app wallet."
+          },
+          "walletScope": {
+            "$ref": "#/components/schemas/WalletScope",
+            "description": "`organization` when the balance is shared by every app of the organization."
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Owning organization, present when `walletScope` is `organization`."
           },
           "balance": {
             "type": "number",
@@ -873,11 +892,24 @@
         },
         "required": [
           "appId",
+          "walletId",
+          "walletScope",
           "balance",
           "currency",
           "updatedAt"
         ],
-        "description": "Credit wallet balance of the authenticated app."
+        "description": "Credit wallet balance visible to the authenticated app. For an app of an\norganization this is the organization wallet shared by all of its apps."
+      },
+      "WalletScope": {
+        "oneOf": [
+          {
+            "const": "app"
+          },
+          {
+            "const": "organization"
+          }
+        ],
+        "description": "`organization`: the organization credit wallet (`org:<organizationId>`) shared\nby every app of the organization. `app`: the legacy per-app wallet, kept only\nuntil the contract step (ADR adr-org-credit-wallet)."
       },
       "ListTemplatesInput": {
         "type": "object",
@@ -4820,7 +4852,20 @@
                   "type": "object",
                   "properties": {
                     "appId": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "The calling app."
+                    },
+                    "walletId": {
+                      "type": "string",
+                      "description": "`org:<organizationId>` for the organization wallet; `app:<appId>` for a legacy per-app wallet."
+                    },
+                    "walletScope": {
+                      "$ref": "#/components/schemas/WalletScope",
+                      "description": "`organization` when the balance is shared by every app of the organization."
+                    },
+                    "organizationId": {
+                      "type": "string",
+                      "description": "Owning organization, present when `walletScope` is `organization`."
                     },
                     "balance": {
                       "type": "number",
@@ -4837,11 +4882,13 @@
                   },
                   "required": [
                     "appId",
+                    "walletId",
+                    "walletScope",
                     "balance",
                     "currency",
                     "updatedAt"
                   ],
-                  "description": "Credit wallet balance of the authenticated app."
+                  "description": "Credit wallet balance visible to the authenticated app. For an app of an\norganization this is the organization wallet shared by all of its apps."
                 }
               }
             },
