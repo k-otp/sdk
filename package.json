@@ -24,11 +24,12 @@
       "@orpc/openapi-client": "^1.15.4",
       "@testing-library/dom": "^10.4.2",
       "@testing-library/react": "^16.3.3",
-      "@types/node": "^26.6.3",
       "@ttsc/lint": "^0.30.4",
       "@types/bun": "^1.4.2",
+      "@types/node": "^26.6.3",
       "@types/react": "^19.3.0",
       "@types/react-dom": "^19.3.0",
+      "playwright": "^1.63.0",
       "react": "^19.3.0",
       "react-dom": "^19.3.0",
       "svelte": "^5.57.1",
@@ -52,7 +53,8 @@
     "size": "bun run scripts/size-report.ts",
     "check": "bun run typecheck && bun run lint && bun run test && bun run build && bun run check:pack && bun run smoke:dist && bun run size && bun run check:examples",
     "smoke:dist": "node scripts/smoke-dist.mjs",
-    "check:examples": "bun run scripts/check-examples.ts"
+    "check:examples": "bun run scripts/check-examples.ts",
+    "e2e:examples": "bun run scripts/e2e-examples.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
@@ -61,6 +63,7 @@
     "@types/bun": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "playwright": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "svelte": "catalog:",

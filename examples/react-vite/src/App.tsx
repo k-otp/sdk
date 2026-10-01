@@ -1,119 +1,108 @@
-import { useOtpFlow } from "@k-otp/sdk/react";
-import { type FormEvent, useState } from "react";
+import type { VerifyResult } from "@k-otp/sdk/react";
+import { OtpForm } from "@k-otp/sdk/ui/react";
+import { useState } from "react";
+import { href, locale, variant } from "./options";
 
-const describeError = (code: string, retryAfterMs?: number): string => {
-  switch (code) {
-    case "PAYMENT_REQUIRED":
-      return "The service is temporarily unable to send codes. Please try again later.";
-    case "TOO_MANY_REQUESTS":
-      return `Too many attempts. Try again in ${Math.ceil((retryAfterMs ?? 0) / 1000)}s.`;
-    case "FORBIDDEN":
-      return "This page's origin is not allowed for the public key (check allowedOrigins).";
-    case "TIMEOUT":
-    case "NETWORK_ERROR":
-    case "SERVICE_UNAVAILABLE":
-    case "INTERNAL_SERVER_ERROR":
-      return "We could not confirm the code was sent. Retrying is safe.";
-    default:
-      return "Something went wrong. Please try again.";
-  }
-};
-
-const sendLabel = (
-  otp: {
-    issueState: { isLoading: boolean };
-    idempotencyKey: string | undefined;
-    issueId: string | undefined;
+const copy = {
+  ko: {
+    title: "휴대폰 인증",
+    preset: "기본 테마",
+    headless: "헤드리스",
+    mock: "목업 모드: 인증번호는 123456입니다.",
+    mobile: "휴대폰",
   },
-  seconds: number,
-): string => {
-  if (otp.issueState.isLoading) return "Sending...";
-  if (seconds > 0) return `Resend in ${seconds}s`;
-  if (otp.idempotencyKey) return "Retry";
-  return otp.issueId ? "Resend code" : "Send code";
-};
+  en: {
+    title: "Phone verification",
+    preset: "Default theme",
+    headless: "Headless",
+    mock: "Mock mode: the code is 123456.",
+    mobile: "Mobile",
+  },
+} as const;
+
+/** The headless parts, styled only by ./custom.css. */
+function Headless({ onVerified }: { onVerified: (r: VerifyResult) => void }) {
+  return (
+    <OtpForm.Root
+      className="custom"
+      purpose="login"
+      locale={locale}
+      onVerified={onVerified}
+    >
+      {({ state }) => (
+        <>
+          <OtpForm.PhoneField>
+            {({ labelProps, inputProps, errorProps, parts }) => (
+              <>
+                <label {...labelProps}>{copy[locale].mobile}</label>
+                <input {...inputProps} />
+                {parts.text.phoneError && (
+                  <p {...errorProps}>{parts.text.phoneError}</p>
+                )}
+              </>
+            )}
+          </OtpForm.PhoneField>
+          {state.issued && (
+            <>
+              <OtpForm.CodeField description={null} />
+              <div className="row">
+                <OtpForm.Countdown />
+                {state.phase !== "verified" && <OtpForm.EditPhoneButton />}
+              </div>
+              <OtpForm.VerifyButton />
+            </>
+          )}
+          <OtpForm.SendButton />
+          <OtpForm.Message />
+        </>
+      )}
+    </OtpForm.Root>
+  );
+}
 
 export function App({ mock }: { mock: boolean }) {
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [code, setCode] = useState("");
-  const otp = useOtpFlow({
-    resendCooldownMs: 30_000,
-    idempotencyKeyPrefix: "signup",
-  });
-  const seconds = Math.ceil(otp.cooldownRemainingMs / 1000);
-
-  const onSend = (event: FormEvent) => {
-    event.preventDefault();
-    void otp.send({ phoneNumber, purpose: "signup" });
-  };
-  const onVerify = (event: FormEvent) => {
-    event.preventDefault();
-    void otp.verify(code);
-  };
-
-  if (otp.verified) {
-    return (
-      <main>
-        <h1>Verified</h1>
-        <button type="button" onClick={otp.reset}>
-          Start over
-        </button>
-      </main>
-    );
-  }
-
+  const [verified, setVerified] = useState<string>();
+  const onVerified = (result: VerifyResult) => setVerified(result.issueId);
+  const t = copy[locale];
   return (
-    <main>
-      <h1>Phone verification</h1>
-      {mock && <p>Mock mode: no API key configured, the code is 123456.</p>}
-
-      <form onSubmit={onSend}>
-        <label>
-          Phone number
-          <input
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            inputMode="tel"
-            placeholder="01012345678"
-            required
-          />
-        </label>
-        <button type="submit" disabled={!otp.canSend}>
-          {sendLabel(otp, seconds)}
-        </button>
-      </form>
-
-      {otp.issueId && (
-        <form onSubmit={onVerify}>
-          <label>
-            Code
-            <input
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              required
-            />
-          </label>
-          <button type="submit" disabled={!otp.canVerify}>
-            {otp.verifyState.isLoading ? "Checking..." : "Verify"}
-          </button>
-        </form>
+    <main className="page">
+      <header>
+        <h1>{t.title}</h1>
+        {mock && <p className="mock">{t.mock}</p>}
+      </header>
+      <nav aria-label="Example options">
+        <a
+          href={href({ variant: "preset" })}
+          aria-current={variant === "preset" ? "page" : undefined}
+        >
+          {t.preset}
+        </a>
+        <a
+          href={href({ variant: "headless" })}
+          aria-current={variant === "headless" ? "page" : undefined}
+        >
+          {t.headless}
+        </a>
+        <a
+          href={href({ lang: "ko" })}
+          aria-current={locale === "ko" ? "page" : undefined}
+        >
+          한국어
+        </a>
+        <a
+          href={href({ lang: "en" })}
+          aria-current={locale === "en" ? "page" : undefined}
+        >
+          English
+        </a>
+      </nav>
+      {variant === "preset" ? (
+        // One line: phone, send/resend with cooldown, code, verify.
+        <OtpForm purpose="signup" locale={locale} onVerified={onVerified} />
+      ) : (
+        <Headless onVerified={onVerified} />
       )}
-
-      {otp.reasonCode && (
-        <p>
-          {otp.reasonCode === "MISMATCH"
-            ? `Wrong code, ${otp.attemptsRemaining} attempts left.`
-            : `This code can no longer be used (${otp.reasonCode}). Request a new one.`}
-        </p>
-      )}
-      {otp.error && (
-        <p role="alert">
-          {describeError(otp.error.code, otp.error.retryAfterMs)}
-        </p>
-      )}
+      {verified && <output>verified issueId: {verified}</output>}
     </main>
   );
 }

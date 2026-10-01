@@ -1,8 +1,11 @@
 # Vue + Vite example
 
-Phone verification (issue -> verify) with
-[`@k-otp/sdk/vue`](../../docs/reference/vue.md)'s `useOtpFlow`: resend
-cooldown, retry-safe idempotency keys and error messages for 402/429/403.
+Phone verification (issue -> verify) with the UI components of
+[`@k-otp/sdk/ui/vue`](../../docs/ui.md): the one-line preset `OtpForm`
+with the optional default theme (`@k-otp/sdk/ui/theme.css`), and the same
+flow composed from the headless parts (`OtpForm.Root`, ...) styled
+by the example's own CSS. Switch with the links on the page
+(`?variant=preset|headless`, `?lang=ko|en`).
 
 ## Run
 
@@ -37,12 +40,20 @@ Set `VITE_K_OTP_PUBLIC_KEY` in `.env.local` to a **`pk_` public key**:
 
 ## What to look at
 
-- `src/main.ts`: `app.use(createOtpPlugin(options))` (mock fetch when no key).
-- `src/App.vue`: `useOtpFlow({ resendCooldownMs: 30_000 })` destructured into
-  refs (templates only unwrap top-level refs), the send/resend button driven
-  by `canSend` and `cooldownRemainingMs`, "Retry" while an ambiguous
-  attempt's idempotency key is pending, and `reasonCode` handling.
+- `src/main.ts`: `app.use(createOtpPlugin(options))` (mock fetch when no key), and the
+  stylesheet of the variant: `import("@k-otp/sdk/ui/theme.css")` for the
+  preset, `./custom.css` for the headless variant.
+- `src/App.vue`: the preset in one line, and the headless composition (render
+  props / slots, `data-k-otp` parts, focus moves and live messages handled
+  by the components).
+- `src/custom.css`: styling the headless parts only through their
+  `data-k-otp`, `data-state`, `data-invalid` and `aria-disabled`
+  attributes.
+- Hooks without components (`useOtpFlow`): see [`docs/vue.md`](../../docs/vue.md).
 
 Type-check with `bun run typecheck` (`vue-tsc`).
+
+The flow is driven end to end in Chromium by `bun run e2e:examples` from the
+repository root (Playwright, against the mock API).
 
 See the [issue -> verify UX guide](../../docs/issue-verify-ux.md).

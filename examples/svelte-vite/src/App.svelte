@@ -1,93 +1,90 @@
 <script lang="ts">
-  import { createOtpStores, type OtpApiError, otpForm } from "@k-otp/sdk/svelte";
-  import { onDestroy } from "svelte";
+  import { createOtpClient, type VerifyResult } from "@k-otp/sdk/svelte";
+  import {
+    OtpForm,
+    OtpFormCodeField,
+    OtpFormCountdown,
+    OtpFormEditPhoneButton,
+    OtpFormMessage,
+    OtpFormPhoneField,
+    OtpFormRoot,
+    OtpFormSendButton,
+    OtpFormVerifyButton,
+  } from "@k-otp/sdk/ui/svelte";
   import { mockFetch } from "./mock-fetch";
+  import { href, locale, variant } from "./options";
 
   const apiKey = import.meta.env.VITE_K_OTP_PUBLIC_KEY?.trim();
   const baseUrl = import.meta.env.VITE_K_OTP_BASE_URL?.trim() || undefined;
   const mock = !apiKey;
-
-  // Stores are created per component instance: nothing is shared globally.
-  const otp = createOtpStores(
-    apiKey
-      ? { apiKey, baseUrl }
-      : // No key configured: talk to the in-browser mock API.
-        { apiKey: "pk_mock", fetch: mockFetch },
+  // One client for both variants (no key: the in-browser mock API).
+  const client = createOtpClient(
+    apiKey ? { apiKey, baseUrl } : { apiKey: "pk_mock", fetch: mockFetch },
   );
-  const flow = otp.createFlow({ resendCooldownMs: 30_000, idempotencyKeyPrefix: "signup" });
-  onDestroy(() => flow.abort());
 
-  const describeError = (e: OtpApiError): string => {
-    switch (e.code) {
-      case "PAYMENT_REQUIRED":
-        return "The service is temporarily unable to send codes. Please try again later.";
-      case "TOO_MANY_REQUESTS":
-        return `Too many attempts. Try again in ${Math.ceil((e.retryAfterMs ?? 0) / 1000)}s.`;
-      case "FORBIDDEN":
-        return "This page's origin is not allowed for the public key (check allowedOrigins).";
-      case "TIMEOUT":
-      case "NETWORK_ERROR":
-      case "SERVICE_UNAVAILABLE":
-      case "INTERNAL_SERVER_ERROR":
-        return "We could not confirm the code was sent. Retrying is safe.";
-      default:
-        return "Something went wrong. Please try again.";
-    }
+  const copy = {
+    ko: {
+      title: "휴대폰 인증",
+      preset: "기본 테마",
+      headless: "헤드리스",
+      mock: "목업 모드: 인증번호는 123456입니다.",
+      mobile: "휴대폰",
+    },
+    en: {
+      title: "Phone verification",
+      preset: "Default theme",
+      headless: "Headless",
+      mock: "Mock mode: the code is 123456.",
+      mobile: "Mobile",
+    },
+  } as const;
+  const t = copy[locale];
+
+  let verified = $state<string>();
+  const onVerified = (result: VerifyResult) => {
+    verified = result.issueId;
   };
-
-  const onSend = (data: FormData) =>
-    flow.send({ phoneNumber: String(data.get("phoneNumber") ?? ""), purpose: "signup" });
-  const onVerify = (data: FormData) => flow.verify(String(data.get("code") ?? ""));
-
-  const seconds = $derived(Math.ceil($flow.cooldownRemainingMs / 1000));
-  const sendLabel = $derived(
-    $flow.issueState.isLoading
-      ? "Sending..."
-      : seconds > 0
-        ? `Resend in ${seconds}s`
-        : $flow.idempotencyKey
-          ? "Retry"
-          : $flow.issueId
-            ? "Resend code"
-            : "Send code",
-  );
 </script>
 
-{#if $flow.verified}
-  <main>
-    <h1>Verified</h1>
-    <button type="button" onclick={flow.reset}>Start over</button>
-  </main>
-{:else}
-  <main>
-    <h1>Phone verification</h1>
-    {#if mock}<p>Mock mode: no API key configured, the code is 123456.</p>{/if}
+<main class="page">
+  <header>
+    <h1>{t.title}</h1>
+    {#if mock}<p class="mock">{t.mock}</p>{/if}
+  </header>
+  <nav aria-label="Example options">
+    <a href={href({ variant: "preset" })} aria-current={variant === "preset" ? "page" : undefined}>{t.preset}</a>
+    <a href={href({ variant: "headless" })} aria-current={variant === "headless" ? "page" : undefined}>{t.headless}</a>
+    <a href={href({ lang: "ko" })} aria-current={locale === "ko" ? "page" : undefined}>한국어</a>
+    <a href={href({ lang: "en" })} aria-current={locale === "en" ? "page" : undefined}>English</a>
+  </nav>
 
-    <form use:otpForm={onSend}>
-      <label>
-        Phone number
-        <input name="phoneNumber" inputmode="tel" placeholder="01012345678" required />
-      </label>
-      <button type="submit" disabled={!$flow.canSend}>{sendLabel}</button>
-    </form>
+  {#if variant === "preset"}
+    <!-- One line: phone, send/resend with cooldown, code, verify. -->
+    <OtpForm {client} purpose="signup" {locale} {onVerified} />
+  {:else}
+    <!-- The headless parts, styled only by ./custom.css. -->
+    <OtpFormRoot {client} class="custom" purpose="login" {locale} {onVerified}>
+      {#snippet children({ state })}
+        <OtpFormPhoneField>
+          {#snippet children({ labelProps, inputProps, errorProps, parts, onInput, onBlur })}
+            <label {...labelProps}>{t.mobile}</label>
+            <input {...inputProps} readonly={state.phoneLocked} oninput={onInput} onblur={onBlur} />
+            {#if parts.text.phoneError}<p {...errorProps}>{parts.text.phoneError}</p>{/if}
+          {/snippet}
+        </OtpFormPhoneField>
+        {#if state.issued}
+          <OtpFormCodeField description="" />
+          <div class="row">
+            <OtpFormCountdown />
+            {#if state.phase !== "verified"}<OtpFormEditPhoneButton />{/if}
+          </div>
+          <OtpFormVerifyButton />
+        {/if}
+        <OtpFormSendButton />
+        <OtpFormMessage />
+      {/snippet}
+    </OtpFormRoot>
+  {/if}
 
-    {#if $flow.issueId}
-      <form use:otpForm={onVerify}>
-        <label>
-          Code
-          <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required />
-        </label>
-        <button type="submit" disabled={!$flow.canVerify}>
-          {$flow.verifyState.isLoading ? "Checking..." : "Verify"}
-        </button>
-      </form>
-    {/if}
-
-    {#if $flow.reasonCode === "MISMATCH"}
-      <p>Wrong code, {$flow.attemptsRemaining} attempts left.</p>
-    {:else if $flow.reasonCode}
-      <p>This code can no longer be used ({$flow.reasonCode}). Request a new one.</p>
-    {/if}
-    {#if $flow.error}<p role="alert">{describeError($flow.error)}</p>{/if}
-  </main>
-{/if}
+  {#if verified}<output>verified issueId: {verified}</output>{/if}
+</main>

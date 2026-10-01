@@ -1,8 +1,11 @@
 # Svelte + Vite example
 
-Phone verification (issue -> verify) with
-[`@k-otp/sdk/svelte`](../../docs/reference/svelte.md)'s flow store: resend
-cooldown, retry-safe idempotency keys and error messages for 402/429/403.
+Phone verification (issue -> verify) with the UI components of
+[`@k-otp/sdk/ui/svelte`](../../docs/ui.md): the one-line preset `OtpForm`
+with the optional default theme (`@k-otp/sdk/ui/theme.css`), and the same
+flow composed from the headless parts (`OtpFormRoot`, ...) styled
+by the example's own CSS. Switch with the links on the page
+(`?variant=preset|headless`, `?lang=ko|en`).
 
 ## Run
 
@@ -37,15 +40,23 @@ Set `VITE_K_OTP_PUBLIC_KEY` in `.env.local` to a **`pk_` public key**:
 
 ## What to look at
 
-- `src/App.svelte` (Svelte 5): `createOtpStores(options)` per component (no
-  module-level singleton, so it stays SSR-safe if you move it to SvelteKit),
-  `otp.createFlow({ resendCooldownMs: 30_000 })` read with `$flow`, forms
-  wired with `use:otpForm` (no double submits), "Retry" while an ambiguous
-  attempt's idempotency key is pending, `reasonCode` handling, and
-  `flow.abort()` on destroy.
-- The adapter only uses `svelte/store`, so the same code works in Svelte 4
-  components.
+- `src/main.ts`: a `createOtpClient(...)` passed as `client` (mock fetch when no key), and the
+  stylesheet of the variant: `import("@k-otp/sdk/ui/theme.css")` for the
+  preset, `./custom.css` for the headless variant.
+- `src/App.svelte`: the preset in one line, and the headless composition (render
+  props / slots, `data-k-otp` parts, focus moves and live messages handled
+  by the components).
+- `src/custom.css`: styling the headless parts only through their
+  `data-k-otp`, `data-state`, `data-invalid` and `aria-disabled`
+  attributes.
+- The components are Svelte 4 syntax sources compiled by your Svelte (4 or
+  5): this runes-mode app passes snippets (`{#snippet children({ state })}`)
+  where a Svelte 4 app would use `let:state`.
+- Hooks without components (`the flow store`): see [`docs/svelte.md`](../../docs/svelte.md).
 
 Type-check with `bun run typecheck` (`svelte-check`).
+
+The flow is driven end to end in Chromium by `bun run e2e:examples` from the
+repository root (Playwright, against the mock API).
 
 See the [issue -> verify UX guide](../../docs/issue-verify-ux.md).

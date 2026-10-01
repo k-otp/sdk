@@ -124,7 +124,7 @@ jobs:
         run: node scripts/smoke-dist.mjs
 
   examples:
-    name: Examples (typecheck, build, smoke)
+    name: Examples (typecheck, build, smoke, e2e)
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -153,6 +153,12 @@ jobs:
 
       - name: Typecheck, build and smoke-test examples
         run: bun run check:examples
+
+      - name: Install Chromium for Playwright
+        run: bunx playwright install --with-deps chromium
+
+      - name: UI components end to end (examples, mock API)
+        run: bun run e2e:examples
 
   adapter-compat:
     name: Adapters on React ${{ matrix.react }} / Svelte ${{ matrix.svelte }}
