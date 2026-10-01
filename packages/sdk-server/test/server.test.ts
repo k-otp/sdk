@@ -485,12 +485,41 @@ describe("organization wallet (API 1.4.0)", () => {
     expect(balance.walletId).toBeUndefined();
     expect(balance.walletScope).toBeUndefined();
     expect(balance.organizationId).toBeUndefined();
-    // Both shapes satisfy the public type (walletId/walletScope are optional).
-    const accepted: GetBalanceResult[] = [
-      legacyBalance,
-      { ...orgBalance, walletScope: "organization" as OtpWalletScope },
+  });
+
+  test("GetBalanceResult types the wallet fields as optional (compile-time)", () => {
+    // These assertions are checked by `bun run typecheck`; the test body only
+    // has to run. A regression to the strict generated type fails to compile.
+    const legacy: GetBalanceResult = {
+      appId: "app_1",
+      balance: 42,
+      currency: "CREDIT",
+      updatedAt: issueOutput.queuedAt,
+    };
+    const scope: OtpWalletScope | undefined = legacy.walletScope;
+    const walletId: string | undefined = legacy.walletId;
+    const organization: GetBalanceResult = {
+      ...legacy,
+      walletId: "org:org_1",
+      walletScope: "organization",
+      organizationId: "org_1",
+    };
+    const app: GetBalanceResult = { ...legacy, walletScope: "app" };
+    // @ts-expect-error the optional wallet field must not be usable as a bare string
+    const bareScope: string = legacy.walletScope;
+    // @ts-expect-error only the documented scopes are accepted
+    const unknownScope: GetBalanceResult = { ...legacy, walletScope: "team" };
+    // @ts-expect-error appId and the balance stay required
+    const missingBalance: GetBalanceResult = { appId: "app_1" };
+    void [
+      scope,
+      walletId,
+      organization,
+      app,
+      bareScope,
+      unknownScope,
+      missingBalance,
     ];
-    expect(accepted).toHaveLength(2);
   });
 
   test("getBalance keeps a legacy per-app wallet distinguishable", async () => {
@@ -520,10 +549,7 @@ describe("organization wallet (API 1.4.0)", () => {
     const page = await client.listCreditLedger();
     expect(page.items[0]?.appId).toBeUndefined();
     expect(page.items[1]?.appId).toBe("app_1");
-    const [credit, debit] = page.items;
-    expect((credit?.balanceAfter ?? 0) + (debit?.amountDelta ?? 0)).not.toBe(
-      debit?.balanceAfter,
-    );
+    expect(page.items[1]?.balanceAfter).toBe(497);
   });
 
   test("a ledger of an old API without appId still resolves", async () => {
