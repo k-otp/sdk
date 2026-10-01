@@ -1,5 +1,11 @@
 # @k-otp/sdk
 
+## 1.0.1 — 2026-10-01
+
+### Patch changes
+
+- [db678ab](https://github.com/k-otp/sdk/commit/db678ab047dbddefefeb286c462f77458b271962) Republish with resolved dependency versions. The 1.0.0 tarball on npm declared its `@orpc/*` dependencies with unresolved `catalog:` ranges and cannot be installed; use 1.0.1 or later. The package now refuses `npm publish` from the package directory when a dependency range is unresolved. — Thanks @imjlk!
+
 ## 1.0.0 — 2026-10-01
 
 ### Major changes
