@@ -34,10 +34,14 @@ const reactClientBanner = ({ fileName }: { fileName: string }) =>
   /^react\.c?js$/.test(fileName) ? { js: '"use client";' } : undefined;
 
 export default defineConfig([
-  // npm entry points: ESM with .d.ts.
+  // npm entry points: ESM with .d.ts. `server.browser` is what
+  // `@k-otp/sdk/server` resolves to under the "browser" export condition:
+  // the same exports, whose functions throw (src/server/browser.ts), so the
+  // sk_ client never ships to a browser by accident. It shares the core
+  // chunks (ESM only: browsers do not `require`).
   {
     ...shared,
-    entry: entries,
+    entry: { ...entries, "server.browser": "src/server/browser.ts" },
     format: "esm",
     dts: { generator: "oxc" },
     banner: reactClientBanner,
@@ -49,16 +53,6 @@ export default defineConfig([
     format: "cjs",
     dts: { generator: "oxc" },
     banner: reactClientBanner,
-  },
-  // `@k-otp/sdk/server` under the "browser" export condition: fails the
-  // bundle (no exports) or throws on load, so the sk_ client never ships to
-  // a browser by accident. See src/server/browser.ts.
-  {
-    ...shared,
-    entry: { "server.browser": "src/server/browser.ts" },
-    format: "esm",
-    dts: false,
-    sourcemap: false,
   },
   // CDN bundle for <script> tags: exposes `window.KOtp`, bundles oRPC.
   {

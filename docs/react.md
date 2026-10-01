@@ -74,7 +74,7 @@ available as state (`data`, `error`, `isLoading`, `status`).
   call [`@k-otp/sdk/server`](./reference/server.md) with `sk_` from route
   handlers / server actions, and call those from the UI. Never import
   `@k-otp/sdk/server` or an `sk_` key into client components (a client
-  bundle resolves `@k-otp/sdk/server` to a stub that fails the build).
+  bundle resolves `@k-otp/sdk/server` to a stub whose functions throw).
 
 ## Testing
 

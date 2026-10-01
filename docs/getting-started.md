@@ -19,7 +19,7 @@ builds). React, Vue and
 Svelte are optional peer dependencies of `@k-otp/sdk`: your app provides the
 one it uses, and importing `@k-otp/sdk/react` never loads Vue, Svelte or the
 server client. `@k-otp/sdk/server` is never bundled for browsers (it resolves
-to a failing stub under the `browser` export condition).
+to a throwing stub under the `browser` export condition).
 
 Framework guides: [React](./react.md), [Vue](./vue.md), [Svelte](./svelte.md).
 UX rules for the "send code / enter code" screen:

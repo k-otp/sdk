@@ -23,19 +23,45 @@ of `@k-otp/sdk` and are never loaded by `@k-otp/sdk/server`.
 `@k-otp/sdk/server` must never end up in a browser bundle (it needs an `sk_`
 key). Bundlers that build for browsers (Vite, webpack, esbuild, Rollup,
 Metro, ...) resolve it with the `browser` export condition, which maps to a
-stub that exports nothing and throws when loaded: importing
-`createOtpServerClient` into client code fails the build instead of shipping
-the server client. Server runtimes whose bundlers also set `browser` resolve
-the real client because their own condition is matched first: `workerd` /
-`worker` (Cloudflare Workers, wrangler), `edge-light` (Vercel / Next.js Edge)
-and `deno`. Node.js, Bun, Deno and SSR builds (Next.js server, Vite SSR,
-SvelteKit, Nuxt) do not set `browser` and are unaffected.
+stub with the same exports: the constants are the plain public values, and
+every function (including the `OtpApiError` constructor) throws an error
+explaining that `@k-otp/sdk/server` was resolved for a browser. The bundle
+still builds, but the server client is not in it, and the first call fails
+loudly. (The stub has no load-time side effects, so the package can stay
+`sideEffects: false` and the failure never depends on what a bundler drops.)
 
-Tests of server code that run in a DOM environment (Jest or Vitest with
-jsdom/happy-dom) may resolve `browser` too: run them in a `node` environment,
-or set the export conditions (Jest:
-`testEnvironmentOptions: { customExportConditions: ["node"] }`), and pass
-`dangerouslyAllowBrowser: true` if `window` and `document` exist.
+Server runtimes whose bundlers also set `browser` resolve the real client
+because their own condition is matched first: `workerd` / `worker`
+(Cloudflare Workers: wrangler, `@cloudflare/vite-plugin`), `edge-light`
+(Vercel / Next.js Edge) and `deno`. Node.js, Bun, Deno and the default Node
+SSR builds (Next.js server, Vite SSR, SvelteKit, Nuxt) do not set `browser`
+and are unaffected.
+
+If server code throws the "resolved with the `browser` export condition"
+error, the build used browser conditions:
+
+- **Vite SSR with `ssr.target: "webworker"`** (for example a Worker built
+  with Vite but without the Cloudflare plugin) uses Vite's client
+  conditions (`module`, `browser`, ...). Add a server condition:
+
+  ```ts
+  // vite.config.ts
+  export default defineConfig({
+    ssr: {
+      target: "webworker",
+      resolve: { conditions: ["workerd", "worker", "module", "browser"] },
+    },
+  });
+  ```
+
+  or build Workers with `@cloudflare/vite-plugin`, which sets `workerd` /
+  `worker` itself.
+- **Tests of server code in a DOM environment** (Jest or Vitest with
+  jsdom/happy-dom) may resolve `browser` too: run them in a `node`
+  environment, or set the export conditions (Jest:
+  `testEnvironmentOptions: { customExportConditions: ["node"] }`; Vitest:
+  `resolve.conditions: ["node"]`), and pass `dangerouslyAllowBrowser: true`
+  if `window` and `document` exist.
 
 ## Quick start
 

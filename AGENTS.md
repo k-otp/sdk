@@ -23,7 +23,8 @@ Public, MIT-licensed SDK for the K-OTP Korean OTP API (`https://api.k-otp.dev/v1
   - `src/server` -> `@k-otp/sdk/server`: all public `/v1` operations with
     `sk_` keys only (any key not starting with `sk_` is a `TypeError`).
     Under the `browser` export condition it resolves to
-    `src/server/browser.ts` (a stub that throws), unless `workerd`, `worker`,
+    `src/server/browser.ts` (same exports, functions throw when called;
+    keep its names in sync, smoke-dist checks), unless `workerd`, `worker`,
     `edge-light` or `deno` matches first.
   - `src/react|vue|svelte` -> `@k-otp/sdk/react|vue|svelte`: thin adapters.
     The framework is an optional `peerDependency` (framework dev packages

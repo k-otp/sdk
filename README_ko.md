@@ -53,7 +53,7 @@ const { verified, reasonCode } = await otp.verify({ issueId, code: "123456" });
 
 - **`sk_` 비밀 키는 절대 브라우저/앱에 포함하지 마세요.** `@k-otp/sdk`는 브라우저에서 `sk_` 키를,
   `@k-otp/sdk/server`는 `sk_`로 시작하지 않는 키(`pk_` 포함)와 브라우저 실행을 거부합니다. 브라우저용
-  번들러는 `browser` export condition으로 `@k-otp/sdk/server`를 빌드 실패용 스텁으로 해석합니다.
+  번들러는 `browser` export condition으로 `@k-otp/sdk/server`를 호출 시 오류를 던지는 스텁으로 해석합니다.
 - **`pk_` 공개 키**는 `issue`/`verify`만 가능하며, 요청의 `Origin`이 키의 `allowedOrigins` 중
   하나와 정확히 일치해야 합니다(스킴·호스트·포트, 와일드카드 없음). 불일치 시 `403 FORBIDDEN`이며,
   브라우저에서는 API가 CORS 헤더를 보내지 않으므로 SDK에는 `NETWORK_ERROR`(status 0, requestId 없음)로

@@ -19,7 +19,7 @@
  *
  * Run `bun run build` first.
  */
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
@@ -236,6 +236,34 @@ try {
     BUDGETS.server,
   ]);
 
+  // A browser bundle that imports `@k-otp/sdk/server` builds, but gets the
+  // throwing stub ("browser" export condition), never the real client.
+  // The entry lives under node_modules/.cache so `@k-otp/sdk` resolves
+  // through the root workspace link and its `exports` map.
+  const cacheDir = path.join(root, "node_modules", ".cache");
+  await mkdir(cacheDir, { recursive: true });
+  const browserDir = await mkdtemp(path.join(cacheDir, "k-otp-size-"));
+  try {
+    const entry = path.join(browserDir, "server-in-browser.js");
+    await writeFile(
+      entry,
+      'import { createOtpServerClient } from "@k-otp/sdk/server";\nexport const run = () => createOtpServerClient({ apiKey: "sk_x" });\n',
+    );
+    const code = (
+      await bundle("@k-otp/sdk/server (browser)", entry)
+    ).bytes.toString();
+    if (!code.includes("export condition. It needs an sk_ secret key")) {
+      isolation.push("@k-otp/sdk/server in a browser bundle is not the stub");
+    }
+    if (code.includes("must not run in a browser")) {
+      isolation.push(
+        "@k-otp/sdk/server in a browser bundle is the real client",
+      );
+    }
+  } finally {
+    await rm(browserDir, { recursive: true, force: true });
+  }
+
   for (const [label, bytes, budget] of rows) {
     const gzip = gzipSync(bytes, { level: 9 }).byteLength;
     const over = gzip > budget;
@@ -252,7 +280,7 @@ if (isolation.length) {
   console.log(`\nTree-shaking check failed:\n- ${isolation.join("\n- ")}`);
 } else {
   console.log(
-    "\nTree-shaking: no subpath loads another framework, adapter or the server client.",
+    "\nTree-shaking: no subpath loads another framework, adapter or the server client; browser bundles get the server stub.",
   );
 }
 // exitCode (not exit()) lets piped stdout flush first.

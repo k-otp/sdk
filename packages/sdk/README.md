@@ -260,9 +260,9 @@ await otp.getBalance();
 import { OtpProvider, useOtpFlow } from "@k-otp/sdk/react";
 ```
 
-`@k-otp/sdk/server` resolves to a stub that fails the build under the
-`browser` export condition, so the `sk_` client cannot slip into a client
-bundle; server runtimes that also set `browser` (Cloudflare Workers, Vercel
+`@k-otp/sdk/server` resolves to a stub under the `browser` export condition
+(same exports; every function throws when called), so the `sk_` client
+cannot slip into a client bundle; server runtimes that also set `browser` (Cloudflare Workers, Vercel
 Edge) are matched first and get the real client. Details, every method and
 the framework APIs: [server](../../docs/reference/server.md),
 [react](../../docs/reference/react.md), [vue](../../docs/reference/vue.md),

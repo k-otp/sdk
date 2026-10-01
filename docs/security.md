@@ -13,8 +13,9 @@ variables, Workers secrets, a secret manager).
   `NEXT_PUBLIC_*` / `VITE_*` / `PUBLIC_*` variables or client-side config.
 - `@k-otp/sdk` throws if it is given an `sk_` key in a browser, and
   `@k-otp/sdk/server` refuses to run in a browser at all: browser bundlers
-  resolve it (via the `browser` export condition) to a stub that fails the
-  build, and the real client throws when `window` and `document` exist.
+  resolve it (via the `browser` export condition) to a stub whose functions
+  throw when called, and the real client throws when `window` and `document`
+  exist.
   These guards catch mistakes; they are not a substitute for keeping keys
   out of client bundles.
 - Rotate a key immediately if it was ever exposed.

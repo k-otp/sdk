@@ -265,8 +265,9 @@ assert.equal(
 );
 console.log("ok - OtpApiError instanceof and the Vue key work across ESM/CJS");
 
-// `@k-otp/sdk/server` under the "browser" export condition is a stub that
-// throws, unless a server runtime condition (workerd, edge-light, ...) wins.
+// `@k-otp/sdk/server` under the "browser" export condition is a stub with the
+// same export names whose functions throw, unless a server runtime condition
+// (workerd, worker, edge-light, deno) wins.
 const importServer = (...conditions) =>
   spawnSync(
     process.execPath,
@@ -274,21 +275,29 @@ const importServer = (...conditions) =>
       ...conditions.map((c) => `--conditions=${c}`),
       "--input-type=module",
       "-e",
-      'const m = await import("@k-otp/sdk/server"); console.log(typeof m.createOtpServerClient);',
+      `const m = await import("@k-otp/sdk/server");
+      let created;
+      try {
+        m.createOtpServerClient({ apiKey: "sk_smoke" });
+        created = "created";
+      } catch (error) {
+        created = error.message;
+      }
+      console.log(JSON.stringify({ names: Object.keys(m).sort(), created }));`,
     ],
     { cwd: root, encoding: "utf8" },
   );
+const serverNames = Object.keys(esmServer).sort();
 const browserServer = importServer("browser");
-assert.notEqual(browserServer.status, 0, "server under browser condition");
-assert.match(
-  browserServer.stderr,
-  /resolved with the "browser" export condition/,
-);
+assert.equal(browserServer.status, 0, browserServer.stderr);
+const stub = JSON.parse(browserServer.stdout);
+assert.deepEqual(stub.names, serverNames, "stub exports = server exports");
+assert.match(stub.created, /resolved with the "browser" export condition/);
 for (const runtime of ["workerd", "worker", "edge-light", "deno"]) {
   const result = importServer(runtime, "browser");
   assert.equal(result.status, 0, `${runtime}: ${result.stderr}`);
-  assert.equal(result.stdout.trim(), "function", runtime);
+  assert.deepEqual(JSON.parse(result.stdout).created, "created", runtime);
 }
 console.log(
-  "ok - server: browser stub, real client for workerd/worker/edge-light/deno",
+  "ok - server: throwing browser stub (same exports), real client for workerd/worker/edge-light/deno",
 );
