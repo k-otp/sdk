@@ -4309,8 +4309,8 @@
     "/credit-ledger": {
       "get": {
         "operationId": "otp.listCreditLedger",
-        "summary": "List wallet ledger entries for the authenticated app",
-        "description": "Returns an audit projection of wallet mutations: `credit` top-ups, per-issue `debit`s, and `refund`s. `amountDelta` is signed (debits are negative) and `balanceAfter` is the wallet balance after the entry. Internal billing references, external payment references, and initiator metadata are omitted; `issueId` is present only for issue-linked entries.\n\nResults are ordered newest first (`createdAt` descending, ties broken by id) and keyset-paginated. Pass `limit` (1-100, default 50) and, for subsequent pages, the opaque `cursor` returned as `nextCursor`; `nextCursor` is omitted on the last page. Cursors are bound to the endpoint that issued them and must be sent unchanged. Keep the same filters while paging.\n\nOptional `createdFrom`/`createdTo` (RFC 3339 date-time) select the half-open range `[createdFrom, createdTo)`; when both are given `createdFrom` must be earlier than `createdTo`. `entryType` filters by entry type.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "summary": "List wallet ledger entries visible to the authenticated app",
+        "description": "Returns an audit projection of mutations of the wallet the key spends from: for an organization wallet, its `credit` top-ups and `clawback`s plus only the authenticated app's per-issue `debit`s and `refund`s (`appId` attributes app-level entries). `amountDelta` is signed (debits are negative) and `balanceAfter` is the wallet balance after the entry. Internal billing references, external payment references, and initiator metadata are omitted; `issueId` is present only for issue-linked entries.\n\nResults are ordered newest first (`createdAt` descending, ties broken by id) and keyset-paginated. Pass `limit` (1-100, default 50) and, for subsequent pages, the opaque `cursor` returned as `nextCursor`; `nextCursor` is omitted on the last page. Cursors are bound to the endpoint that issued them and must be sent unchanged. Keep the same filters while paging.\n\nOptional `createdFrom`/`createdTo` (RFC 3339 date-time) select the half-open range `[createdFrom, createdTo)`; when both are given `createdFrom` must be earlier than `createdTo`. `entryType` filters by entry type.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
         "tags": [
           "otp"
         ],
@@ -4838,7 +4838,7 @@
       "get": {
         "operationId": "otp.balance",
         "summary": "Get wallet balance",
-        "description": "Returns the current credit wallet balance for the authenticated app. `balance` is a credit quantity (not money) and `currency` is `CREDIT`. Reading the balance never affects OTP issue status.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "description": "Returns the current balance of the credit wallet the authenticated app spends from: the organization wallet shared by every app of the organization (`walletScope: organization`), or a legacy per-app wallet (`walletScope: app`). `balance` is a credit quantity (not money) and `currency` is `CREDIT`. Reading the balance never affects OTP issue status.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
         "tags": [
           "otp"
         ],
