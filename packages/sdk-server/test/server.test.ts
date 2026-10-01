@@ -10,11 +10,13 @@ import {
 } from "../../sdk-core/test/helpers";
 import {
   createOtpServerClient,
+  type GetBalanceResult,
   type GetTemplateResult,
   isOtpApiError,
   type OtpApiError,
   OtpApiError as OtpApiErrorClass,
   type OtpOperation,
+  type OtpWalletScope,
   paginatePages,
 } from "../src/index";
 
@@ -437,5 +439,98 @@ describe("key guards", () => {
         dangerouslyAllowBrowser: true,
       }),
     ).not.toThrow();
+  });
+});
+
+describe("organization wallet (API 1.4.0)", () => {
+  const updatedAt = issueOutput.queuedAt;
+  // Exactly what an API older than 1.4.0 sends: no wallet fields at all.
+  const legacyBalance = {
+    appId: "app_1",
+    balance: 42,
+    currency: "CREDIT",
+    updatedAt,
+  };
+  const orgBalance = {
+    ...legacyBalance,
+    walletId: "org:org_1",
+    walletScope: "organization",
+    organizationId: "org_1",
+  };
+
+  const clientFor = (body: unknown) => {
+    const { fetch } = mockFetch(() => json(200, body));
+    return createOtpServerClient({
+      baseUrl: BASE,
+      apiKey: "sk_test_1",
+      fetch,
+    });
+  };
+
+  test("getBalance exposes the organization wallet fields", async () => {
+    const balance = await clientFor(orgBalance).getBalance();
+    expect(balance.walletScope).toBe("organization");
+    expect(balance.walletId).toBe("org:org_1");
+    expect(balance.organizationId).toBe("org_1");
+    // appId stays the calling app even though the balance is shared.
+    expect(balance.appId).toBe("app_1");
+    expect(balance.balance).toBe(42);
+    expect(balance.currency).toBe("CREDIT");
+  });
+
+  test("getBalance still resolves for a response without wallet fields (old API)", async () => {
+    const balance = await clientFor(legacyBalance).getBalance();
+    expect(balance.balance).toBe(42);
+    expect(balance.appId).toBe("app_1");
+    expect(balance.walletId).toBeUndefined();
+    expect(balance.walletScope).toBeUndefined();
+    expect(balance.organizationId).toBeUndefined();
+    // Both shapes satisfy the public type (walletId/walletScope are optional).
+    const accepted: GetBalanceResult[] = [
+      legacyBalance,
+      { ...orgBalance, walletScope: "organization" as OtpWalletScope },
+    ];
+    expect(accepted).toHaveLength(2);
+  });
+
+  test("getBalance keeps a legacy per-app wallet distinguishable", async () => {
+    const balance = await clientFor({
+      ...legacyBalance,
+      walletId: "app:app_1",
+      walletScope: "app",
+    }).getBalance();
+    expect(balance.walletScope).toBe("app");
+    expect(balance.organizationId).toBeUndefined();
+  });
+
+  test("ledger entries carry the optional attribution appId", async () => {
+    const entry = (n: number, extra: object) => ({
+      ...ledgerEntry(n),
+      ...extra,
+    });
+    const client = clientFor({
+      items: [
+        // An organization credit without an attributed app: no appId.
+        entry(1, { entryType: "credit", amountDelta: 500, balanceAfter: 500 }),
+        // A debit of the calling app always has it. Other apps' debits are not
+        // listed, so balanceAfter jumps by more than amountDelta (500 -> 497).
+        entry(2, { appId: "app_1", amountDelta: -1, balanceAfter: 497 }),
+      ],
+    });
+    const page = await client.listCreditLedger();
+    expect(page.items[0]?.appId).toBeUndefined();
+    expect(page.items[1]?.appId).toBe("app_1");
+    const [credit, debit] = page.items;
+    expect((credit?.balanceAfter ?? 0) + (debit?.amountDelta ?? 0)).not.toBe(
+      debit?.balanceAfter,
+    );
+  });
+
+  test("a ledger of an old API without appId still resolves", async () => {
+    const page = await clientFor({
+      items: [ledgerEntry(1)],
+    }).listCreditLedger();
+    expect(page.items[0]?.appId).toBeUndefined();
+    expect(page.items[0]?.balanceAfter).toBe(99);
   });
 });

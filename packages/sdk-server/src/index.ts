@@ -35,6 +35,7 @@ export {
   type OtpTelemetryHooks,
   type OtpTemplateSummary,
   type OtpVerificationStatus,
+  type OtpWalletScope,
   type VerifyInput,
   type VerifyReasonCode,
   type VerifyResult,

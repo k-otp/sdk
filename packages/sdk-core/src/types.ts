@@ -20,6 +20,7 @@ import type {
   TemplateSummary,
   VerifyOtpInput,
   VerifyOtpOutput,
+  WalletScope,
 } from "./generated/openapi";
 
 /**
@@ -55,7 +56,24 @@ export type ListCreditLedgerInput = NonNullable<
 >;
 export type ListCreditLedgerResult = ListOtpCreditLedgerOutput;
 export type CreditLedgerEntry = OtpCreditLedgerItem;
-export type GetBalanceResult = OtpBalanceOutput;
+/**
+ * Which wallet a balance or ledger belongs to (1.4.0+): `"organization"` is the
+ * credit wallet shared by every app of the organization, `"app"` the legacy
+ * per-app wallet that only exists until the API's contract step.
+ */
+export type OtpWalletScope = WalletScope;
+/**
+ * Result of `GET /v1/balance`. From API 1.4.0 the balance is the organization
+ * wallet shared by all apps of the key's organization (`walletScope:
+ * "organization"`, `organizationId` set). `walletId` and `walletScope` are
+ * always sent by 1.4.0+ but are typed optional here: an API deployment older
+ * than 1.4.0 omits them and the balance is then that app's own wallet.
+ */
+export type GetBalanceResult = Omit<
+  OtpBalanceOutput,
+  "walletId" | "walletScope"
+> &
+  Partial<Pick<OtpBalanceOutput, "walletId" | "walletScope">>;
 export type ListTemplatesResult = ListTemplatesOutput;
 export type OtpTemplateSummary = TemplateSummary;
 export type GetTemplateInput = OpenApiOperations["getTemplate"]["params"];
