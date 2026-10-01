@@ -30,7 +30,7 @@
       "groupName": "monthly dependency maintenance"
     },
     {
-      "description": "oRPC is a runtime dependency of @k-otp/sdk-core: keep all packages aligned and review bundle size.",
+      "description": "oRPC is a runtime dependency of @k-otp/sdk: keep all @orpc packages aligned and review bundle size (bun run size).",
       "matchPackageNames": ["@orpc/**"],
       "groupName": "orpc runtime",
       "automerge": false
