@@ -143,7 +143,8 @@ type RootContext = OtpFormSvelteContext & {
   submit: (event: Event) => void;
 };
 
-const CONTEXT_KEY: unique symbol = Symbol("k-otp-form");
+// A registered symbol: shared by every copy of the runtime.
+const CONTEXT_KEY: unique symbol = Symbol.for("@k-otp/sdk/ui/svelte/form");
 
 const clientFrom = (props: OtpFormRootProps): OtpClientLike => {
   if (props.client) return props.client;

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { OtpCodeInput, OtpForm } from "@k-otp/sdk/ui/vue";
+import { OTP_FORM_KEY, OtpCodeInput, OtpForm } from "@k-otp/sdk/ui/vue";
 import { createOtpPlugin } from "@k-otp/sdk/vue";
 import { fireEvent, screen } from "@testing-library/dom";
 import {
@@ -128,6 +128,10 @@ describe("<OtpForm /> preset (Vue)", () => {
     expect(html).toContain('id="otp-phone"');
     expect(api.calls).toHaveLength(0);
   });
+});
+
+test("the form injection key is a registered symbol (shared by ESM and CJS)", () => {
+  expect(OTP_FORM_KEY).toBe(Symbol.for("@k-otp/sdk/ui/vue/form"));
 });
 
 describe("<OtpCodeInput /> (Vue)", () => {

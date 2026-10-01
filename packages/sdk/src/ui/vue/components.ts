@@ -61,8 +61,13 @@ export type OtpFormContext = {
   t: ComputedRef<OtpTranslator>;
 };
 
-/** Injection key of the form context. */
-export const OTP_FORM_KEY: InjectionKey<OtpFormContext> = Symbol("k-otp-form");
+/**
+ * Injection key of the form context. A registered symbol, so the ESM and
+ * CommonJS builds of `@k-otp/sdk/ui/vue` share it.
+ */
+export const OTP_FORM_KEY: InjectionKey<OtpFormContext> = Symbol.for(
+  "@k-otp/sdk/ui/vue/form",
+);
 
 /** The injected form context; throws outside `OtpFormRoot`. */
 export const useOtpFormContext = (): OtpFormContext => {

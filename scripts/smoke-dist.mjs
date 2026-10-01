@@ -407,7 +407,13 @@ assert.equal(
   require("@k-otp/sdk/vue").OTP_CLIENT_KEY,
   (await import("@k-otp/sdk/vue")).OTP_CLIENT_KEY,
 );
-console.log("ok - OtpApiError instanceof and the Vue key work across ESM/CJS");
+assert.equal(
+  require("@k-otp/sdk/ui/vue").OTP_FORM_KEY,
+  (await import("@k-otp/sdk/ui/vue")).OTP_FORM_KEY,
+);
+console.log(
+  "ok - OtpApiError instanceof and the Vue keys (vue, ui/vue) work across ESM/CJS",
+);
 
 // `@k-otp/sdk/server` under the "browser" export condition is a stub with the
 // same export names whose functions throw, unless a server runtime condition
