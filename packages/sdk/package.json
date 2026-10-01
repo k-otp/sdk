@@ -1,7 +1,7 @@
 {
   "name": "@k-otp/sdk",
   "version": "0.0.0",
-  "description": "Official K-OTP (Korean OTP API) SDK: issue and verify one-time passwords from browsers, SSR, edge and servers, with React, Vue and Svelte bindings and a CDN bundle.",
+  "description": "Official K-OTP (Korean OTP API) SDK: issue and verify one-time passwords from browsers, SSR, edge and servers, with React, Vue and Svelte bindings, headless UI components with an optional theme, and a CDN bundle.",
   "keywords": [
     "k-otp",
     "otp",
@@ -13,7 +13,9 @@
     "orpc",
     "react",
     "vue",
-    "svelte"
+    "svelte",
+    "otp-input",
+    "headless-ui"
   ],
   "license": "MIT",
   "author": "1990Company",
@@ -27,7 +29,9 @@
     "url": "https://github.com/k-otp/sdk/issues"
   },
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css"
+  ],
   "main": "./dist/core.cjs",
   "module": "./dist/core.js",
   "types": "./dist/core.d.ts",
@@ -152,6 +156,42 @@
       "types": "./dist/svelte.d.ts",
       "default": "./dist/svelte.js"
     },
+    "./ui": {
+      "import": {
+        "types": "./dist/ui.d.ts",
+        "default": "./dist/ui.js"
+      },
+      "require": {
+        "types": "./dist/ui.d.cts",
+        "default": "./dist/ui.cjs"
+      }
+    },
+    "./ui/react": {
+      "import": {
+        "types": "./dist/ui-react.d.ts",
+        "default": "./dist/ui-react.js"
+      },
+      "require": {
+        "types": "./dist/ui-react.d.cts",
+        "default": "./dist/ui-react.cjs"
+      }
+    },
+    "./ui/vue": {
+      "import": {
+        "types": "./dist/ui-vue.d.ts",
+        "default": "./dist/ui-vue.js"
+      },
+      "require": {
+        "types": "./dist/ui-vue.d.cts",
+        "default": "./dist/ui-vue.cjs"
+      }
+    },
+    "./ui/svelte": {
+      "types": "./dist/ui-svelte/index.d.ts",
+      "svelte": "./dist/ui-svelte/index.js",
+      "default": "./dist/ui-svelte/index.js"
+    },
+    "./ui/theme.css": "./dist/ui/theme.css",
     "./k-otp.iife.js": "./dist/k-otp.iife.js",
     "./k-otp.iife.min.js": "./dist/k-otp.iife.min.js",
     "./package.json": "./package.json"

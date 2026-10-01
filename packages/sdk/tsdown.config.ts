@@ -24,14 +24,28 @@ const entries = {
   react: "src/react/index.ts",
   vue: "src/vue/index.ts",
   svelte: "src/svelte/index.ts",
+  ui: "src/ui/index.ts",
+  "ui-react": "src/ui/react/index.ts",
+  "ui-vue": "src/ui/vue/index.ts",
+  // The runtime of the Svelte components. The components themselves are
+  // `.svelte` sources copied next to it (see `copy` below) and compiled by
+  // the app's Svelte 4 or 5 compiler through the "svelte" export condition.
+  "ui-svelte/runtime": "src/ui/svelte/runtime.ts",
 };
 
-// Svelte itself is ESM-only, so the Svelte subpath has no CommonJS build.
-const { svelte: _svelte, ...cjsEntries } = entries;
+// Svelte itself is ESM-only, so the Svelte subpaths have no CommonJS build.
+const {
+  svelte: _svelte,
+  "ui-svelte/runtime": _uiSvelte,
+  ...cjsEntries
+} = entries;
 
-/** Hooks and context only work in client components (Next.js App Router). */
+/**
+ * Hooks, context and components only work in client components (Next.js
+ * App Router): `@k-otp/sdk/react` and `@k-otp/sdk/ui/react`.
+ */
 const reactClientBanner = ({ fileName }: { fileName: string }) =>
-  /^react\.c?js$/.test(fileName) ? { js: '"use client";' } : undefined;
+  /^(ui-)?react\.c?js$/.test(fileName) ? { js: '"use client";' } : undefined;
 
 export default defineConfig([
   // npm entry points: ESM with .d.ts. `server.browser` is what
@@ -45,6 +59,20 @@ export default defineConfig([
     format: "esm",
     dts: { generator: "oxc" },
     banner: reactClientBanner,
+    // Shipped as-is: the Svelte component sources (+ their declarations and
+    // the subpath index) and the optional default theme.
+    copy: [
+      {
+        from: [
+          "src/ui/svelte/*.svelte",
+          "src/ui/svelte/*.svelte.d.ts",
+          "src/ui/svelte/index.js",
+          "src/ui/svelte/index.d.ts",
+        ],
+        to: "dist/ui-svelte",
+      },
+      { from: "src/ui/theme.css", to: "dist/ui" },
+    ],
   },
   // CommonJS with .d.cts (every subpath except svelte).
   {

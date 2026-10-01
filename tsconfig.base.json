@@ -29,7 +29,11 @@
       "@k-otp/sdk/server": ["./packages/sdk/src/server/index.ts"],
       "@k-otp/sdk/react": ["./packages/sdk/src/react/index.ts"],
       "@k-otp/sdk/vue": ["./packages/sdk/src/vue/index.ts"],
-      "@k-otp/sdk/svelte": ["./packages/sdk/src/svelte/index.ts"]
+      "@k-otp/sdk/svelte": ["./packages/sdk/src/svelte/index.ts"],
+      "@k-otp/sdk/ui": ["./packages/sdk/src/ui/index.ts"],
+      "@k-otp/sdk/ui/react": ["./packages/sdk/src/ui/react/index.ts"],
+      "@k-otp/sdk/ui/vue": ["./packages/sdk/src/ui/vue/index.ts"],
+      "@k-otp/sdk/ui/svelte": ["./packages/sdk/src/ui/svelte/index"]
     },
 
     "plugins": [{ "transform": "@ttsc/lint" }]
