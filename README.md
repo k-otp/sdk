@@ -80,7 +80,7 @@ import "@k-otp/sdk/ui/theme.css"; // optional default theme
 <OtpForm options={{ apiKey: "pk_live_..." }} purpose="signup" onVerified={(r) => console.log(r.issueId)} />;
 ```
 
-Korean mobile numbers are canonicalized like the API (`+82 10-...` ->
+Korean mobile numbers are canonicalized before sending (`+82 10-...` ->
 `010...`), the code input handles paste, autofill (`one-time-code`, WebOTP)
 and keyboard navigation, focus follows the flow, and every part exposes
 `data-*` state for your own styles or a full headless composition

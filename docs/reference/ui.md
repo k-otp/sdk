@@ -32,7 +32,8 @@ keys, the resend cooldown and the 429/503 retry hints).
 | `clearCodeOnMismatch` | `true` | clear the code after `MISMATCH` |
 | `allowInternational` | `false` | accept non-Korean E.164 numbers |
 | `defaultPhoneNumber` | | initial phone input |
-| `resendCooldownMs`, `idempotencyKeyPrefix`, `createIdempotencyKey`, `now` | | as `createOtpFlow` |
+| `resendCooldownMs` | `30000` | local cooldown after a send; `editPhoneNumber()` and `reset()` clear it (a server `Retry-After` wait is kept) |
+| `idempotencyKeyPrefix`, `createIdempotencyKey`, `now` | | as `createOtpFlow` |
 | `flow` | | use an existing `OtpFlowController` |
 | `onSent(result)`, `onVerified(result)`, `onError(error, "send" \| "verify")`, `onPhaseChange(phase, previous)` | | callbacks |
 
@@ -41,7 +42,13 @@ Controller: `getState()`, `subscribe(listener)`, `setPhoneNumber(value,
 `setCode(value)` (sanitized; auto-verifies), `send()`, `verify()`,
 `submit()` (send in the phone step, verify in the code step),
 `editPhoneNumber()`, `reset()`, `abort()`, `configure(partialConfig)`
-(callbacks and settings, never notifies) and `flow`. Actions resolve the flow
+(callbacks and settings; notifies subscribers only when
+`allowInternational` changes, the React root applies it in a layout effect)
+and `flow`. A request that is in flight when `abort()`, `reset()` or
+`editPhoneNumber()` is called is dropped: no `onError` (`ABORTED`),
+`onSent`, `onVerified` or WebOTP for it. `getState()` returns the same
+object until something visible changes, also while nobody is subscribed.
+Actions resolve the flow
 result, or `{ skipped: "invalid" }` when the phone number or code is not
 valid (the matching error is then shown); they never reject for API errors.
 
@@ -55,7 +62,8 @@ valid (the matching error is then shown); they never reject for API errors.
 | `phoneLocked`, `issued`, `sentTo` | the number is locked because a code was sent to it (masked as `sentTo`) |
 | `code`, `codeLength`, `codeComplete` | |
 | `canSend`, `canVerify` | an action would start a request now |
-| `sendDisabled`, `verifyDisabled` | the button does nothing now (in flight, cooldown, terminal, verified) |
+| `sendDisabled` | the send button does nothing now: in flight, a cooldown runs, or verified (a terminal verify outcome keeps it enabled) |
+| `verifyDisabled` | the verify button does nothing now: no usable code (terminal, expired), in flight, a retry wait runs, or verified |
 | `resendIn`, `retryIn` | seconds until send / verify may run again (local cooldown and server `retryAfterMs`) |
 | `expiresIn`, `expired` | seconds left on the current code, anchored on the server's `expiresAt - queuedAt` |
 | `attemptsRemaining`, `verified`, `reasonCode`, `error`, `errorOperation`, `retryPending`, `isLoading` | |
@@ -86,6 +94,8 @@ valid (the matching error is then shown); they never reject for API errors.
 
 - `OTP_MESSAGES` (`ko`, `en`), `DEFAULT_OTP_LOCALE` (`"ko"`),
   `createOtpTranslator({ locale, messages })` -> `t(key, params)`,
+  `resolveOtpLocale(locale?)` (explicit locale, else `<html lang>` when
+  Korean or English in a browser, else `"ko"`),
   `formatOtpMessage(template, params)`.
 - `otpErrorMessageKey(error, operation?)`, `otpReasonMessageKey(reason)`,
   `otpSkipMessageKey(skip)`, `otpPhoneErrorMessageKey(error)`.
@@ -104,10 +114,11 @@ valid (the matching error is then shown); they never reject for API errors.
 - `getOtpFormParts(state, { id, t })`: the attributes (DOM names) and copy
   of every part; `otpFormIds(id)`, `otpCodeSegmentId(id, index)`.
 - `getOtpCodeInputParts(options)`: group and segment attributes of a
-  standalone code input.
+  standalone code input (one tab stop: `otpCodeTabIndex(value, length)`).
 - `createOtpCodeInputHandlers({ getValue, getLength, isReadOnly, onChange,
-  getContainer })`: `input`, `keydown`, `paste`, `focus` handlers for the
-  segments.
+  getContainer })`: `input`, `keydown` (Tab/Shift+Tab leave the group),
+  `paste`, `focus`, `compositionstart` and `compositionend` (IME) handlers
+  for the segments, and `isComposing()`.
 - `focusOtpFormTarget(root, target, state)`, `focusOtpCodeSegment(container,
   index)`.
 
@@ -135,6 +146,8 @@ React 18 and 19, marked `"use client"`, ESM + CJS.
 - `OtpFormSendButton`, `OtpFormVerifyButton`, `OtpFormEditPhoneButton`,
   `OtpFormCountdown`, `OtpFormMessage`: element attributes, and `children`
   (nodes or a function of the context) to replace the default copy.
+- Dot-notation parts (`OtpForm.Root`) need a client component; a Server
+  Component can render the named exports with serializable props.
 - `OtpCodeInput`: `value` / `defaultValue`, `onValueChange`, `onComplete`,
   `length`, `readOnly`, `invalid`, `id`, `autoFocus`, `webOtp`, `name`
   (hidden input), `locale`, `messages`, `aria-labelledby` /
@@ -182,7 +195,8 @@ SvelteKit) and compiled by your Svelte, over a compiled runtime.
   `{ form, state, parts, t }`.
 - `OtpFormPhoneField` slot adds `labelProps`, `inputProps`,
   `descriptionProps`, `errorProps`, `onInput`, `onBlur`; a custom input also
-  binds `readonly={state.phoneLocked}`.
+  uses the `phoneInput` action (`<input {...inputProps} use:phoneInput />`),
+  which wires the handlers and keeps `readonly` in sync.
 - `OtpCodeInput`: `bind:value`, `onValueChange`, `onComplete` /
   `on:complete`, `length`, `readOnly`, `invalid`, `id`, `autoFocus`,
   `webOtp`, `name`, `locale`, `messages`.

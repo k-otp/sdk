@@ -262,7 +262,7 @@ import "@k-otp/sdk/ui/theme.css"; // optional
 <OtpForm options={{ apiKey: "pk_live_..." }} purpose="signup" onVerified={(r) => console.log(r.issueId)} />;
 ```
 
-A phone field (Korean mobiles canonicalized like the API), send/resend with
+A phone field (Korean mobiles canonicalized before sending), send/resend with
 the cooldown, a segmented code input (paste, `one-time-code` autofill,
 WebOTP, keyboard navigation), verify, an expiry countdown and a live status
 message, in Korean or English. Headless parts (`OtpForm.Root`,

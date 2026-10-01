@@ -64,7 +64,7 @@ import "@k-otp/sdk/ui/theme.css"; // 선택: 기본 테마
 <OtpForm options={{ apiKey: "pk_live_..." }} purpose="signup" onVerified={(r) => console.log(r.issueId)} />;
 ```
 
-휴대폰 번호는 API와 같은 규칙으로 정규화되고(`+82 10-...` -> `010...`),
+휴대폰 번호는 전송 전에 정규화되고(`+82 10-...` -> `010...`),
 인증번호 입력은 붙여넣기, 자동 입력(`one-time-code`, WebOTP), 키보드 이동을
 지원하며, 포커스가 흐름을 따라 이동합니다. 모든 파트가 `data-*` 상태를
 노출하므로 직접 스타일을 입히거나 `OtpForm.Root`, `OtpForm.PhoneField` 등으로

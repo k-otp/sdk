@@ -70,11 +70,16 @@ server-side with `getStatus` and an `sk_` key.
 
 Every form takes the same settings: `purpose` (required), `issue` (other
 `issue` fields: `channel`, `templateId`, `templateVariables`, `metadata`, ...),
-`codeLength` (6), `resendCooldownMs` (30 s), `idempotencyKeyPrefix`,
-`autoSubmit` (verify once all digits are in, `true`), `webOtp` (`true`),
-`clearCodeOnMismatch` (`true`), `allowInternational` (`false`),
-`defaultPhoneNumber`, `locale` (`"ko"` or `"en"`, default `"ko"`),
-`messages` (overrides) and `id` (root id; part ids derive from it). Events:
+`codeLength` (6), `resendCooldownMs` (30 s; "change number" clears it,
+while a server-imposed `Retry-After` wait is kept), `idempotencyKeyPrefix`,
+`autoSubmit` (verify once all digits are in, `true`), `webOtp` (`true`, see
+[WebOTP](#webotp-sms-autofill-on-android-chrome)), `clearCodeOnMismatch`
+(`true`), `allowInternational` (`false`), `defaultPhoneNumber`, `locale`
+(`"ko"` or `"en"`; default: the page's `<html lang>` when it is Korean or
+English, else `"ko"`), `messages` (overrides) and `id` (root id; part ids
+derive from it). Requests in flight when the form is unmounted, reset or
+sent back to the phone step are dropped silently: no `error` (`ABORTED`),
+`sent` or `verified` for them. Events:
 `sent`, `verified`, `error` and `phaseChange` (React and Svelte: `onSent`,
 `onVerified`, `onError`, `onPhaseChange` props; Vue: `@sent`, `@verified`,
 `@error`, `@phase-change`; Svelte also dispatches `on:sent` etc.).
@@ -98,7 +103,11 @@ yourself:
 
 Svelte has no namespaces: `OtpFormRoot`, `OtpFormPhoneField`, ...
 
-React (render props):
+React (render props). `@k-otp/sdk/ui/react` is a `"use client"` module: use
+`OtpForm.Root` and the other dot-notation parts, and function props such as
+render props or `onVerified`, inside a client component. A Server Component
+can render the named exports (`OtpForm`, `OtpFormRoot`, `OtpFormPhoneField`,
+...) with serializable props only.
 
 ```tsx
 <OtpForm.Root purpose="login" className="my-form" onVerified={done}>
@@ -143,9 +152,9 @@ Svelte (slot props with `let:` in Svelte 4 and 5, or snippets in Svelte 5):
 
 ```svelte
 <OtpFormRoot {client} purpose="login" class="my-form" let:state>
-  <OtpFormPhoneField let:labelProps let:inputProps let:onInput let:onBlur>
+  <OtpFormPhoneField let:labelProps let:inputProps let:phoneInput>
     <label {...labelProps}>Mobile</label>
-    <input {...inputProps} readonly={state.phoneLocked} on:input={onInput} on:blur={onBlur} />
+    <input {...inputProps} use:phoneInput />
   </OtpFormPhoneField>
   {#if state.issued}
     <OtpFormCodeField />
@@ -157,7 +166,7 @@ Svelte (slot props with `let:` in Svelte 4 and 5, or snippets in Svelte 5):
 ```
 
 With snippets: `{#snippet children({ state })} ... {/snippet}` inside
-`OtpFormRoot`, and `{#snippet children({ inputProps, onInput })}` inside
+`OtpFormRoot`, and `{#snippet children({ inputProps, phoneInput })}` inside
 `OtpFormPhoneField` (use `oninput={onInput}`).
 
 ### State attributes
@@ -184,12 +193,19 @@ Phases: `phone` (entering the number) -> `sending` -> `code` -> `verifying`
 
 - Labels are real `<label for>`; descriptions and errors are linked with
   `aria-describedby`; invalid inputs get `aria-invalid="true"`.
-- The code input is a `role="group"` labelled by the code label; each segment
-  is named "Digit 1 of 6" and the first one has `autocomplete="one-time-code"`
-  (iOS/Android SMS autofill), all have `inputmode="numeric"`.
-- Keyboard: Enter sends in the phone step and verifies in the code step;
-  Backspace/Delete/Arrow keys/Home/End move between segments; paste fills
-  across segments (spaces, hyphens, full-width digits are normalized).
+- The code input is a `role="group"` labelled by the code label (the
+  standalone `OtpCodeInput` defaults to the "Verification code" message
+  unless you pass `aria-label`/`aria-labelledby`) and described once; each
+  segment is named "Digit 1 of 6", the first one has
+  `autocomplete="one-time-code"` (iOS/Android SMS autofill), all have
+  `inputmode="numeric"`. It is always laid out left to right (`dir="ltr"`).
+- Keyboard: the code input is **one tab stop** (roving tabindex: the first
+  empty segment); Tab and Shift+Tab leave it from any segment, and
+  ArrowLeft/ArrowRight/Home/End move between segments. Enter sends in the
+  phone step and verifies in the code step; Backspace/Delete edit; paste fills
+  across segments (spaces, hyphens, full-width digits are normalized); digits
+  composed with an input method (IME) are applied once, when the composition
+  ends.
 - Focus moves with the flow: to the first code segment after a send, back to
   it after a wrong code, to the result message after a verification (or a
   terminal failure), and to the phone input after "change number".
@@ -216,11 +232,16 @@ with custom properties (on the form, or `:root`):
 
 Tokens: `--k-otp-accent`, `--k-otp-accent-contrast`, `--k-otp-radius`,
 `--k-otp-font`, `--k-otp-font-mono`, `--k-otp-space`, `--k-otp-surface`,
-`--k-otp-text`, `--k-otp-muted`, `--k-otp-border`, `--k-otp-border-strong`,
-`--k-otp-field`, `--k-otp-field-locked`, `--k-otp-danger`,
-`--k-otp-success`, `--k-otp-focus-ring`, `--k-otp-focus-width`,
-`--k-otp-shadow`, `--k-otp-max-width`, `--k-otp-segment-size`. Motion is
-removed under `prefers-reduced-motion: reduce`. The package marks only CSS as
+`--k-otp-text`, `--k-otp-muted`, `--k-otp-border` (the card),
+`--k-otp-field-border`, `--k-otp-border-strong`, `--k-otp-field`,
+`--k-otp-field-locked`, `--k-otp-danger`, `--k-otp-success`,
+`--k-otp-focus-ring`, `--k-otp-focus-width`, `--k-otp-shadow`,
+`--k-otp-max-width`, `--k-otp-segment-size`. The defaults keep field borders
+and the focus outline (a solid accent outline) at 3:1 or more against their
+surroundings and the text at 4.5:1 or more, in light and dark; keep that in
+mind when you override them. In forced-colors mode (Windows High Contrast)
+borders, outlines and disabled states use system colors. Motion is removed
+under `prefers-reduced-motion: reduce`. The package marks only CSS as
 a side effect (`"sideEffects": ["**/*.css"]`).
 
 Without the theme the parts are unstyled; the
@@ -250,17 +271,17 @@ reused). The full catalog is `OTP_MESSAGES` in `@k-otp/sdk/ui`.
 
 ## Phone numbers
 
-`parseOtpPhoneNumber` accepts Korean mobiles in any common spelling and
-canonicalizes them like the API's per-phone rate limit: `010-1234-5678`,
+`parseOtpPhoneNumber` accepts Korean mobiles in any common spelling and the
+SDK canonicalizes them before sending: `010-1234-5678`,
 `010 1234 5678`, `+82 10-1234-5678`, `82 1012345678`, `0082 10 1234 5678` and
 the mis-dial `+82 010-1234-5678` are all sent as `01012345678` (`010` + 8
 digits, or `011`/`016`-`019` + 7 or 8 digits). Full-width digits are
 normalized. Landlines are rejected (`not-mobile`). Other countries are
 accepted as E.164 (`+14155550123`) only with `allowInternational`.
 
-The API hashes the number exactly as received, so sending one canonical
-spelling keeps "a new code for the same number and purpose replaces the
-previous one" reliable. The input formats as you type (`010-1234-5678`).
+The same number is therefore always sent the same way, whatever the user
+typed (from API 1.4.0 the server also canonicalizes the key of its per-phone
+rate limit). The input formats as you type (`010-1234-5678`).
 
 ## WebOTP (SMS autofill on Android Chrome)
 
@@ -276,19 +297,23 @@ origin-bound line**:
 @www.example.com #123456
 ```
 
-The last line must be `@<host of the page> #<code>`. The current K-OTP SMS
-templates (`otp_default_kr`, `otp_login_kr`, `otp_signup_kr`,
-`otp_payment_kr`) do not include it, and their variables only allow `code`,
-so WebOTP will not trigger until the API adds such a line for your domain.
-Until then, iOS/macOS Safari and Android keyboards still offer the code
-through `autocomplete="one-time-code"`. Turn WebOTP off with `webOtp={false}`.
+The last line must be `@<host of the page> #<code>`. Check whether the SMS
+your users receive (the template of `templateId`) ends with such a line for
+your domain; the default K-OTP templates do not. Without it the request
+simply never resolves, so leaving `webOtp` on is harmless: it is aborted on
+verify, "change number" and unmount. iOS/macOS Safari and Android keyboards
+offer the code through `autocomplete="one-time-code"` either way. Turn
+WebOTP off with `webOtp={false}`.
 
 ## SSR
 
 Importing any UI subpath and rendering the components on the server performs
-no request, starts no timer and never touches `window`. Pass `id` when you
-server-render, so that the server and client ids match (React uses `useId`,
-Vue 3.5 `useId`; Svelte and older Vue generate one).
+no request, starts no timer and never touches `window`. When you
+server-render, pass `id` (React uses `useId` and Vue 3.5 `useId`, but
+Svelte and older Vue generate a random id, which would differ on the client)
+and `locale` (the server has no `<html lang>` to read, so a page whose `lang`
+is English would otherwise hydrate Korean server text). The hydration of the
+three presets with an explicit `id` is covered by the tests.
 
 ## Svelte 4 and 5
 
@@ -299,7 +324,8 @@ compiles them, so they always match your runtime. Svelte 5 apps can mix them
 with runes components and pass snippets. If you force
 `compilerOptions.runes: true` globally, exclude `node_modules` (e.g. with
 `vitePlugin.dynamicCompileOptions`), as for any library written in Svelte 4
-syntax.
+syntax. A
+future Svelte major that drops this syntax would need new component sources.
 
 ---
 
@@ -356,8 +382,10 @@ Vue는 `<OtpForm purpose="signup" @verified="..." />`, Svelte는
 - 인증번호 입력은 `role="group"` 이고 각 칸은 "6자리 중 1번째 숫자" 처럼
   이름이 붙으며, 첫 칸에 `autocomplete="one-time-code"`, 모든 칸에
   `inputmode="numeric"` 이 있습니다.
-- Enter 로 전송/확인, Backspace/Delete/방향키/Home/End 로 칸 이동, 붙여넣기는
-  여러 칸에 나뉘어 들어갑니다(공백, 하이픈, 전각 숫자 정리).
+- 인증번호 입력은 **탭 정지점 하나**입니다(첫 빈 칸). 어느 칸에서든 Tab /
+  Shift+Tab 으로 빠져나가고, 방향키/Home/End 로 칸을 옮깁니다. Enter 로
+  전송/확인, 붙여넣기는 여러 칸에 나뉘어 들어가며(공백, 하이픈, 전각 숫자
+  정리), 입력기(IME)로 조합한 숫자는 조합이 끝날 때 한 번만 들어갑니다.
 - 포커스 이동: 전송 후 첫 칸, 틀린 인증번호 후 다시 첫 칸, 인증 완료 후 결과
   메시지, 번호 변경 후 번호 입력.
 - 카운트다운은 `role="timer"`, `aria-live="off"`, 메시지는 polite 라이브
@@ -369,29 +397,33 @@ Vue는 `<OtpForm purpose="signup" @verified="..." />`, Svelte는
 선택자로 꾸미므로 직접 지정한 클래스가 항상 이깁니다. 라이트/다크는
 `prefers-color-scheme` 을 따르고 `data-k-otp-theme="light" | "dark"` 로
 고정할 수 있습니다. `--k-otp-accent`, `--k-otp-radius`, `--k-otp-font` 등의
-변수로 조정합니다.
+변수로 조정합니다. 기본값은 입력란 테두리와 포커스 표시를 주변 대비 3:1
+이상으로 유지하고, 고대비(forced-colors) 모드에서는 시스템 색을 씁니다.
 
 ## 휴대폰 번호
 
 `010-1234-5678`, `+82 10-1234-5678`, `82 1012345678`, `0082 10 1234 5678`,
-`+82 010-1234-5678` 은 모두 API의 번호별 정규화와 같은 `01012345678` 로
-전송됩니다(`010` + 8자리, `011`/`016`-`019` + 7-8자리). 유선 번호는
-거부되고, 해외 번호(E.164)는 `allowInternational` 일 때만 허용됩니다. API는
-받은 문자열 그대로 해시하므로, 한 가지 표기로 보내야 "같은 번호와 목적의 새
-인증번호가 이전 것을 대체" 하는 동작이 안정적입니다.
+`+82 010-1234-5678` 은 SDK가 전송 전에 모두 `01012345678` 로 정규화합니다
+(`010` + 8자리, `011`/`016`-`019` + 7-8자리). 따라서 같은 번호는 입력
+형태와 관계없이 항상 같은 값으로 전송됩니다(API 1.4.0부터는 서버도 번호별
+레이트 리밋 키를 정규화합니다). 유선 번호는 거부되고, 해외 번호(E.164)는
+`allowInternational` 일 때만 허용됩니다.
 
 ## WebOTP
 
 전송 후 브라우저가 지원하면 `navigator.credentials.get({ otp })` 를
 호출합니다(기능 감지, 서버에서는 실행되지 않음). Android Chrome 은 SMS
 마지막 줄이 `@<페이지 도메인> #<인증번호>` 형식일 때만 자동 입력합니다.
-현재 K-OTP SMS 템플릿에는 이 줄이 없고 변수도 `code` 만 허용하므로, API가
-도메인 줄을 지원하기 전까지 WebOTP 는 동작하지 않습니다. iOS/Android 키보드의
+사용하는 템플릿의 SMS 가 도메인 줄로 끝나는지 확인하세요(기본 K-OTP 템플릿에는
+없습니다). 이 줄이 없으면 요청이 그냥 완료되지 않을 뿐이므로 `webOtp` 를 켜
+두어도 무해합니다(확인, 번호 변경, 언마운트 시 중단). iOS/Android 키보드의
 `autocomplete="one-time-code"` 자동 입력은 그대로 동작합니다.
 
 ## SSR, Svelte 4/5
 
 모든 UI 서브패스는 서버에서 불러오고 렌더링해도 요청, 타이머, `window`
-접근이 없습니다. SSR 에서는 `id` 를 넘겨 서버와 클라이언트 id 를 맞추세요.
+접근이 없습니다. SSR 에서는 `id` 와 `locale` 을 넘겨 서버와 클라이언트의
+id 와 문구를 맞추세요(기본 언어는 브라우저에서 `<html lang>` 을 따르고
+서버에서는 `"ko"` 입니다).
 Svelte 컴포넌트는 Svelte 4/5 가 모두 컴파일할 수 있는 `.svelte` 소스로
 배포되어 앱의 Svelte 가 직접 컴파일합니다.
