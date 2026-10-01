@@ -15,6 +15,23 @@ const clampLength = (length: number): number =>
   Number.isInteger(length) && length > 0 ? length : DEFAULT_OTP_CODE_LENGTH;
 
 /**
+ * Per-length regular expressions, built once. No lookbehind: it throws at
+ * construction in Safari < 16.4.
+ */
+const patterns = new Map<number, { run: RegExp; complete: RegExp }>();
+const patternsFor = (size: number): { run: RegExp; complete: RegExp } => {
+  let cached = patterns.get(size);
+  if (!cached) {
+    cached = {
+      run: new RegExp(`(?:^|\\D)(\\d(?:[\\s-]?\\d){${size - 1}})(?!\\d)`),
+      complete: new RegExp(`^\\d{${size}}$`),
+    };
+    patterns.set(size, cached);
+  }
+  return cached;
+};
+
+/**
  * Normalizes typed or pasted text into code digits: full-width and other
  * compatibility digits become ASCII (NFKC), and when the text contains a
  * standalone run of exactly `length` digits (optionally split by spaces or
@@ -31,10 +48,9 @@ export const sanitizeOtpCode = (
   length: number = DEFAULT_OTP_CODE_LENGTH,
 ): string => {
   const size = clampLength(length);
-  const normalized = text.normalize("NFKC");
-  const run = new RegExp(`(?<!\\d)\\d(?:[\\s-]?\\d){${size - 1}}(?!\\d)`);
-  const match = run.exec(normalized);
-  const digits = (match ? match[0] : normalized).replace(/\D+/g, "");
+  const normalized = String(text ?? "").normalize("NFKC");
+  const match = patternsFor(size).run.exec(normalized);
+  const digits = (match ? (match[1] ?? "") : normalized).replace(/\D+/g, "");
   return digits.slice(0, size);
 };
 
@@ -49,7 +65,7 @@ export const otpCodeSegments = (
 export const isOtpCodeComplete = (
   value: string,
   length: number = DEFAULT_OTP_CODE_LENGTH,
-): boolean => new RegExp(`^\\d{${clampLength(length)}}$`).test(value);
+): boolean => patternsFor(clampLength(length)).complete.test(value);
 
 /**
  * The segment that may receive focus when the user focuses segment `index`:
