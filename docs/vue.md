@@ -5,6 +5,10 @@ and composables. API reference:
 [`@k-otp/sdk/vue` reference](./reference/vue.md). Runnable app:
 [`examples/vue-vite`](../examples/vue-vite).
 
+> Prefer ready-made components? `@k-otp/sdk/ui/vue` renders the whole form
+> (phone, send/resend, code input, verify, messages) on top of these
+> composables: see [UI components](./ui.md).
+
 ## Setup
 
 ```bash

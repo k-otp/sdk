@@ -13,6 +13,9 @@ npm 패키지는 [`@k-otp/sdk`](./packages/sdk) 하나이며, 용도별 서브�
 | [`@k-otp/sdk/react`](./docs/reference/react.md) | React 18/19 훅: `OtpProvider`, `useOtpIssue`, `useOtpVerify`, `useOtpFlow`(재발송 쿨다운 + 멱등키 관리). |
 | [`@k-otp/sdk/vue`](./docs/reference/vue.md) | Vue 3 플러그인·컴포저블: `createOtpPlugin`, `useOtp`, `useOtpFlow`. |
 | [`@k-otp/sdk/svelte`](./docs/reference/svelte.md) | Svelte 4/5 스토어: `createOtpStores`, 플로우 스토어, `use:otpForm`. |
+| [`@k-otp/sdk/ui/react`, `/ui/vue`, `/ui/svelte`](./docs/ui.md#ui-컴포넌트-한국어) | 헤드리스 UI 컴포넌트: 한 줄짜리 `<OtpForm />` 과 조합 가능한 파트(번호 입력, 인증번호 받기/재전송, SMS 자동 입력을 지원하는 분할 인증번호 입력, 확인, 카운트다운, 메시지), 한국어/영어. |
+| [`@k-otp/sdk/ui/theme.css`](./docs/ui.md#테마) | UI 컴포넌트용 선택적 기본 테마(라이트/다크, 토큰). |
+| [`@k-otp/sdk/ui`](./docs/reference/ui.md#k-otpsdkui) | 프레임워크 무관 UI 모델: 번호 정규화, 인증번호 입력, 폼 상태 머신, 메시지, WebOTP. |
 | [`@k-otp/sdk/headless`](./packages/sdk/README.md#headless-flow-k-otpsdkheadless) | 어댑터들이 공유하는 프레임워크 무관 발급 -> 검증 플로우. |
 | [`@k-otp/sdk/contract`](./packages/sdk/README.md#advanced-entry-points) | oRPC 계약과 생성된 OpenAPI 타입. |
 | [`@k-otp/sdk/k-otp.iife.min.js`](./packages/sdk/README.md#cdn--static-sites) | 정적 사이트용 `<script>` 번들(`window.KOtp`), jsDelivr 또는 unpkg. |
@@ -48,6 +51,25 @@ const { verified, reasonCode } = await otp.verify({ issueId, code: "123456" });
   const otp = KOtp.createOtpClient({ apiKey: "pk_live_..." }); // Origin 정확히 일치 필요
 </script>
 ```
+
+## UI 컴포넌트
+
+접근성을 갖춘 휴대폰 인증 폼을 한 줄로 쓸 수 있습니다(React 예시, Vue와
+Svelte도 같은 방식). 테마를 임포트하지 않으면 스타일이 없습니다.
+
+```tsx
+import { OtpForm } from "@k-otp/sdk/ui/react";
+import "@k-otp/sdk/ui/theme.css"; // 선택: 기본 테마
+
+<OtpForm options={{ apiKey: "pk_live_..." }} purpose="signup" onVerified={(r) => console.log(r.issueId)} />;
+```
+
+휴대폰 번호는 API와 같은 규칙으로 정규화되고(`+82 10-...` -> `010...`),
+인증번호 입력은 붙여넣기, 자동 입력(`one-time-code`, WebOTP), 키보드 이동을
+지원하며, 포커스가 흐름을 따라 이동합니다. 모든 파트가 `data-*` 상태를
+노출하므로 직접 스타일을 입히거나 `OtpForm.Root`, `OtpForm.PhoneField` 등으로
+완전히 헤드리스하게 조합할 수 있습니다. [UI 가이드](./docs/ui.md#ui-컴포넌트-한국어)를
+참고하세요.
 
 ## 핵심 규칙
 
@@ -85,11 +107,12 @@ const { verified, reasonCode } = await otp.verify({ issueId, code: "123456" });
 - [시작하기](./docs/getting-started.md)
 - [발급 -> 검증 UX(쿨다운, 재발송, 재시도, 402/429)](./docs/issue-verify-ux.md)
 - 프레임워크 가이드: [React](./docs/react.md), [Vue](./docs/vue.md), [Svelte](./docs/svelte.md)
+- [UI 컴포넌트와 테마](./docs/ui.md#ui-컴포넌트-한국어) (한국어 섹션 포함)
 - [예제](./examples) (vanilla/CDN, React, Vue, Svelte, Node 서버)
 - [오류, 재시도, 레이트 리밋(429), 멱등성](./docs/errors-and-retries.md)
 - [보안: 키 종류와 Origin 허용 목록](./docs/security.md)
 - [릴리스](./docs/releasing.md)
-- API 레퍼런스: [`@k-otp/sdk`](./packages/sdk/README.md)(core, headless, contract, CDN), [`/server`](./docs/reference/server.md), [`/react`](./docs/reference/react.md), [`/vue`](./docs/reference/vue.md), [`/svelte`](./docs/reference/svelte.md)
+- API 레퍼런스: [`@k-otp/sdk`](./packages/sdk/README.md)(core, headless, contract, CDN), [`/server`](./docs/reference/server.md), [`/react`](./docs/reference/react.md), [`/vue`](./docs/reference/vue.md), [`/svelte`](./docs/reference/svelte.md), [`/ui*`](./docs/reference/ui.md)
 
 상세 문서는 현재 영어로 제공됩니다.
 

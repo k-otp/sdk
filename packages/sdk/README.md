@@ -13,23 +13,24 @@ package, with a subpath per use:
 | `@k-otp/sdk/react` | `OtpProvider`, `useOtpIssue`, `useOtpVerify`, `useOtpFlow` (React 18/19, `"use client"`) | `pk_` | [react](../../docs/reference/react.md) |
 | `@k-otp/sdk/vue` | `createOtpPlugin`, `useOtp`, `useOtpFlow` (Vue >= 3.3) | `pk_` | [vue](../../docs/reference/vue.md) |
 | `@k-otp/sdk/svelte` | `createOtpStores`, flow store, `use:otpForm` (Svelte 4/5, ESM-only) | `pk_` | [svelte](../../docs/reference/svelte.md) |
+| `@k-otp/sdk/ui/react`, `/ui/vue`, `/ui/svelte` | Headless UI components: `<OtpForm />` preset and composable parts (React 18/19, Vue >= 3.3, Svelte 4/5) | `pk_` | [ui](../../docs/reference/ui.md) |
+| `@k-otp/sdk/ui/theme.css` | Optional default theme for the UI components | | [theme](../../docs/ui.md#theme) |
+| `@k-otp/sdk/ui` | The framework-agnostic UI model (phone, code input, form state machine, messages, WebOTP) | | [ui](../../docs/reference/ui.md#k-otpsdkui) |
 | `@k-otp/sdk/contract` | The oRPC contract and generated OpenAPI types, for custom oRPC clients | | [below](#advanced-entry-points) |
 | `@k-otp/sdk/k-otp.iife.min.js` | `<script>` bundle exposing `window.KOtp` (also `k-otp.iife.js`) | `pk_` | [below](#cdn--static-sites) |
 
-- Zero framework code in the core, side-effect free (`sideEffects: false`),
-  SSR-safe (no `window` access at import)
+- Zero framework code in the core, side-effect free (only the optional theme
+  CSS is a side effect: `sideEffects: ["**/*.css"]`), SSR-safe (no `window`
+  access at import)
 - Each subpath only loads what it needs: `@k-otp/sdk/react` never pulls Vue,
-  Svelte or the server client, and the framework adapters share one copy of
-  the core per module format (`OtpApiError` from `@k-otp/sdk` and
-  `@k-otp/sdk/react` is the same class; across the ESM and CommonJS builds,
-  `instanceof OtpApiError` still matches)
+  Svelte, the UI components or the server client, `@k-otp/sdk/ui/react` never
+  pulls Vue or Svelte, and the subpaths share one copy of the core per module
+  format (`OtpApiError` from `@k-otp/sdk` and `@k-otp/sdk/react` is the same
+  class; across the ESM and CommonJS builds, `instanceof OtpApiError` still
+  matches)
 - Typed from the published OpenAPI spec; normalized `OtpApiError`
 - ESM and CommonJS per subpath (Svelte: ESM only) with type declarations,
   plus the `<script>` bundle
-
-Prebuilt UI components are planned as further subpaths (`@k-otp/sdk/ui`,
-`@k-otp/sdk/ui/react|vue|svelte`, `@k-otp/sdk/ui/theme.css`); they are not
-available yet.
 
 ## Install
 
@@ -44,9 +45,9 @@ and Svelte are **optional peer dependencies**: install the one your app uses
 
 | Subpath | Peer dependency |
 | --- | --- |
-| `@k-otp/sdk/react` | `react >= 18` |
-| `@k-otp/sdk/vue` | `vue >= 3.3` |
-| `@k-otp/sdk/svelte` | `svelte >= 4` |
+| `@k-otp/sdk/react`, `@k-otp/sdk/ui/react` | `react >= 18` |
+| `@k-otp/sdk/vue`, `@k-otp/sdk/ui/vue` | `vue >= 3.3` |
+| `@k-otp/sdk/svelte`, `@k-otp/sdk/ui/svelte` | `svelte >= 4` |
 | everything else | none |
 
 Requires a runtime with `fetch`, `AbortController` and Web Streams (all modern
@@ -251,6 +252,25 @@ protection. See the [issue -> verify UX guide](../../docs/issue-verify-ux.md).
 
 Anything not listed in the `exports` map (for example the shared transport
 under `src/core/internal.ts`) is private and cannot be imported.
+
+## UI components
+
+```tsx
+import { OtpForm } from "@k-otp/sdk/ui/react"; // or /ui/vue, /ui/svelte
+import "@k-otp/sdk/ui/theme.css"; // optional
+
+<OtpForm options={{ apiKey: "pk_live_..." }} purpose="signup" onVerified={(r) => console.log(r.issueId)} />;
+```
+
+A phone field (Korean mobiles canonicalized like the API), send/resend with
+the cooldown, a segmented code input (paste, `one-time-code` autofill,
+WebOTP, keyboard navigation), verify, an expiry countdown and a live status
+message, in Korean or English. Headless parts (`OtpForm.Root`,
+`OtpForm.PhoneField`, ...) expose `data-*` state and render props / slots.
+Guide: [UI components](../../docs/ui.md); API:
+[reference](../../docs/reference/ui.md). The Svelte components are shipped as
+`.svelte` sources (the `svelte` export condition) that your Svelte 4 or 5
+compiles.
 
 ## Server, React, Vue and Svelte
 

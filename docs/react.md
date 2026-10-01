@@ -4,6 +4,10 @@
 API reference: [`@k-otp/sdk/react` reference](./reference/react.md).
 Runnable app: [`examples/react-vite`](../examples/react-vite).
 
+> Prefer ready-made components? `@k-otp/sdk/ui/react` renders the whole form
+> (phone, send/resend, code input, verify, messages) on top of these
+> hooks: see [UI components](./ui.md).
+
 ## Setup
 
 ```bash

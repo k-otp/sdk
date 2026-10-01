@@ -7,6 +7,10 @@ as usual). API reference:
 [`@k-otp/sdk/svelte` reference](./reference/svelte.md). Runnable app:
 [`examples/svelte-vite`](../examples/svelte-vite).
 
+> Prefer ready-made components? `@k-otp/sdk/ui/svelte` renders the whole form
+> (phone, send/resend, code input, verify, messages) on top of these
+> stores: see [UI components](./ui.md).
+
 ## Setup
 
 ```bash
