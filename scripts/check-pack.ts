@@ -16,6 +16,8 @@
  * - every bare import in the built JS is a declared dependency, and a
  *   framework is only imported by its own subpath (`react` only from
  *   `dist/react.*`, never from a shared chunk)
+ * - `dist/react.js` and `dist/react.cjs` start with `"use client"`, and no
+ *   other file contains it
  *
  * Run `bun run build` first.
  */
@@ -287,8 +289,18 @@ const checkPackage = async (dir: string): Promise<void> => {
 
   // Imports in the built output must be declared dependencies.
   for (const file of files.filter((f) => /\.(c?js|mjs)$/.test(f))) {
-    if (file.includes(".iife.")) continue; // self-contained CDN bundle
     const code = await readFile(path.join(unpacked, file), "utf8");
+    // `"use client"` opens the react entry (Next.js App Router) and nothing
+    // else: on a shared chunk it would turn the core into client code.
+    const useClient = /^\s*["']use client["'];?/.test(code);
+    const isReactEntry = /^dist[/\\]react\.c?js$/.test(file);
+    if (isReactEntry && !useClient) {
+      fail(name, `${file} must start with "use client"`);
+    }
+    if (!isReactEntry && /["']use client["']/.test(code)) {
+      fail(name, `${file} must not contain "use client"`);
+    }
+    if (file.includes(".iife.")) continue; // self-contained CDN bundle
     for (const specifier of bareImports(code)) {
       const dep = packageName(specifier);
       if (!Object.hasOwn(runtimeDeps, dep)) {
