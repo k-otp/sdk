@@ -1,7 +1,8 @@
 # Vanilla / CDN example
 
 A single static `index.html` that uses the `window.KOtp` script bundle of
-[`@k-otp/sdk-core`](../../packages/sdk-core): no bundler, no framework.
+[`@k-otp/sdk`](../../packages/sdk/README.md#cdn--static-sites)
+(`@k-otp/sdk/k-otp.iife.min.js`): no bundler, no framework.
 
 ## Run
 
@@ -13,17 +14,18 @@ bun run build                         # dist/: index.html + k-otp.iife.min.js
 ```
 
 `serve.ts` serves `index.html` and the locally built
-`packages/sdk-core/dist/k-otp.iife.min.js` as `./k-otp.iife.min.js`. With
+`packages/sdk/dist/k-otp.iife.min.js` (resolved through the
+`@k-otp/sdk/k-otp.iife.min.js` export) as `./k-otp.iife.min.js`. With
 `PUBLIC_KEY = ""` the page uses an in-page mock API (code `123456`).
 
-## Production: jsDelivr + SRI
+## Production: jsDelivr (or unpkg) + SRI
 
 Replace the local `<script>` with a pinned jsDelivr URL and an integrity
-hash:
+hash (unpkg: `https://unpkg.com/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js`):
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@k-otp/sdk-core@0.1.0/dist/k-otp.iife.min.js"
+  src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js"
   integrity="sha384-..."
   crossorigin="anonymous"
 ></script>
@@ -44,7 +46,7 @@ a separate key) and your production origin such as
 `sk_` key in a page: the SDK refuses it in browsers, and anyone could read it.
 
 The page drives the UI with `KOtp.createOtpFlow` (the public
-`@k-otp/sdk-core/headless` flow that the framework adapters also use): one
+`@k-otp/sdk/headless` flow that the framework adapters also use): one
 idempotency key per send attempt, reused while the outcome is unknown, a
 30 s resend cooldown (or the server's `retryAfterMs`), and `verify` results
 with `reasonCode` handled as normal outcomes. See the

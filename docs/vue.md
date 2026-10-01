@@ -1,18 +1,18 @@
 # Vue guide
 
-[`@k-otp/sdk-vue`](../packages/sdk-vue) wraps `@k-otp/sdk-core` in a plugin
-and composables. API reference: the
-[package README](../packages/sdk-vue/README.md). Runnable app:
+[`@k-otp/sdk/vue`](./reference/vue.md) wraps the `@k-otp/sdk` core client in a plugin
+and composables. API reference:
+[`@k-otp/sdk/vue` reference](./reference/vue.md). Runnable app:
 [`examples/vue-vite`](../examples/vue-vite).
 
 ## Setup
 
 ```bash
-npm install @k-otp/sdk-vue   # vue >= 3.3 is a peer dependency
+npm install @k-otp/sdk vue   # vue (>= 3.3) is an optional peer dependency
 ```
 
 ```ts
-import { createOtpPlugin } from "@k-otp/sdk-vue";
+import { createOtpPlugin } from "@k-otp/sdk/vue";
 
 app.use(createOtpPlugin({ apiKey: import.meta.env.VITE_K_OTP_PUBLIC_KEY }));
 ```
@@ -32,7 +32,7 @@ parent component's `setup`.
 
 ```vue
 <script setup lang="ts">
-import { useOtpFlow } from "@k-otp/sdk-vue";
+import { useOtpFlow } from "@k-otp/sdk/vue";
 
 const { send, verify, canSend, canVerify, cooldownRemainingMs, verified, reasonCode, error } =
   useOtpFlow({ resendCooldownMs: 30_000 });
@@ -62,7 +62,7 @@ for API errors, so `@click="send(...)"` is safe.
   the idle state.
 - Browser-direct flow: expose only the `pk_` key (`NUXT_PUBLIC_*` /
   `VITE_*`).
-- Server-driven flow: call [`@k-otp/sdk-server`](../packages/sdk-server) with
+- Server-driven flow: call [`@k-otp/sdk/server`](./reference/server.md) with
   `sk_` from server routes (`server/api/*.ts` in Nuxt) and call those from
   the UI. Never put an `sk_` key in runtime public config.
 

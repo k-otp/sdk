@@ -1,7 +1,7 @@
 # Vue + Vite example
 
 Phone verification (issue -> verify) with
-[`@k-otp/sdk-vue`](../../packages/sdk-vue)'s `useOtpFlow`: resend
+[`@k-otp/sdk/vue`](../../docs/reference/vue.md)'s `useOtpFlow`: resend
 cooldown, retry-safe idempotency keys and error messages for 402/429/403.
 
 ## Run

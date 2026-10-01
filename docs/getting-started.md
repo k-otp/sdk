@@ -1,21 +1,23 @@
 # Getting started
 
 K-OTP issues 6-digit one-time passwords over SMS or KakaoTalk AlimTalk and
-verifies them. This repository ships these packages:
+verifies them. Everything ships in one package, `@k-otp/sdk`
+(`npm install @k-otp/sdk`), with one subpath per use:
 
-| Package | Where | Key | Operations |
+| Import | Where | Key | Operations |
 | --- | --- | --- | --- |
-| [`@k-otp/sdk-core`](../packages/sdk-core) | Browser, SSR, edge, server | `pk_` (browser) or `sk_` (server) | `issue`, `verify` |
-| [`@k-otp/sdk-server`](../packages/sdk-server) | Node.js, Bun, Deno, Workers | `sk_` only | everything in `/v1` |
-| [`@k-otp/sdk-react`](../packages/sdk-react) | React 18/19 (client components) | `pk_` | `issue`, `verify`, flow |
-| [`@k-otp/sdk-vue`](../packages/sdk-vue) | Vue >= 3.3 | `pk_` | `issue`, `verify`, flow |
-| [`@k-otp/sdk-svelte`](../packages/sdk-svelte) | Svelte 4/5 | `pk_` | `issue`, `verify`, flow |
+| [`@k-otp/sdk`](../packages/sdk/README.md) | Browser, SSR, edge, server | `pk_` (browser) or `sk_` (server) | `issue`, `verify` |
+| [`@k-otp/sdk/server`](./reference/server.md) | Node.js, Bun, Deno, Workers | `sk_` only | everything in `/v1` |
+| [`@k-otp/sdk/react`](./reference/react.md) | React 18/19 (client components) | `pk_` | `issue`, `verify`, flow |
+| [`@k-otp/sdk/vue`](./reference/vue.md) | Vue >= 3.3 | `pk_` | `issue`, `verify`, flow |
+| [`@k-otp/sdk/svelte`](./reference/svelte.md) | Svelte 4/5 | `pk_` | `issue`, `verify`, flow |
 
-The adapters depend on `@k-otp/sdk-core` as a regular dependency pinned to
-the exact same version (all packages are released in lockstep, so one
-install brings the matching core and there is no peer range to get wrong)
-and re-export its common helpers and types. The framework itself is a peer
-dependency, so installing one adapter never pulls in another framework.
+The framework subpaths re-export the common core helpers and types (the same
+objects as `@k-otp/sdk`, from one shared copy of the core). React, Vue and
+Svelte are optional peer dependencies of `@k-otp/sdk`: your app provides the
+one it uses, and importing `@k-otp/sdk/react` never loads Vue, Svelte or the
+server client. `@k-otp/sdk/server` is never bundled for browsers (it resolves
+to a failing stub under the `browser` export condition).
 
 Framework guides: [React](./react.md), [Vue](./vue.md), [Svelte](./svelte.md).
 UX rules for the "send code / enter code" screen:
@@ -40,7 +42,7 @@ the code. You keep full control over rate limiting and which phone numbers can
 receive codes.
 
 ```ts
-import { createIdempotencyKey, createOtpServerClient } from "@k-otp/sdk-server";
+import { createIdempotencyKey, createOtpServerClient } from "@k-otp/sdk/server";
 
 const otp = createOtpServerClient({ apiKey: process.env.K_OTP_SECRET_KEY! });
 
@@ -56,7 +58,7 @@ const { verified, reasonCode } = await otp.verify({ issueId, code });
 **Browser-direct.** A static site or SPA calls the API with a `pk_` key.
 
 ```ts
-import { createIdempotencyKey, createOtpClient } from "@k-otp/sdk-core";
+import { createIdempotencyKey, createOtpClient } from "@k-otp/sdk";
 
 const otp = createOtpClient({ apiKey: "pk_live_..." });
 const { issueId } = await otp.issue({
@@ -73,7 +75,7 @@ If your backend must trust the result, check it server-side (`getStatus` with
 Without a bundler:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@k-otp/sdk-core@0.1.0/dist/k-otp.iife.min.js"
+<script src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js"
         integrity="sha384-..." crossorigin="anonymous"></script>
 <script>
   const otp = KOtp.createOtpClient({ apiKey: "pk_live_..." });
@@ -90,7 +92,7 @@ Without a bundler:
 
 ## 4. Templates
 
-`GET /v1/templates` (`sdk-server`: `listTemplates()`) lists the whitelisted
+`GET /v1/templates` (`@k-otp/sdk/server`: `listTemplates()`) lists the whitelisted
 message templates. Pass `templateId` to `issue` to choose one and
 `templateVariables` for its declared variables; the `code` variable is always
 filled in by the server.
@@ -105,8 +107,8 @@ filled in by the server.
 
 Runtime requirements: Node.js >= 20.19 (the CommonJS builds `require()` the
 ESM-only oRPC packages, which needs `require(esm)` support), Bun, Deno, modern
-browsers and edge runtimes. `@k-otp/sdk-server` only accepts `sk_` keys.
+browsers and edge runtimes. `@k-otp/sdk/server` only accepts `sk_` keys.
 
 The OpenAPI document the SDK is generated from is vendored at
 [`spec/openapi.json`](../spec/openapi.json) (API version shown in
-`OPENAPI_VERSION` from `@k-otp/sdk-core/contract`).
+`OPENAPI_VERSION` from `@k-otp/sdk/contract`).

@@ -4,28 +4,32 @@
 
 [K-OTP](https://api.k-otp.dev) 한국형 OTP API의 공식 JavaScript/TypeScript SDK입니다.
 SMS 또는 카카오 알림톡으로 일회용 인증번호를 발급(issue)하고 검증(verify)합니다.
+npm 패키지는 [`@k-otp/sdk`](./packages/sdk) 하나이며, 용도별 서브패스로 나뉩니다.
 
-| 패키지 | 용도 |
+| 임포트 | 용도 |
 | --- | --- |
-| [`@k-otp/sdk-core`](./packages/sdk-core) | 브라우저(`pk_` 키)·SSR·엣지에서 `issue` / `verify`. 프레임워크 무관, `<script>` 번들(`window.KOtp`) 제공. |
-| [`@k-otp/sdk-server`](./packages/sdk-server) | Node.js, Bun, Deno, Workers에서 `sk_` 키로 모든 공개 `/v1` 기능(상태, 발급 이력, 원장, 잔액, 템플릿) 호출. 크레딧은 조직 단위 지갑 하나입니다(API 1.4.0). |
-| [`@k-otp/sdk-react`](./packages/sdk-react) | React 18/19 훅: `OtpProvider`, `useOtpIssue`, `useOtpVerify`, `useOtpFlow`(재발송 쿨다운 + 멱등키 관리). |
-| [`@k-otp/sdk-vue`](./packages/sdk-vue) | Vue 3 플러그인·컴포저블: `createOtpPlugin`, `useOtp`, `useOtpFlow`. |
-| [`@k-otp/sdk-svelte`](./packages/sdk-svelte) | Svelte 4/5 스토어: `createOtpStores`, 플로우 스토어, `use:otpForm`. |
+| [`@k-otp/sdk`](./packages/sdk/README.md) (= `@k-otp/sdk/core`) | 브라우저(`pk_` 키)·SSR·엣지에서 `issue` / `verify`. 프레임워크 무관. |
+| [`@k-otp/sdk/server`](./docs/reference/server.md) | Node.js, Bun, Deno, Workers에서 `sk_` 키로 모든 공개 `/v1` 기능(상태, 발급 이력, 원장, 잔액, 템플릿) 호출. 크레딧은 조직 단위 지갑 하나입니다(API 1.4.0). 브라우저 번들에는 포함되지 않습니다. |
+| [`@k-otp/sdk/react`](./docs/reference/react.md) | React 18/19 훅: `OtpProvider`, `useOtpIssue`, `useOtpVerify`, `useOtpFlow`(재발송 쿨다운 + 멱등키 관리). |
+| [`@k-otp/sdk/vue`](./docs/reference/vue.md) | Vue 3 플러그인·컴포저블: `createOtpPlugin`, `useOtp`, `useOtpFlow`. |
+| [`@k-otp/sdk/svelte`](./docs/reference/svelte.md) | Svelte 4/5 스토어: `createOtpStores`, 플로우 스토어, `use:otpForm`. |
+| [`@k-otp/sdk/headless`](./packages/sdk/README.md#headless-flow-k-otpsdkheadless) | 어댑터들이 공유하는 프레임워크 무관 발급 -> 검증 플로우. |
+| [`@k-otp/sdk/contract`](./packages/sdk/README.md#advanced-entry-points) | oRPC 계약과 생성된 OpenAPI 타입. |
+| [`@k-otp/sdk/k-otp.iife.min.js`](./packages/sdk/README.md#cdn--static-sites) | 정적 사이트용 `<script>` 번들(`window.KOtp`), jsDelivr 또는 unpkg. |
 
-어댑터는 `sdk-core` 위의 얇은 계층(각각 gzip 1 kB 미만)이며 동작과 정규화된 `OtpApiError`가 모두
-동일합니다. 각 어댑터는 같은 버전의 `sdk-core`에 의존하고(락스텝 릴리스), 프레임워크는 peer dependency입니다.
+프레임워크 서브패스는 코어 위의 얇은 계층(각각 gzip 약 1 kB)이며 동작과 정규화된 `OtpApiError`가 모두
+동일하고, 하나의 공유 코어를 사용합니다. React, Vue, Svelte는 선택적(optional) peer dependency이며,
+`@k-otp/sdk/react`를 임포트해도 Vue, Svelte, 서버 클라이언트는 로드되지 않습니다.
 
 ## 빠른 시작
 
 ```bash
-npm install @k-otp/sdk-server   # 백엔드
-npm install @k-otp/sdk-core     # 브라우저 / SSR, 프레임워크 무관
-npm install @k-otp/sdk-react    # 또는 @k-otp/sdk-vue, @k-otp/sdk-svelte
+npm install @k-otp/sdk
+# 어댑터를 쓰면 프레임워크도 함께: react, vue 또는 svelte (선택적 peer)
 ```
 
 ```ts
-import { createIdempotencyKey, createOtpServerClient } from "@k-otp/sdk-server";
+import { createIdempotencyKey, createOtpServerClient } from "@k-otp/sdk/server";
 
 const otp = createOtpServerClient({ apiKey: process.env.K_OTP_SECRET_KEY! });
 
@@ -38,7 +42,7 @@ const { verified, reasonCode } = await otp.verify({ issueId, code: "123456" });
 정적 사이트:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@k-otp/sdk-core@0.1.0/dist/k-otp.iife.min.js"
+<script src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js"
         integrity="sha384-..." crossorigin="anonymous"></script>
 <script>
   const otp = KOtp.createOtpClient({ apiKey: "pk_live_..." }); // Origin 정확히 일치 필요
@@ -47,8 +51,9 @@ const { verified, reasonCode } = await otp.verify({ issueId, code: "123456" });
 
 ## 핵심 규칙
 
-- **`sk_` 비밀 키는 절대 브라우저/앱에 포함하지 마세요.** `sdk-core`는 브라우저에서 `sk_` 키를,
-  `sdk-server`는 `sk_`로 시작하지 않는 키(`pk_` 포함)와 브라우저 실행을 거부합니다.
+- **`sk_` 비밀 키는 절대 브라우저/앱에 포함하지 마세요.** `@k-otp/sdk`는 브라우저에서 `sk_` 키를,
+  `@k-otp/sdk/server`는 `sk_`로 시작하지 않는 키(`pk_` 포함)와 브라우저 실행을 거부합니다. 브라우저용
+  번들러는 `browser` export condition으로 `@k-otp/sdk/server`를 빌드 실패용 스텁으로 해석합니다.
 - **`pk_` 공개 키**는 `issue`/`verify`만 가능하며, 요청의 `Origin`이 키의 `allowedOrigins` 중
   하나와 정확히 일치해야 합니다(스킴·호스트·포트, 와일드카드 없음). 불일치 시 `403 FORBIDDEN`이며,
   브라우저에서는 API가 CORS 헤더를 보내지 않으므로 SDK에는 `NETWORK_ERROR`(status 0, requestId 없음)로
@@ -84,14 +89,14 @@ const { verified, reasonCode } = await otp.verify({ issueId, code: "123456" });
 - [오류, 재시도, 레이트 리밋(429), 멱등성](./docs/errors-and-retries.md)
 - [보안: 키 종류와 Origin 허용 목록](./docs/security.md)
 - [릴리스](./docs/releasing.md)
-- API 레퍼런스: [`sdk-core`](./packages/sdk-core/README.md), [`sdk-server`](./packages/sdk-server/README.md), [`sdk-react`](./packages/sdk-react/README.md), [`sdk-vue`](./packages/sdk-vue/README.md), [`sdk-svelte`](./packages/sdk-svelte/README.md)
+- API 레퍼런스: [`@k-otp/sdk`](./packages/sdk/README.md)(core, headless, contract, CDN), [`/server`](./docs/reference/server.md), [`/react`](./docs/reference/react.md), [`/vue`](./docs/reference/vue.md), [`/svelte`](./docs/reference/svelte.md)
 
 상세 문서는 현재 영어로 제공됩니다.
 
 ## API 스펙 동기화
 
 공개 OpenAPI 문서를 [`spec/openapi.json`](./spec/openapi.json)에 벤더링하고, 여기서 TypeScript 타입을
-생성합니다(`bun run gen:types`). `packages/sdk-core/src/contract.ts`의 oRPC 계약이 스펙과 어긋나면
+생성합니다(`bun run gen:types`). `packages/sdk/src/core/contract.ts`의 oRPC 계약이 스펙과 어긋나면
 드리프트 테스트가 CI를 실패시킵니다. 스펙 갱신은 `bun run sync:openapi`로 합니다.
 
 ## 개발

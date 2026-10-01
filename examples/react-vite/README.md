@@ -1,7 +1,7 @@
 # React + Vite example
 
 Phone verification (issue -> verify) with
-[`@k-otp/sdk-react`](../../packages/sdk-react)'s `useOtpFlow`: resend
+[`@k-otp/sdk/react`](../../docs/reference/react.md)'s `useOtpFlow`: resend
 cooldown, retry-safe idempotency keys and error messages for 402/429/403.
 
 ## Run

@@ -1,7 +1,7 @@
 # Node.js server example (`sk_` key)
 
 A backend that exposes two endpoints for a server-driven OTP flow with
-[`@k-otp/sdk-server`](../../packages/sdk-server). The browser only talks to
+[`@k-otp/sdk/server`](../../docs/reference/server.md). The browser only talks to
 this server; the **`sk_` secret key never leaves it**.
 
 | Endpoint | Body | Response |
@@ -38,7 +38,7 @@ Without `K_OTP_SECRET_KEY` the server uses a mock API (code `123456`).
   number verified in your session/database right there.
 - The `sk_` key stays in server config (`.env`, a secret manager, Workers
   secrets). Never expose it through `NEXT_PUBLIC_*`, `VITE_*` or any
-  client bundle. `@k-otp/sdk-server` refuses to run in a browser and only
+  client bundle. `@k-otp/sdk/server` refuses to run in a browser and only
   accepts keys starting with `sk_`.
 
 `sk_` keys are not subject to an Origin allowlist. `pk_` public keys (used by

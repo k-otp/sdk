@@ -32,7 +32,7 @@ All SDK methods reject with `OtpApiError`:
 | `UNKNOWN` | any | no | Anything else (unexpected status, malformed success body). |
 
 Configuration mistakes (missing `apiKey`, a key without the `sk_` prefix in
-`sdk-server`, an `sk_` key in a browser, no `fetch`) throw `TypeError` instead.
+`@k-otp/sdk/server`, an `sk_` key in a browser, no `fetch`) throw `TypeError` instead.
 
 ## `NETWORK_ERROR` in the browser, but the same call works with curl
 
@@ -83,7 +83,7 @@ The SDK does not retry automatically, so you stay in control of user-visible
 side effects. A reasonable policy:
 
 ```ts
-import { isOtpApiError } from "@k-otp/sdk-core";
+import { isOtpApiError } from "@k-otp/sdk";
 
 async function issueWithRetry(otp, input, attempts = 3) {
   for (let attempt = 1; ; attempt++) {
@@ -112,7 +112,7 @@ and every key is capped at a platform ceiling. An exceeded rule rejects with
 and this error data:
 
 ```ts
-import { isOtpApiError, type OtpRateLimitedData } from "@k-otp/sdk-core";
+import { isOtpApiError, type OtpRateLimitedData } from "@k-otp/sdk";
 
 if (isOtpApiError(error) && error.code === "TOO_MANY_REQUESTS") {
   const data = error.data as OtpRateLimitedData | undefined;

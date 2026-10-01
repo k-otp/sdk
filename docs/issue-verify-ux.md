@@ -3,9 +3,9 @@
 How to build the "send code / enter code" screen so that it is pleasant,
 safe to retry and never double-sends an SMS. The adapters' flow helpers
 (`useOtpFlow` in React and Vue, `createFlow()` / `createOtpFlowStore` in
-Svelte, and `createOtpFlow` from `@k-otp/sdk-core/headless` or
+Svelte, and `createOtpFlow` from `@k-otp/sdk/headless` or
 `KOtp.createOtpFlow` for plain JavaScript) implement every rule below; with
-the bare `issue`/`verify` calls or `@k-otp/sdk-server` you apply them
+the bare `issue`/`verify` calls or `@k-otp/sdk/server` you apply them
 yourself.
 
 ## The states
@@ -129,6 +129,6 @@ It is not the end user's fault:
 - React: [`docs/react.md`](./react.md)
 - Vue: [`docs/vue.md`](./vue.md)
 - Svelte: [`docs/svelte.md`](./svelte.md)
-- Plain JavaScript / CDN: `createOtpFlow` from `@k-otp/sdk-core/headless`
+- Plain JavaScript / CDN: `createOtpFlow` from `@k-otp/sdk/headless`
   (`KOtp.createOtpFlow` in the script bundle), see
   [`examples/vanilla-cdn`](../examples/vanilla-cdn).

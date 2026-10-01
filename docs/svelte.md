@@ -1,21 +1,21 @@
 # Svelte guide
 
-[`@k-otp/sdk-svelte`](../packages/sdk-svelte) wraps `@k-otp/sdk-core` in
+[`@k-otp/sdk/svelte`](./reference/svelte.md) wraps the `@k-otp/sdk` core client in
 Svelte stores. It only uses `svelte/store` (and `svelte` for context), so it
 works in Svelte 4 and Svelte 5 (runes components read stores with `$store`
-as usual). API reference: the
-[package README](../packages/sdk-svelte/README.md). Runnable app:
+as usual). API reference:
+[`@k-otp/sdk/svelte` reference](./reference/svelte.md). Runnable app:
 [`examples/svelte-vite`](../examples/svelte-vite).
 
 ## Setup
 
 ```bash
-npm install @k-otp/sdk-svelte   # svelte >= 4 is a peer dependency
+npm install @k-otp/sdk svelte   # svelte (>= 4) is an optional peer dependency
 ```
 
 ```svelte
 <script lang="ts">
-  import { createOtpStores } from "@k-otp/sdk-svelte";
+  import { createOtpStores } from "@k-otp/sdk/svelte";
 
   const otp = createOtpStores({ apiKey: import.meta.env.VITE_K_OTP_PUBLIC_KEY });
   const flow = otp.createFlow({ resendCooldownMs: 30_000 });
@@ -76,7 +76,7 @@ only runs while the store has subscribers.
   component, or call `setOtpContext(...)` in the root `+layout.svelte` and
   `getOtpContext()` below it.
 - Browser-direct flow: expose only the `pk_` key (`PUBLIC_*` env).
-- Server-driven flow: call [`@k-otp/sdk-server`](../packages/sdk-server) with
+- Server-driven flow: call [`@k-otp/sdk/server`](./reference/server.md) with
   `sk_` from `+server.ts` endpoints or form actions in `+page.server.ts`
   (`$env/static/private`), and never import it from universal code.
 

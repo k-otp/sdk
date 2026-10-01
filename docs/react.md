@@ -1,17 +1,17 @@
 # React guide
 
-[`@k-otp/sdk-react`](../packages/sdk-react) wraps `@k-otp/sdk-core` in hooks.
-API reference: the [package README](../packages/sdk-react/README.md).
+[`@k-otp/sdk/react`](./reference/react.md) wraps the `@k-otp/sdk` core client in hooks.
+API reference: [`@k-otp/sdk/react` reference](./reference/react.md).
 Runnable app: [`examples/react-vite`](../examples/react-vite).
 
 ## Setup
 
 ```bash
-npm install @k-otp/sdk-react   # react >= 18 is a peer dependency
+npm install @k-otp/sdk react   # react (>= 18) is an optional peer dependency
 ```
 
 ```tsx
-import { OtpProvider } from "@k-otp/sdk-react";
+import { OtpProvider } from "@k-otp/sdk/react";
 
 <OtpProvider options={{ apiKey: import.meta.env.VITE_K_OTP_PUBLIC_KEY }}>
   <App />
@@ -71,9 +71,10 @@ available as state (`data`, `error`, `isLoading`, `status`).
   state.
 - Browser-direct flow: expose only the `pk_` key (`NEXT_PUBLIC_K_OTP_PUBLIC_KEY`).
 - Server-driven flow (recommended when the backend must trust the result):
-  call [`@k-otp/sdk-server`](../packages/sdk-server) with `sk_` from route
+  call [`@k-otp/sdk/server`](./reference/server.md) with `sk_` from route
   handlers / server actions, and call those from the UI. Never import
-  `@k-otp/sdk-server` or an `sk_` key into client components.
+  `@k-otp/sdk/server` or an `sk_` key into client components (a client
+  bundle resolves `@k-otp/sdk/server` to a stub that fails the build).
 
 ## Testing
 

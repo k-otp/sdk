@@ -1,26 +1,52 @@
-# @k-otp/sdk-core
+# @k-otp/sdk
 
-Framework-agnostic client for the [K-OTP](https://api.k-otp.dev) Korean OTP API.
-Issue and verify one-time passwords (SMS / KakaoTalk AlimTalk) from browsers,
-SSR frameworks, and edge runtimes.
+The official JavaScript/TypeScript SDK for the [K-OTP](https://api.k-otp.dev)
+Korean OTP API: issue and verify one-time passwords (SMS / KakaoTalk
+AlimTalk) from browsers, SSR frameworks, edge runtimes and servers. One
+package, with a subpath per use:
 
-- `issue` / `verify` only: the operations a browser `pk_` key may call
-- Zero framework dependencies, side-effect free, SSR-safe (no `window` access at import)
+| Import | Use it for | Key | Reference |
+| --- | --- | --- | --- |
+| `@k-otp/sdk` (= `@k-otp/sdk/core`) | Framework-agnostic `issue` / `verify` for browsers, SSR and edge | `pk_` (browser) or `sk_` | [below](#api) |
+| `@k-otp/sdk/headless` | The issue -> verify flow state machine behind the adapters | | [below](#headless-flow-k-otpsdkheadless) |
+| `@k-otp/sdk/server` | Every public `/v1` operation (status, history, ledger, balance, templates) from Node.js, Bun, Deno or edge runtimes; never bundled for browsers | `sk_` only | [server](../../docs/reference/server.md) |
+| `@k-otp/sdk/react` | `OtpProvider`, `useOtpIssue`, `useOtpVerify`, `useOtpFlow` (React 18/19, `"use client"`) | `pk_` | [react](../../docs/reference/react.md) |
+| `@k-otp/sdk/vue` | `createOtpPlugin`, `useOtp`, `useOtpFlow` (Vue >= 3.3) | `pk_` | [vue](../../docs/reference/vue.md) |
+| `@k-otp/sdk/svelte` | `createOtpStores`, flow store, `use:otpForm` (Svelte 4/5, ESM-only) | `pk_` | [svelte](../../docs/reference/svelte.md) |
+| `@k-otp/sdk/contract` | The oRPC contract and generated OpenAPI types, for custom oRPC clients | | [below](#advanced-entry-points) |
+| `@k-otp/sdk/k-otp.iife.min.js` | `<script>` bundle exposing `window.KOtp` (also `k-otp.iife.js`) | `pk_` | [below](#cdn--static-sites) |
+
+- Zero framework code in the core, side-effect free (`sideEffects: false`),
+  SSR-safe (no `window` access at import)
+- Each subpath only loads what it needs: `@k-otp/sdk/react` never pulls Vue,
+  Svelte or the server client, and the framework adapters share one copy of
+  the core (`OtpApiError` from `@k-otp/sdk` and `@k-otp/sdk/react` is the
+  same class)
 - Typed from the published OpenAPI spec; normalized `OtpApiError`
-- ESM, CommonJS and a `<script>` bundle exposing `window.KOtp`
+- ESM and CommonJS per subpath (Svelte: ESM only) with type declarations,
+  plus the `<script>` bundle
 
-Server code that needs status, history, balance or templates should use
-[`@k-otp/sdk-server`](../sdk-server) with an `sk_` secret key. React, Vue and
-Svelte apps can use the adapters [`@k-otp/sdk-react`](../sdk-react),
-[`@k-otp/sdk-vue`](../sdk-vue) and [`@k-otp/sdk-svelte`](../sdk-svelte), which
-add loading/error state and an issue -> verify flow on top of this package.
+Prebuilt UI components are planned as further subpaths (`@k-otp/sdk/ui`,
+`@k-otp/sdk/ui/react|vue|svelte`, `@k-otp/sdk/ui/theme.css`); they are not
+available yet.
 
 ## Install
 
 ```bash
-npm install @k-otp/sdk-core
-# or: bun add / pnpm add / yarn add @k-otp/sdk-core
+npm install @k-otp/sdk
+# or: bun add / pnpm add / yarn add @k-otp/sdk
 ```
+
+The only runtime dependencies are the `@orpc/*` client packages. React, Vue
+and Svelte are **optional peer dependencies**: install the one your app uses
+(it already does), and only import its subpath.
+
+| Subpath | Peer dependency |
+| --- | --- |
+| `@k-otp/sdk/react` | `react >= 18` |
+| `@k-otp/sdk/vue` | `vue >= 3.3` |
+| `@k-otp/sdk/svelte` | `svelte >= 4` |
+| everything else | none |
 
 Requires a runtime with `fetch`, `AbortController` and Web Streams (all modern
 browsers, Node.js >= 20.19, Bun, Deno, Cloudflare Workers).
@@ -28,7 +54,7 @@ browsers, Node.js >= 20.19, Bun, Deno, Cloudflare Workers).
 ## Quick start
 
 ```ts
-import { createIdempotencyKey, createOtpClient, isOtpApiError } from "@k-otp/sdk-core";
+import { createIdempotencyKey, createOtpClient, isOtpApiError } from "@k-otp/sdk";
 
 const otp = createOtpClient({
   apiKey: "pk_live_...", // public key; its allowedOrigins must include this page's exact origin
@@ -54,7 +80,7 @@ if (!result.verified) {
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@k-otp/sdk-core@0.1.0/dist/k-otp.iife.min.js"
+  src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js"
   integrity="sha384-REPLACE_WITH_THE_FILE_HASH"
   crossorigin="anonymous"
 ></script>
@@ -69,11 +95,17 @@ Always pin an exact version and add Subresource Integrity. Get the hash from
 jsDelivr ("Copy HTML + SRI" on the package page) or compute it:
 
 ```bash
-curl -s https://cdn.jsdelivr.net/npm/@k-otp/sdk-core@0.1.0/dist/k-otp.iife.min.js \
+curl -s https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js \
   | openssl dgst -sha384 -binary | openssl base64 -A
 ```
 
-`dist/k-otp.iife.js` is the unminified variant.
+unpkg works the same way:
+`https://unpkg.com/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js` (the package's
+`unpkg` / `jsdelivr` fields also point there, so
+`https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0` serves it too). CDN URLs use
+the file path `dist/...`; bundlers and Node.js use the package export
+`@k-otp/sdk/k-otp.iife.min.js`. `dist/k-otp.iife.js` is the unminified
+variant.
 
 ## API
 
@@ -160,15 +192,15 @@ createOtpClient({
 Hooks run synchronously; exceptions thrown by hooks are swallowed. They are not
 called for client-side validation failures (no request is made).
 
-### Headless flow: `@k-otp/sdk-core/headless`
+### Headless flow: `@k-otp/sdk/headless`
 
 The state machine behind the React, Vue and Svelte adapters, for plain
 JavaScript or any other framework. Also available in the CDN bundle as
 `KOtp.createOtpFlow` / `KOtp.createOtpOperation`.
 
 ```ts
-import { createOtpClient } from "@k-otp/sdk-core";
-import { createOtpFlow } from "@k-otp/sdk-core/headless";
+import { createOtpClient } from "@k-otp/sdk";
+import { createOtpFlow } from "@k-otp/sdk/headless";
 
 const flow = createOtpFlow(createOtpClient({ apiKey: "pk_live_..." }), {
   // resendCooldownMs: 30_000 (default; 0 disables), idempotencyKeyPrefix, createIdempotencyKey
@@ -204,11 +236,36 @@ protection. See the [issue -> verify UX guide](../../docs/issue-verify-ux.md).
 
 ### Advanced entry points
 
-- `@k-otp/sdk-core/contract` - the oRPC contract (`otpPublicContract`,
-  `otpServerContract`) and every generated OpenAPI type, for building your own
-  oRPC `OpenAPILink` client.
-- `@k-otp/sdk-core/internal` - transport building blocks for
-  `@k-otp/sdk-server`. **Not covered by SemVer.**
+- `@k-otp/sdk/contract` - the oRPC contract (`otpPublicContract`,
+  `otpServerContract`), `OPENAPI_VERSION` and every generated OpenAPI type,
+  for building your own oRPC `OpenAPILink` client.
+
+Anything not listed in the `exports` map (for example the shared transport
+under `src/core/internal.ts`) is private and cannot be imported.
+
+## Server, React, Vue and Svelte
+
+```ts
+// Backend (Node.js, Bun, Deno, Workers) with an sk_ key:
+import { createOtpServerClient } from "@k-otp/sdk/server";
+const otp = createOtpServerClient({ apiKey: process.env.K_OTP_SECRET_KEY! });
+await otp.getBalance();
+```
+
+```tsx
+// React (Vue and Svelte mirror this API):
+import { OtpProvider, useOtpFlow } from "@k-otp/sdk/react";
+```
+
+`@k-otp/sdk/server` resolves to a stub that fails the build under the
+`browser` export condition, so the `sk_` client cannot slip into a client
+bundle; server runtimes that also set `browser` (Cloudflare Workers, Vercel
+Edge) are matched first and get the real client. Details, every method and
+the framework APIs: [server](../../docs/reference/server.md),
+[react](../../docs/reference/react.md), [vue](../../docs/reference/vue.md),
+[svelte](../../docs/reference/svelte.md); guides:
+[React](../../docs/react.md), [Vue](../../docs/vue.md),
+[Svelte](../../docs/svelte.md).
 
 ## Runtime notes
 
@@ -231,8 +288,8 @@ protection. See the [issue -> verify UX guide](../../docs/issue-verify-ux.md).
 
 ## Versioning
 
-All `@k-otp/sdk-*` packages are released in lockstep with the same version.
-Breaking changes bump the minor version while `0.x`. See the
+`@k-otp/sdk` follows SemVer from 1.0.0. Every subpath listed above is part of
+the public API and shares the package version. See the
 [changelog](./CHANGELOG.md).
 
 ## License

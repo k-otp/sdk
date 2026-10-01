@@ -1,7 +1,7 @@
 # Svelte + Vite example
 
 Phone verification (issue -> verify) with
-[`@k-otp/sdk-svelte`](../../packages/sdk-svelte)'s flow store: resend
+[`@k-otp/sdk/svelte`](../../docs/reference/svelte.md)'s flow store: resend
 cooldown, retry-safe idempotency keys and error messages for 402/429/403.
 
 ## Run

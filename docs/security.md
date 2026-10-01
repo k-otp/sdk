@@ -11,9 +11,12 @@ variables, Workers secrets, a secret manager).
 
 - Never put an `sk_` key in browser code, mobile apps, public repositories,
   `NEXT_PUBLIC_*` / `VITE_*` / `PUBLIC_*` variables or client-side config.
-- `@k-otp/sdk-core` throws if it is given an `sk_` key in a browser, and
-  `@k-otp/sdk-server` refuses to run in a browser at all. These guards catch
-  mistakes; they are not a substitute for keeping keys out of client bundles.
+- `@k-otp/sdk` throws if it is given an `sk_` key in a browser, and
+  `@k-otp/sdk/server` refuses to run in a browser at all: browser bundlers
+  resolve it (via the `browser` export condition) to a stub that fails the
+  build, and the real client throws when `window` and `document` exist.
+  These guards catch mistakes; they are not a substitute for keeping keys
+  out of client bundles.
 - Rotate a key immediately if it was ever exposed.
 
 ## `pk_` public keys and the Origin allowlist
@@ -36,7 +39,7 @@ variables, Workers secrets, a secret manager).
 - For allowed origins the API exposes `X-Request-Id` and `Retry-After` via
   `Access-Control-Expose-Headers`, so `error.requestId` and
   `error.retryAfterMs` are available in browsers too.
-- `@k-otp/sdk-server` only accepts keys that start with `sk_` (it refuses
+- `@k-otp/sdk/server` only accepts keys that start with `sk_` (it refuses
   `pk_` keys and anything unprefixed); use `sk_` on servers.
 
 ### Troubleshooting: `NETWORK_ERROR` in the browser, but it works with curl
@@ -72,7 +75,7 @@ that requested it.
 Pin exact versions and use Subresource Integrity:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@k-otp/sdk-core@0.1.0/dist/k-otp.iife.min.js"
+<script src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js"
         integrity="sha384-..." crossorigin="anonymous"></script>
 ```
 

@@ -6,16 +6,16 @@ mock API when no key is configured.
 
 | Example | SDK | Key |
 | --- | --- | --- |
-| [`vanilla-cdn`](./vanilla-cdn) | `@k-otp/sdk-core` script bundle (`window.KOtp`), jsDelivr + SRI notes | `pk_` |
-| [`react-vite`](./react-vite) | `@k-otp/sdk-react` (`useOtpFlow`) | `pk_` |
-| [`vue-vite`](./vue-vite) | `@k-otp/sdk-vue` (`useOtpFlow`) | `pk_` |
-| [`svelte-vite`](./svelte-vite) | `@k-otp/sdk-svelte` (flow store, `use:otpForm`) | `pk_` |
-| [`node-server`](./node-server) | `@k-otp/sdk-server` issue/verify endpoints | `sk_` (server only) |
+| [`vanilla-cdn`](./vanilla-cdn) | `@k-otp/sdk/k-otp.iife.min.js` script bundle (`window.KOtp`), jsDelivr/unpkg + SRI notes | `pk_` |
+| [`react-vite`](./react-vite) | `@k-otp/sdk/react` (`useOtpFlow`) | `pk_` |
+| [`vue-vite`](./vue-vite) | `@k-otp/sdk/vue` (`useOtpFlow`) | `pk_` |
+| [`svelte-vite`](./svelte-vite) | `@k-otp/sdk/svelte` (flow store, `use:otpForm`) | `pk_` |
+| [`node-server`](./node-server) | `@k-otp/sdk/server` issue/verify endpoints | `sk_` (server only) |
 
 ```bash
 bun install
 bun run build            # examples use the built packages
-bun run check:examples   # typecheck + build (+ smoke) every example
+bun run check:examples   # typecheck + build (+ smoke, + bundle check) every example
 cd examples/react-vite && bun run dev
 ```
 
