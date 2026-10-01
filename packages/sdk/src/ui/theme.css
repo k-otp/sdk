@@ -1,0 +1,541 @@
+/*
+ * @k-otp/sdk/ui/theme.css: optional default theme of the K-OTP UI
+ * components. It only matches elements with a `data-k-otp` attribute, and
+ * every selector is wrapped in :where() (zero specificity), so any class of
+ * yours wins without !important.
+ *
+ * Customize with the --k-otp-* custom properties, on the form or any
+ * ancestor (e.g. :root):
+ *   --k-otp-accent, --k-otp-accent-contrast, --k-otp-radius, --k-otp-font,
+ *   --k-otp-font-mono, --k-otp-space, --k-otp-surface, --k-otp-text,
+ *   --k-otp-muted, --k-otp-border, --k-otp-field, --k-otp-danger,
+ *   --k-otp-success, --k-otp-focus-ring, --k-otp-focus-width,
+ *   --k-otp-shadow, --k-otp-max-width, --k-otp-segment-size.
+ *
+ * Light and dark follow prefers-color-scheme; force one with
+ * data-k-otp-theme="light" | "dark" on the form or an ancestor.
+ */
+
+/* Tokens: light (default). */
+:where([data-k-otp="root"], [data-k-otp="code-input"]) {
+  --_k-otp-accent: var(--k-otp-accent, #5e4cff);
+  --_k-otp-accent-contrast: var(--k-otp-accent-contrast, #ffffff);
+  --_k-otp-surface: var(--k-otp-surface, #ffffff);
+  --_k-otp-text: var(--k-otp-text, #0d0d18);
+  --_k-otp-muted: var(--k-otp-muted, #6c6c84);
+  --_k-otp-border: var(--k-otp-border, #e2e2eb);
+  --_k-otp-border-strong: var(--k-otp-border-strong, #cbcbd8);
+  --_k-otp-field: var(--k-otp-field, #fbfbfd);
+  --_k-otp-field-locked: var(--k-otp-field-locked, #f3f3f8);
+  --_k-otp-danger: var(--k-otp-danger, #c62828);
+  --_k-otp-success: var(--k-otp-success, #047857);
+  --_k-otp-shadow: var(
+    --k-otp-shadow,
+    0 1px 2px rgb(13 13 24 / 0.04),
+    0 8px 24px -12px rgb(13 13 24 / 0.12)
+  );
+  --_k-otp-radius: var(--k-otp-radius, 0.75rem);
+  --_k-otp-space: var(--k-otp-space, 0.25rem);
+  --_k-otp-font: var(
+    --k-otp-font,
+    "Pretendard Variable",
+    Pretendard,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    sans-serif
+  );
+  --_k-otp-font-mono: var(
+    --k-otp-font-mono,
+    ui-monospace,
+    "SF Mono",
+    "JetBrains Mono",
+    Menlo,
+    Consolas,
+    monospace
+  );
+  --_k-otp-ring: var(
+    --k-otp-focus-ring,
+    color-mix(in oklab, var(--_k-otp-accent) 40%, transparent)
+  );
+  --_k-otp-ring-width: var(--k-otp-focus-width, 3px);
+  --_k-otp-segment-size: var(--k-otp-segment-size, 3.25rem);
+  color-scheme: light;
+}
+
+/* Tokens: dark, from the OS preference unless forced to light. */
+@media (prefers-color-scheme: dark) {
+  :where([data-k-otp="root"], [data-k-otp="code-input"]):not(
+    [data-k-otp-theme="light"],
+    [data-k-otp-theme="light"] *
+  ) {
+    --_k-otp-accent: var(--k-otp-accent, #8b7dff);
+    --_k-otp-accent-contrast: var(--k-otp-accent-contrast, #0d0d18);
+    --_k-otp-surface: var(--k-otp-surface, #19192a);
+    --_k-otp-text: var(--k-otp-text, #f5f5f9);
+    --_k-otp-muted: var(--k-otp-muted, #9d9db0);
+    --_k-otp-border: var(--k-otp-border, #2e2e44);
+    --_k-otp-border-strong: var(--k-otp-border-strong, #45455e);
+    --_k-otp-field: var(--k-otp-field, #12121f);
+    --_k-otp-field-locked: var(--k-otp-field-locked, #1f1f32);
+    --_k-otp-danger: var(--k-otp-danger, #f87171);
+    --_k-otp-success: var(--k-otp-success, #34d399);
+    --_k-otp-shadow: var(--k-otp-shadow, 0 8px 28px -14px rgb(0 0 0 / 0.6));
+    color-scheme: dark;
+  }
+}
+
+/* Tokens: dark, forced. */
+:where([data-k-otp-theme="dark"])
+:where([data-k-otp="root"], [data-k-otp="code-input"]),
+:where([data-k-otp="root"], [data-k-otp="code-input"]):where(
+  [data-k-otp-theme="dark"]
+) {
+  --_k-otp-accent: var(--k-otp-accent, #8b7dff);
+  --_k-otp-accent-contrast: var(--k-otp-accent-contrast, #0d0d18);
+  --_k-otp-surface: var(--k-otp-surface, #19192a);
+  --_k-otp-text: var(--k-otp-text, #f5f5f9);
+  --_k-otp-muted: var(--k-otp-muted, #9d9db0);
+  --_k-otp-border: var(--k-otp-border, #2e2e44);
+  --_k-otp-border-strong: var(--k-otp-border-strong, #45455e);
+  --_k-otp-field: var(--k-otp-field, #12121f);
+  --_k-otp-field-locked: var(--k-otp-field-locked, #1f1f32);
+  --_k-otp-danger: var(--k-otp-danger, #f87171);
+  --_k-otp-success: var(--k-otp-success, #34d399);
+  --_k-otp-shadow: var(--k-otp-shadow, 0 8px 28px -14px rgb(0 0 0 / 0.6));
+  color-scheme: dark;
+}
+
+/* Root: a quiet card with generous spacing. */
+:where([data-k-otp="root"]) {
+  box-sizing: border-box;
+  display: grid;
+  gap: calc(var(--_k-otp-space) * 4);
+  width: 100%;
+  max-width: var(--k-otp-max-width, 26rem);
+  margin: 0;
+  padding: calc(var(--_k-otp-space) * 7) calc(var(--_k-otp-space) * 6);
+  border: 1px solid var(--_k-otp-border);
+  border-radius: calc(var(--_k-otp-radius) * 1.5);
+  background: var(--_k-otp-surface);
+  box-shadow: var(--_k-otp-shadow);
+  color: var(--_k-otp-text);
+  font-family: var(--_k-otp-font);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+:where([data-k-otp="root"], [data-k-otp="code-input"])
+  :where(*, *::before, *::after) {
+  box-sizing: border-box;
+}
+
+:where([data-k-otp="root"]) :where(p) {
+  margin: 0;
+}
+
+/* Fields. */
+:where([data-k-otp="phone-field"], [data-k-otp="code-field"]) {
+  display: grid;
+  gap: calc(var(--_k-otp-space) * 2);
+  min-width: 0;
+}
+
+:where([data-k-otp="phone-label"], [data-k-otp="code-label"]) {
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+:where([data-k-otp="phone-description"], [data-k-otp="code-description"]) {
+  color: var(--_k-otp-muted);
+  font-size: 0.8125rem;
+}
+
+:where([data-k-otp="phone-error"], [data-k-otp="code-error"]) {
+  color: var(--_k-otp-danger);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+:where([data-k-otp="phone-input"]) {
+  width: 100%;
+  height: 3rem;
+  margin: 0;
+  padding: 0 calc(var(--_k-otp-space) * 4);
+  border: 1px solid var(--_k-otp-border);
+  border-radius: var(--_k-otp-radius);
+  background: var(--_k-otp-field);
+  color: inherit;
+  font: inherit;
+  /* 16px keeps iOS from zooming into the field. */
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background-color 150ms ease;
+}
+
+:where([data-k-otp="phone-input"])::placeholder {
+  color: var(--_k-otp-muted);
+  opacity: 0.6;
+}
+
+:where([data-k-otp="phone-input"]):hover:not([readonly]) {
+  border-color: var(--_k-otp-border-strong);
+}
+
+:where([data-k-otp="phone-input"], [data-k-otp="code-segment"]):focus-visible,
+:where([data-k-otp="phone-input"], [data-k-otp="code-segment"]):focus {
+  outline: none;
+  border-color: var(--_k-otp-accent);
+  box-shadow: 0 0 0 var(--_k-otp-ring-width) var(--_k-otp-ring);
+}
+
+:where([data-k-otp="phone-input"])[readonly] {
+  background: var(--_k-otp-field-locked);
+  color: var(--_k-otp-muted);
+}
+
+:where([data-k-otp="phone-input"])[data-invalid] {
+  border-color: var(--_k-otp-danger);
+}
+
+:where([data-k-otp="phone-input"])[data-invalid]:focus {
+  box-shadow: 0 0 0 var(--_k-otp-ring-width)
+    color-mix(in oklab, var(--_k-otp-danger) 30%, transparent);
+}
+
+/* Segmented code input. */
+:where([data-k-otp="code-input"]) {
+  display: flex;
+  gap: calc(var(--_k-otp-space) * 2);
+  min-width: 0;
+  color: var(--_k-otp-text);
+  font-family: var(--_k-otp-font);
+}
+
+:where([data-k-otp="code-segment"]) {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: var(--_k-otp-segment-size);
+  height: calc(var(--_k-otp-segment-size) * 1.1);
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--_k-otp-border);
+  border-radius: var(--_k-otp-radius);
+  background: var(--_k-otp-field);
+  color: inherit;
+  caret-color: var(--_k-otp-accent);
+  font-family: var(--_k-otp-font-mono);
+  font-size: 1.375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+
+:where([data-k-otp="code-segment"]):hover:not([readonly]) {
+  border-color: var(--_k-otp-border-strong);
+}
+
+:where([data-k-otp="code-segment"])[data-state="filled"] {
+  border-color: var(--_k-otp-border-strong);
+  animation: k-otp-pop 160ms ease-out;
+}
+
+:where([data-k-otp="code-segment"])[readonly] {
+  cursor: default;
+}
+
+:where([data-k-otp="code-segment"])[data-invalid] {
+  border-color: var(--_k-otp-danger);
+  background: color-mix(in oklab, var(--_k-otp-danger) 6%, var(--_k-otp-field));
+}
+
+:where([data-k-otp="code-input"])[data-invalid] {
+  animation: k-otp-shake 320ms ease-in-out;
+}
+
+:where([data-k-otp="code-input"])[data-state="verifying"]
+  :where([data-k-otp="code-segment"]) {
+  animation: k-otp-pulse 1s ease-in-out infinite;
+}
+
+:where([data-k-otp="code-input"])[data-state="verified"]
+  :where([data-k-otp="code-segment"]) {
+  border-color: var(--_k-otp-success);
+  background: color-mix(
+    in oklab,
+    var(--_k-otp-success) 8%,
+    var(--_k-otp-field)
+  );
+  color: var(--_k-otp-success);
+}
+
+:where([data-k-otp="code-input"])[data-state="failed"]
+  :where([data-k-otp="code-segment"]) {
+  opacity: 0.55;
+}
+
+/* Countdown under the code. */
+:where([data-k-otp="countdown"]) {
+  justify-self: end;
+  margin-top: calc(var(--_k-otp-space) * -2);
+  color: var(--_k-otp-muted);
+  font-family: var(--_k-otp-font-mono);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+:where([data-k-otp="countdown"])[data-state="expired"] {
+  color: var(--_k-otp-danger);
+}
+
+/* Buttons. */
+:where([data-k-otp="send-button"], [data-k-otp="verify-button"]) {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--_k-otp-space) * 2);
+  width: 100%;
+  min-height: 3rem;
+  margin: 0;
+  padding: 0 calc(var(--_k-otp-space) * 5);
+  border: 1px solid transparent;
+  border-radius: var(--_k-otp-radius);
+  background: var(--_k-otp-accent);
+  color: var(--_k-otp-accent-contrast);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease,
+    transform 120ms ease,
+    opacity 150ms ease;
+}
+
+:where([data-k-otp="send-button"], [data-k-otp="verify-button"]):hover:not(
+  [aria-disabled="true"]
+) {
+  background: color-mix(in oklab, var(--_k-otp-accent) 88%, var(--_k-otp-text));
+}
+
+:where([data-k-otp="send-button"], [data-k-otp="verify-button"]):active:not(
+  [aria-disabled="true"]
+) {
+  transform: translateY(1px) scale(0.99);
+}
+
+:where(
+  [data-k-otp="send-button"],
+  [data-k-otp="verify-button"],
+  [data-k-otp="edit-phone"]
+):focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--_k-otp-surface),
+    0 0 0 calc(2px + var(--_k-otp-ring-width)) var(--_k-otp-ring);
+}
+
+:where(
+  [data-k-otp="send-button"],
+  [data-k-otp="verify-button"]
+)[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+:where(
+  [data-k-otp="send-button"],
+  [data-k-otp="verify-button"]
+)[data-state="loading"] {
+  cursor: progress;
+  opacity: 0.85;
+}
+
+:where(
+  [data-k-otp="send-button"],
+  [data-k-otp="verify-button"]
+)[data-state="loading"]::before {
+  content: "";
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: k-otp-spin 700ms linear infinite;
+}
+
+/* Once a code was sent, "resend" is the secondary action. */
+:where([data-k-otp="root"])[data-issued]:not([data-state="failed"])
+:where([data-k-otp="send-button"]) {
+  border-color: var(--_k-otp-border);
+  background: transparent;
+  color: var(--_k-otp-text);
+  font-weight: 500;
+}
+
+:where([data-k-otp="root"])[data-issued]:not([data-state="failed"])
+  :where([data-k-otp="send-button"]):hover:not([aria-disabled="true"]) {
+  border-color: var(--_k-otp-border-strong);
+  background: color-mix(in oklab, var(--_k-otp-text) 4%, transparent);
+}
+
+:where([data-k-otp="root"])[data-issued]:not([data-state="failed"])
+  :where([data-k-otp="send-button"])[data-state="cooldown"] {
+  opacity: 1;
+  color: var(--_k-otp-muted);
+}
+
+:where([data-k-otp="edit-phone"]) {
+  justify-self: center;
+  margin: calc(var(--_k-otp-space) * -1) 0 0;
+  padding: calc(var(--_k-otp-space) * 1) calc(var(--_k-otp-space) * 2);
+  border: 0;
+  border-radius: calc(var(--_k-otp-radius) * 0.5);
+  background: none;
+  color: var(--_k-otp-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, currentColor 40%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+:where([data-k-otp="edit-phone"]):hover {
+  color: var(--_k-otp-text);
+}
+
+/* Status message (live region). */
+:where([data-k-otp="message"]) {
+  min-height: 1.25rem;
+  color: var(--_k-otp-muted);
+  font-size: 0.875rem;
+  text-align: center;
+  text-wrap: pretty;
+}
+
+:where([data-k-otp="message"]):focus {
+  outline: none;
+}
+
+:where([data-k-otp="message"])[data-empty] {
+  min-height: 0;
+}
+
+:where([data-k-otp="message"])[data-state="error"] {
+  color: var(--_k-otp-danger);
+  font-weight: 500;
+}
+
+:where([data-k-otp="message"])[data-state="success"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--_k-otp-space) * 2);
+  padding: calc(var(--_k-otp-space) * 3);
+  border-radius: var(--_k-otp-radius);
+  background: color-mix(in oklab, var(--_k-otp-success) 10%, transparent);
+  color: var(--_k-otp-success);
+  font-weight: 600;
+  animation: k-otp-rise 240ms ease-out;
+}
+
+:where([data-k-otp="message"])[data-state="success"]::before {
+  content: "";
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  background: currentColor;
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+@keyframes k-otp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes k-otp-pop {
+  from {
+    transform: scale(0.94);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes k-otp-pulse {
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes k-otp-shake {
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes k-otp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where([data-k-otp="root"], [data-k-otp="code-input"]),
+  :where([data-k-otp="root"], [data-k-otp="code-input"]) :where(*) {
+    transition: none;
+  }
+
+  :where([data-k-otp="code-segment"])[data-state],
+  :where([data-k-otp="code-input"])[data-invalid],
+  :where([data-k-otp="code-input"])[data-state]
+    :where([data-k-otp="code-segment"]),
+  :where([data-k-otp="message"])[data-state] {
+    animation: none;
+  }
+
+  :where(
+    [data-k-otp="send-button"],
+    [data-k-otp="verify-button"]
+  )[data-state="loading"]::before {
+    animation: none;
+    border-right-color: currentColor;
+    opacity: 0.6;
+  }
+}
