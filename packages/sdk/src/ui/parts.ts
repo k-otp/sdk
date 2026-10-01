@@ -449,7 +449,6 @@ type InputLike = {
 };
 type KeyLike = {
   key: string;
-  shiftKey?: boolean;
   isComposing?: boolean;
   altKey?: boolean;
   ctrlKey?: boolean;
@@ -470,12 +469,21 @@ export type OtpCodeInputHandlers = {
   paste: (index: number, event: PasteLike) => void;
   /** `focus` event of segment `index` (redirects to the first empty one). */
   focus: (index: number, event: InputLike) => void;
+  /** `blur` event of a segment (ends a composition left open). */
+  blur: () => void;
   /** `compositionstart` event (IME): input is ignored until it ends. */
   compositionstart: () => void;
   /** `compositionend` event of segment `index`: applies the composed text. */
   compositionend: (index: number, event: InputLike) => void;
   /** `true` while an IME composition is in progress. */
   isComposing: () => boolean;
+  /**
+   * Writes the current value into the segments (call after each render).
+   * Skipped while composing, so a re-render (e.g. the countdown tick) never
+   * cancels an IME composition. The segments are uncontrolled for that
+   * reason: frameworks render no `value`, only call this.
+   */
+  sync: (container?: ParentNode | null) => void;
 };
 
 export type OtpCodeInputHandlerOptions = {
@@ -536,6 +544,12 @@ export const createOtpCodeInputHandlers = (
     );
     setTimeout(restoreTabIndex, 0);
   };
+  /**
+   * The segment and text applied by the latest `compositionend`: WebKit
+   * fires it before the composition's final `input`, which must not apply
+   * the same text again (and pull the focus back).
+   */
+  let composed: { index: number } | undefined;
   const apply = (index: number, element: HTMLInputElement): void => {
     const value = options.getValue();
     if (options.isReadOnly()) {
@@ -551,33 +565,68 @@ export const createOtpCodeInputHandlers = (
     element.value = change.value[index] ?? "";
     commit(change.value, change.focus);
   };
+  const sync = (container?: ParentNode | null): void => {
+    if (composing) return;
+    const value = options.getValue();
+    segmentsOf(container ?? options.getContainer()).forEach(
+      (segment, index) => {
+        const input = segment as HTMLInputElement;
+        const digit = value[index] ?? "";
+        if (input.value !== digit) input.value = digit;
+      },
+    );
+  };
   return {
     input: (index, event) => {
-      // An IME is composing (full-width digits, Android keyboards): wait for
-      // `compositionend`, or the composed text would be applied twice.
       const native = event.nativeEvent as { isComposing?: boolean } | undefined;
-      if (composing || event.isComposing || native?.isComposing) {
+      const flag = event.isComposing ?? native?.isComposing;
+      // An IME is composing (full-width digits, Android keyboards): wait for
+      // `compositionend`, or the composed text would be applied twice. The
+      // event is trusted over our flag, which a missing `compositionend`
+      // (cancelled composition, removed element) could leave stuck.
+      if (flag === true || (flag === undefined && composing)) {
+        composing = true;
         return;
       }
+      composing = false;
       const element = elementOf(event);
-      if (element) apply(index, element);
+      if (!element) return;
+      const last = composed;
+      composed = undefined;
+      if (
+        last?.index === index &&
+        element.value === (options.getValue()[index] ?? "")
+      ) {
+        return; // the trailing input of a composition already applied
+      }
+      apply(index, element);
+    },
+    blur: () => {
+      composing = false;
     },
     compositionstart: () => {
       composing = true;
+      composed = undefined;
     },
     compositionend: (index, event) => {
       composing = false;
       const element = elementOf(event);
-      if (element) apply(index, element);
+      if (!element) return;
+      composed = { index };
+      apply(index, element);
     },
     isComposing: () => composing,
+    sync,
     keydown: (index, event) => {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       if (event.key === "Tab") {
         leaveGroup();
         return;
       }
-      if (composing || event.isComposing) return;
+      if (event.isComposing === true || event.key === "Process") return;
+      // A key outside any composition ends a composition left open.
+      if (event.isComposing === false) composing = false;
+      if (composing) return;
       const value = options.getValue();
       const change = applyOtpCodeKey(
         value,

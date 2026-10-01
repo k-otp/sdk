@@ -11,24 +11,56 @@ import type { OtpPhoneErrorCode } from "./phone";
 
 export type OtpLocale = "ko" | "en";
 
-/** The built-in locale when none is given and the page has no usable `lang`. */
+/** The locale when none is given (on the server and in the browser). */
 export const DEFAULT_OTP_LOCALE: OtpLocale = "ko";
 
 /**
- * The locale to use: `locale` when given; otherwise, in a browser, the
- * page's `<html lang>` when it is Korean or English; otherwise `"ko"`.
- * Server rendering has no document, so pass `locale` explicitly when you
- * server-render a page whose `lang` is not Korean, or the hydrated text
- * differs from the server's.
+ * A locale, or `"auto"`: follow the page's `<html lang>` (Korean for `ko*`
+ * or no `lang`, English for any other language). `"auto"` renders Korean on
+ * the server and on the first client render (so hydration matches), then
+ * switches after mount and follows later `lang` changes.
  */
-export const resolveOtpLocale = (locale?: OtpLocale): OtpLocale => {
-  if (locale) return locale;
+export type OtpLocaleOption = OtpLocale | "auto";
+
+/**
+ * The locale to render: `locale` when it is `"ko"` or `"en"`, otherwise
+ * (`undefined`, `"auto"` before mount) {@link DEFAULT_OTP_LOCALE}.
+ * Deterministic: the same on the server and the client.
+ */
+export const resolveOtpLocale = (locale?: OtpLocaleOption): OtpLocale =>
+  locale === "en" || locale === "ko" ? locale : DEFAULT_OTP_LOCALE;
+
+/**
+ * The locale of the page's `<html lang>`: `"ko"` for Korean or no `lang`,
+ * `"en"` for any other language. `"ko"` without a document (server).
+ */
+export const detectOtpDocumentLocale = (): OtpLocale => {
   const lang =
     typeof document === "undefined"
       ? ""
-      : (document.documentElement?.lang ?? "").toLowerCase();
-  if (lang.startsWith("en")) return "en";
-  return DEFAULT_OTP_LOCALE;
+      : (document.documentElement?.lang ?? "").trim().toLowerCase();
+  return lang === "" || lang.startsWith("ko") ? "ko" : "en";
+};
+
+/**
+ * Calls `onChange` with {@link detectOtpDocumentLocale} now and whenever
+ * `<html lang>` changes (for `locale: "auto"`, after mount). Returns the
+ * function that stops watching. Does nothing without a document.
+ */
+export const watchOtpDocumentLocale = (
+  onChange: (locale: OtpLocale) => void,
+): (() => void) => {
+  if (typeof document === "undefined") return () => {};
+  onChange(detectOtpDocumentLocale());
+  if (typeof MutationObserver === "undefined") return () => {};
+  const observer = new MutationObserver(() =>
+    onChange(detectOtpDocumentLocale()),
+  );
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["lang"],
+  });
+  return () => observer.disconnect();
 };
 
 const en = {
@@ -194,8 +226,8 @@ export const formatOtpMessage = (
   });
 
 export type OtpTranslatorOptions = {
-  /** `ko` or `en`; default: see {@link resolveOtpLocale}. */
-  locale?: OtpLocale | undefined;
+  /** `ko` (default) or `en` (`"auto"` is treated as the default). */
+  locale?: OtpLocaleOption | undefined;
   /** Per-key overrides (templates or functions). */
   messages?: OtpMessageOverrides | undefined;
 };

@@ -2,9 +2,9 @@
 <script>
   import {
     attrs,
-    codeDigits,
     codeFieldHandlers,
     getOtpFormContext,
+    syncSegments,
   } from "./runtime.js";
 
   /** @type {string | undefined} */
@@ -17,23 +17,23 @@
   /** @type {HTMLElement | undefined} */
   let group;
   const handlers = codeFieldHandlers(context, () => group);
+  const sync = syncSegments(handlers);
 
-  $: digits = codeDigits($formState.code, $formState.codeLength);
   $: descriptionText = description ?? $parts.text.codeDescription;
 </script>
 
 <div {...attrs($parts.codeField)} {...$$restProps}>
   <label {...attrs($parts.codeLabel)}>{label ?? $parts.text.codeLabel}</label>
-  <div {...attrs($parts.codeInput)} bind:this={group}>
+  <div {...attrs($parts.codeInput)} bind:this={group} use:sync={$formState.code}>
     {#each $parts.codeSegments as segment, index (index)}
       <input
         {...attrs(segment)}
         readonly={segment.readonly === true}
-        value={digits[index]}
         on:input={(event) => handlers.input(index, event)}
         on:keydown={(event) => handlers.keydown(index, event)}
         on:paste={(event) => handlers.paste(index, event)}
         on:focus={(event) => handlers.focus(index, event)}
+        on:blur={handlers.blur}
         on:compositionstart={handlers.compositionstart}
         on:compositionend={(event) => handlers.compositionend(index, event)}
       />

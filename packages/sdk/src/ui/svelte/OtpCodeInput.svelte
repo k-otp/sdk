@@ -4,7 +4,7 @@
   Backspace/arrow navigation and optional WebOTP.
 -->
 <script>
-  import { attrs, createOtpCodeInputModel } from "./runtime.js";
+  import { attrs, createOtpCodeInputModel, syncSegments } from "./runtime.js";
 
   /** Digits (`bind:value`). @type {string} */
   export let value = "";
@@ -40,7 +40,8 @@
     },
     getProps: () => ({ onValueChange, onComplete }),
   });
-  const { handlers, group } = model;
+  const { handlers, group, detectedLocale } = model;
+  const sync = syncSegments(handlers);
 
   $: parts = model.parts({
     id,
@@ -50,21 +51,22 @@
     invalid,
     labelledBy: $$restProps["aria-labelledby"],
     describedBy: $$restProps["aria-describedby"],
-    locale,
+    // Read so that `locale="auto"` re-renders once the page's lang is known.
+    locale: locale === "auto" ? $detectedLocale : locale,
     messages,
   });
 </script>
 
-<div {...attrs(parts.group)} {...$$restProps} use:group={{ autoFocus, webOtp }}>
+<div {...attrs(parts.group)} {...$$restProps} use:group={{ autoFocus, webOtp, locale }} use:sync={parts.digits.join("")}>
   {#each parts.segments as segment, index (index)}
     <input
       {...attrs(segment)}
       readonly={segment.readonly === true}
-      value={parts.digits[index]}
       on:input={(event) => handlers.input(index, event)}
       on:keydown={(event) => handlers.keydown(index, event)}
       on:paste={(event) => handlers.paste(index, event)}
       on:focus={(event) => handlers.focus(index, event)}
+      on:blur={handlers.blur}
       on:compositionstart={handlers.compositionstart}
       on:compositionend={(event) => handlers.compositionend(index, event)}
     />

@@ -29,6 +29,7 @@ import {
   createOtpForm,
   createOtpTranslator,
   DEFAULT_OTP_CODE_LENGTH,
+  DEFAULT_OTP_LOCALE,
   focusOtpCodeSegment,
   focusOtpFormTarget,
   getOtpCodeInputParts,
@@ -43,11 +44,13 @@ import {
   type OtpFormPhase,
   type OtpFormState,
   type OtpLocale,
+  type OtpLocaleOption,
   type OtpMessageOverrides,
   type OtpTranslator,
   otpCodeSegments,
   receiveWebOtp,
   sanitizeOtpCode,
+  watchOtpDocumentLocale,
 } from "..";
 
 /**
@@ -94,7 +97,8 @@ export type OtpFormRootProps = OtpFormConfig & {
   resendCooldownMs?: number | undefined;
   idempotencyKeyPrefix?: string | undefined;
   createIdempotencyKey?: (() => string) | undefined;
-  locale?: OtpLocale | undefined;
+  /** `ko` (default), `en`, or `"auto"` (`<html lang>`, after mount). */
+  locale?: OtpLocaleOption | undefined;
   messages?: OtpMessageOverrides | undefined;
 };
 
@@ -210,12 +214,23 @@ export const createOtpFormRoot = (initial: OtpFormRootProps): RootContext => {
     set(form.getState());
     return form.subscribe(() => set(form.getState()));
   });
-  const t = derived(settings, ($settings) =>
+  // `locale: "auto"`: the default until mounted, then `<html lang>`.
+  const detectedLocale = writable<OtpLocale>(DEFAULT_OTP_LOCALE);
+  const t = derived([settings, detectedLocale], ([$settings, $detected]) =>
     createOtpTranslator({
-      locale: $settings.locale,
+      locale: $settings.locale === "auto" ? $detected : $settings.locale,
       messages: $settings.messages,
     }),
   );
+  let mounted = false;
+  let stopLocale: (() => void) | undefined;
+  const watchLocale = (locale: OtpLocaleOption | undefined): void => {
+    stopLocale?.();
+    stopLocale =
+      locale === "auto"
+        ? watchOtpDocumentLocale((next) => detectedLocale.set(next))
+        : undefined;
+  };
   const parts = derived([state, settings, t], ([$state, $settings, $t]) =>
     getOtpFormParts($state, { id: $settings.id, t: $t }),
   );
@@ -248,9 +263,13 @@ export const createOtpFormRoot = (initial: OtpFormRootProps): RootContext => {
           locale: next.locale,
           messages: next.messages,
         });
+        if (mounted) watchLocale(next.locale);
       }
     },
     root: (node) => {
+      // Actions run after mount (never on the server): detect the locale.
+      mounted = true;
+      watchLocale(props.locale);
       let applied = form.getState().focus?.seq ?? 0;
       const unsubscribe = form.subscribe(() => {
         const current = form.getState();
@@ -262,7 +281,13 @@ export const createOtpFormRoot = (initial: OtpFormRootProps): RootContext => {
           focusOtpFormTarget(node, focus.target, form.getState()),
         );
       });
-      return { destroy: unsubscribe };
+      return {
+        destroy: () => {
+          unsubscribe();
+          mounted = false;
+          stopLocale?.();
+        },
+      };
     },
     submit: (event) => {
       event.preventDefault();
@@ -371,6 +396,21 @@ export const buttonHandlers = (
 export const codeDigits = (value: string, length: number): string[] =>
   otpCodeSegments(value, length);
 
+/**
+ * `use:` action on a code input group: writes the code into the
+ * (uncontrolled) segments whenever it changes, never while an IME is
+ * composing. Svelte would otherwise re-apply `value` on re-renders (e.g. the
+ * countdown tick) and cancel the composition.
+ */
+export const syncSegments = (
+  handlers: OtpCodeInputHandlers,
+): ((node: HTMLElement, code: string) => { update: () => void }) => {
+  return (node) => {
+    handlers.sync(node);
+    return { update: () => handlers.sync(node) };
+  };
+};
+
 /** Code input handlers of the form's code field. */
 export const codeFieldHandlers = (
   context: OtpFormSvelteContext,
@@ -402,7 +442,8 @@ export type OtpCodeInputProps = {
   webOtp?: boolean | undefined;
   /** Renders a hidden input with this name and the value, for form posts. */
   name?: string | undefined;
-  locale?: OtpLocale | undefined;
+  /** `ko` (default), `en`, or `"auto"` (`<html lang>`, after mount). */
+  locale?: OtpLocaleOption | undefined;
   messages?: OtpMessageOverrides | undefined;
   onValueChange?: ((value: string) => void) | undefined;
   onComplete?: ((value: string) => void) | undefined;
@@ -424,13 +465,15 @@ type CodeInputModel = {
     invalid: boolean;
     labelledBy: string | undefined;
     describedBy: string | undefined;
-    locale: OtpLocale | undefined;
+    locale: OtpLocaleOption | undefined;
     messages: OtpMessageOverrides | undefined;
   }) => { group: OtpAttrs; segments: OtpAttrs[]; digits: string[] };
-  /** `use:` action on the group: autofocus and WebOTP. */
+  /** The `<html lang>` locale for `locale: "auto"` (after mount). */
+  detectedLocale: Readable<OtpLocale>;
+  /** `use:` action on the group: autofocus, WebOTP and `locale: "auto"`. */
   group: (
     node: HTMLElement,
-    options: { autoFocus: boolean; webOtp: boolean },
+    options: { autoFocus: boolean; webOtp: boolean; locale?: unknown },
   ) => { destroy: () => void };
 };
 
@@ -464,18 +507,19 @@ export const createOtpCodeInputModel = (options: {
   });
   let translator: { key: unknown[]; t: OtpTranslator } | undefined;
   const generatedId = randomId("k-otp-code");
+  const detectedLocale = writable<OtpLocale>(DEFAULT_OTP_LOCALE);
+  let detected: OtpLocale = DEFAULT_OTP_LOCALE;
   return {
     handlers,
     id: generatedId,
+    detectedLocale,
     parts: (props) => {
-      const key = [props.locale, props.messages];
+      const locale = props.locale === "auto" ? detected : props.locale;
+      const key = [locale, props.messages];
       if (!translator || key.some((k, i) => k !== translator?.key[i])) {
         translator = {
           key,
-          t: createOtpTranslator({
-            locale: props.locale,
-            messages: props.messages,
-          }),
+          t: createOtpTranslator({ locale, messages: props.messages }),
         };
       }
       const size = props.length || DEFAULT_OTP_CODE_LENGTH;
@@ -500,6 +544,13 @@ export const createOtpCodeInputModel = (options: {
         focusOtpCodeSegment(node, Math.min(current().length, length() - 1));
       }
       const controller = new AbortController();
+      const stopLocale =
+        groupOptions.locale === "auto"
+          ? watchOtpDocumentLocale((next) => {
+              detected = next;
+              detectedLocale.set(next);
+            })
+          : undefined;
       if (groupOptions.webOtp) {
         void receiveWebOtp({
           signal: controller.signal,
@@ -511,6 +562,7 @@ export const createOtpCodeInputModel = (options: {
       return {
         destroy: () => {
           controller.abort();
+          stopLocale?.();
           container = undefined;
         },
       };
@@ -522,6 +574,7 @@ export type {
   OtpFormPhase,
   OtpFormState,
   OtpLocale,
+  OtpLocaleOption,
   OtpMessageKey,
   OtpMessageOverrides,
 } from "..";

@@ -33,9 +33,11 @@ export {
 export {
   createOtpTranslator,
   DEFAULT_OTP_LOCALE,
+  detectOtpDocumentLocale,
   formatOtpMessage,
   OTP_MESSAGES,
   type OtpLocale,
+  type OtpLocaleOption,
   type OtpMessageCatalog,
   type OtpMessageKey,
   type OtpMessageOverride,
@@ -48,6 +50,7 @@ export {
   otpReasonMessageKey,
   otpSkipMessageKey,
   resolveOtpLocale,
+  watchOtpDocumentLocale,
 } from "./messages";
 export {
   createOtpCodeInputHandlers,

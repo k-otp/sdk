@@ -19,6 +19,7 @@ export type {
   OtpFormState,
   OtpFormSvelteContext,
   OtpLocale,
+  OtpLocaleOption,
   OtpMessageKey,
   OtpMessageOverrides,
 } from "./runtime.js";

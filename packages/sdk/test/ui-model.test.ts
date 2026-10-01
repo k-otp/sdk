@@ -5,6 +5,7 @@ import {
   applyOtpCodeKey,
   applyOtpCodePaste,
   createOtpTranslator,
+  detectOtpDocumentLocale,
   formatOtpCountdown,
   formatOtpMessage,
   formatOtpPhoneInput,
@@ -23,6 +24,7 @@ import {
   receiveWebOtp,
   resolveOtpLocale,
   sanitizeOtpCode,
+  watchOtpDocumentLocale,
 } from "../src/ui";
 
 describe("parseOtpPhoneNumber", () => {
@@ -435,10 +437,28 @@ describe("messages", () => {
   });
 });
 
-describe("resolveOtpLocale", () => {
-  test("explicit locale, then <html lang> (ko/en), then ko", () => {
-    expect(resolveOtpLocale("en")).toBe("en");
-    expect(resolveOtpLocale()).toBe("ko"); // no document (server)
+describe("locale", () => {
+  test("resolveOtpLocale is deterministic: explicit ko/en, else ko", () => {
+    const globals = globalThis as Record<string, unknown>;
+    const saved = globals.document;
+    try {
+      // Even with an English page, the default never reads the document
+      // (server and client render the same text).
+      globals.document = { documentElement: { lang: "en" } };
+      expect(resolveOtpLocale()).toBe("ko");
+      expect(resolveOtpLocale("auto")).toBe("ko");
+      expect(resolveOtpLocale("en")).toBe("en");
+      expect(createOtpTranslator()("send.idle")).toBe("인증번호 받기");
+      expect(createOtpTranslator({ locale: "auto" })("send.idle")).toBe(
+        "인증번호 받기",
+      );
+    } finally {
+      globals.document = saved;
+    }
+  });
+
+  test("detectOtpDocumentLocale: ko for ko* or no lang, en for any other", () => {
+    expect(detectOtpDocumentLocale()).toBe("ko"); // no document (server)
     const globals = globalThis as Record<string, unknown>;
     const saved = globals.document;
     try {
@@ -446,20 +466,24 @@ describe("resolveOtpLocale", () => {
         ["en-US", "en"],
         ["EN", "en"],
         ["ko-KR", "ko"],
-        ["ja", "ko"],
+        ["ko", "ko"],
+        ["ja", "en"],
+        ["fr-FR", "en"],
         ["", "ko"],
       ] as const) {
         globals.document = { documentElement: { lang } };
-        expect(resolveOtpLocale()).toBe(expected);
-        expect(createOtpTranslator()("send.idle")).toBe(
-          expected === "en" ? "Send code" : "인증번호 받기",
-        );
+        expect(detectOtpDocumentLocale()).toBe(expected);
       }
-      globals.document = { documentElement: { lang: "en" } };
-      expect(resolveOtpLocale("ko")).toBe("ko");
     } finally {
       globals.document = saved;
     }
+  });
+
+  test("watchOtpDocumentLocale does nothing without a document", () => {
+    const seen: string[] = [];
+    const stop = watchOtpDocumentLocale((locale) => seen.push(locale));
+    stop();
+    expect(seen).toEqual([]);
   });
 });
 

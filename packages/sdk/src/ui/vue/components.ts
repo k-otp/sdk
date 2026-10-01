@@ -10,6 +10,7 @@ import {
   inject,
   onBeforeUnmount,
   onMounted,
+  onUpdated,
   provide,
   type Ref,
   ref,
@@ -32,6 +33,7 @@ import {
   createOtpForm,
   createOtpTranslator,
   DEFAULT_OTP_CODE_LENGTH,
+  DEFAULT_OTP_LOCALE,
   focusOtpCodeSegment,
   focusOtpFormTarget,
   getOtpCodeInputParts,
@@ -46,11 +48,13 @@ import {
   type OtpFormPhase,
   type OtpFormState,
   type OtpLocale,
+  type OtpLocaleOption,
   type OtpMessageOverrides,
   type OtpTranslator,
-  otpCodeSegments,
   receiveWebOtp,
+  resolveOtpLocale,
   sanitizeOtpCode,
+  watchOtpDocumentLocale,
 } from "..";
 
 /** What every part injects from `OtpFormRoot`. */
@@ -105,6 +109,36 @@ const useStableId = (prefix: string): string => {
   return `${prefix}-${generated.replace(/[^\w-]/g, "")}`;
 };
 
+/**
+ * The locale to render. `"auto"` renders the default on the server and the
+ * first client render, then follows `<html lang>` after mount.
+ */
+const useOtpLocale = (
+  locale: () => OtpLocaleOption | undefined,
+): ComputedRef<OtpLocale> => {
+  const detected = ref<OtpLocale>(DEFAULT_OTP_LOCALE);
+  let stop: (() => void) | undefined;
+  onMounted(() => {
+    watch(
+      locale,
+      (value) => {
+        stop?.();
+        stop =
+          value === "auto"
+            ? watchOtpDocumentLocale((next) => {
+                detected.value = next;
+              })
+            : undefined;
+      },
+      { immediate: true },
+    );
+  });
+  onBeforeUnmount(() => stop?.());
+  return computed(() =>
+    locale() === "auto" ? detected.value : resolveOtpLocale(locale()),
+  );
+};
+
 /** Runtime prop definitions: booleans keep `undefined` when absent. */
 const propDefs = <P>(keys: string[], booleans: string[] = []): P =>
   Object.fromEntries(
@@ -129,7 +163,8 @@ export type OtpFormRootProps = Omit<
   resendCooldownMs?: number | undefined;
   idempotencyKeyPrefix?: string | undefined;
   createIdempotencyKey?: (() => string) | undefined;
-  locale?: OtpLocale | undefined;
+  /** `ko` (default), `en`, or `"auto"` (`<html lang>`, after mount). */
+  locale?: OtpLocaleOption | undefined;
   messages?: OtpMessageOverrides | undefined;
 };
 
@@ -226,8 +261,12 @@ export const OtpFormRoot: DefineSetupFnComponent<
     });
     const generatedId = useStableId("k-otp");
     const id = computed(() => props.id ?? generatedId);
+    const effectiveLocale = useOtpLocale(() => props.locale);
     const t = computed(() =>
-      createOtpTranslator({ locale: props.locale, messages: props.messages }),
+      createOtpTranslator({
+        locale: effectiveLocale.value,
+        messages: props.messages,
+      }),
     );
     const parts = computed(() =>
       getOtpFormParts(state.value, { id: id.value, t: t.value }),
@@ -466,20 +505,20 @@ export const OtpFormMessage: DefineSetupFnComponent<
 const renderSegments = (
   group: OtpAttrs,
   segments: readonly OtpAttrs[],
-  value: string,
-  length: number,
   handlers: OtpCodeInputHandlers,
   groupRef: Ref<HTMLElement | null>,
   extra?: VNode | null,
-): VNode => {
-  const digits = otpCodeSegments(value, length);
-  return h("div", { ...group, ref: groupRef }, [
+): VNode =>
+  h("div", { ...group, ref: groupRef }, [
     ...segments.map((attrs, index) =>
       h("input", {
         ...attrs,
         key: index,
-        value: digits[index] ?? "",
+        // No `value`: Vue re-patches it on every render (e.g. the countdown
+        // tick), which would cancel an IME composition. `handlers.sync()`
+        // writes it after each render instead.
         onInput: (event: Event) => handlers.input(index, event),
+        onBlur: handlers.blur,
         onKeydown: (event: KeyboardEvent) => handlers.keydown(index, event),
         onPaste: (event: ClipboardEvent) => handlers.paste(index, event),
         onFocus: (event: FocusEvent) => handlers.focus(index, event),
@@ -490,6 +529,11 @@ const renderSegments = (
     ),
     extra ?? null,
   ]);
+
+/** Writes the code into the (uncontrolled) segments after every render. */
+const syncAfterRender = (handlers: OtpCodeInputHandlers): void => {
+  onMounted(handlers.sync);
+  onUpdated(handlers.sync);
 };
 
 /** Label + segmented code input + description/error of the form. */
@@ -514,14 +558,14 @@ export const OtpFormCodeField: DefineSetupFnComponent<
       onChange: form.setCode,
       getContainer: () => group.value,
     });
+    syncAfterRender(handlers);
     return () => {
+      // Reading `parts` tracks the state: each change re-renders, then
+      // `handlers.sync()` (onUpdated) writes the code into the segments.
       const parts = context.parts.value;
-      const state = context.state.value;
       const input = renderSegments(
         parts.codeInput,
         parts.codeSegments,
-        state.code,
-        state.codeLength,
         handlers,
         group,
       );
@@ -564,7 +608,8 @@ export type OtpCodeInputProps = {
   webOtp?: boolean | undefined;
   /** Renders a hidden input with this name and the value, for form posts. */
   name?: string | undefined;
-  locale?: OtpLocale | undefined;
+  /** `ko` (default), `en`, or `"auto"` (`<html lang>`, after mount). */
+  locale?: OtpLocaleOption | undefined;
   messages?: OtpMessageOverrides | undefined;
 };
 
@@ -605,8 +650,13 @@ export const OtpCodeInput: DefineSetupFnComponent<
       onChange: change,
       getContainer: () => group.value,
     });
+    syncAfterRender(handlers);
+    const effectiveLocale = useOtpLocale(() => props.locale);
     const t = computed(() =>
-      createOtpTranslator({ locale: props.locale, messages: props.messages }),
+      createOtpTranslator({
+        locale: effectiveLocale.value,
+        messages: props.messages,
+      }),
     );
     let webOtp: AbortController | undefined;
     onMounted(() => {
@@ -639,8 +689,6 @@ export const OtpCodeInput: DefineSetupFnComponent<
       return renderSegments(
         parts.group,
         parts.segments,
-        inner.value,
-        length(),
         handlers,
         group,
         props.name

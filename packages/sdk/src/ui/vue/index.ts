@@ -11,6 +11,7 @@ export type {
   OtpFormPhase,
   OtpFormState,
   OtpLocale,
+  OtpLocaleOption,
   OtpMessageKey,
   OtpMessageOverrides,
 } from "..";

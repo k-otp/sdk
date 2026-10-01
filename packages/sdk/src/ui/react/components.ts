@@ -22,6 +22,7 @@ import {
   useId,
   useLayoutEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   useSyncExternalStore,
@@ -34,6 +35,7 @@ import {
   createOtpForm,
   createOtpTranslator,
   DEFAULT_OTP_CODE_LENGTH,
+  DEFAULT_OTP_LOCALE,
   focusOtpCodeSegment,
   focusOtpFormTarget,
   getOtpCodeInputParts,
@@ -47,11 +49,14 @@ import {
   type OtpFormParts,
   type OtpFormState,
   type OtpLocale,
+  type OtpLocaleOption,
   type OtpMessageOverrides,
   type OtpTranslator,
   otpCodeSegments,
   receiveWebOtp,
+  resolveOtpLocale,
   sanitizeOtpCode,
+  watchOtpDocumentLocale,
 } from "..";
 
 /** DOM attribute names that React spells differently. */
@@ -89,6 +94,19 @@ const useStableId = (id: string | undefined, prefix: string): string => {
 const useClientLayoutEffect: typeof useLayoutEffect = (effect, deps) =>
   (typeof document === "undefined" ? useEffect : useLayoutEffect)(effect, deps);
 
+/**
+ * The locale to render. `"auto"` renders the default on the server and the
+ * first client render, then follows `<html lang>` after mount.
+ */
+const useOtpLocale = (locale: OtpLocaleOption | undefined): OtpLocale => {
+  const [detected, setDetected] = useState<OtpLocale>(DEFAULT_OTP_LOCALE);
+  useEffect(
+    () => (locale === "auto" ? watchOtpDocumentLocale(setDetected) : undefined),
+    [locale],
+  );
+  return locale === "auto" ? detected : resolveOtpLocale(locale);
+};
+
 /** Settings of the form (see `createOtpForm`). */
 export type OtpFormSettings = OtpFormConfig &
   Pick<
@@ -99,8 +117,11 @@ export type OtpFormSettings = OtpFormConfig &
     | "idempotencyKeyPrefix"
     | "createIdempotencyKey"
   > & {
-    /** `ko` (default) or `en`. */
-    locale?: OtpLocale | undefined;
+    /**
+     * `ko` (default) or `en`, or `"auto"` to follow `<html lang>` after
+     * mount (hydration-safe).
+     */
+    locale?: OtpLocaleOption | undefined;
     /** Override any message of the catalog. */
     messages?: OtpMessageOverrides | undefined;
   };
@@ -215,9 +236,10 @@ export const OtpFormRoot = (rootProps: OtpFormRootProps): ReactElement => {
   useEffect(() => () => form.abort(), [form]);
 
   const id = useStableId(idProp, "k-otp");
+  const effectiveLocale = useOtpLocale(locale);
   const t = useMemo(
-    () => createOtpTranslator({ locale, messages }),
-    [locale, messages],
+    () => createOtpTranslator({ locale: effectiveLocale, messages }),
+    [effectiveLocale, messages],
   );
   const parts = useMemo(
     () => getOtpFormParts(state, { id, t }),
@@ -495,16 +517,8 @@ const Segments = ({
   hidden,
 }: SegmentsProps): ReactElement => {
   const digits = otpCodeSegments(value, length);
-  useClientLayoutEffect(() => {
-    if (handlers.isComposing()) return;
-    const inputs = groupRef.current?.querySelectorAll<HTMLInputElement>(
-      '[data-k-otp="code-segment"]',
-    );
-    inputs?.forEach((input, index) => {
-      const digit = digits[index] ?? "";
-      if (input.value !== digit) input.value = digit;
-    });
-  });
+  // After every render: the DOM shows `value`, unless an IME is composing.
+  useClientLayoutEffect(() => handlers.sync());
   return h(
     "div",
     {
@@ -630,7 +644,8 @@ export type OtpCodeInputProps = Omit<
   webOtp?: boolean | undefined;
   /** Renders a hidden input with this name and the value, for form posts. */
   name?: string | undefined;
-  locale?: OtpLocale | undefined;
+  /** `ko` (default), `en` or `"auto"` (see `OtpFormRoot`). */
+  locale?: OtpLocaleOption | undefined;
   messages?: OtpMessageOverrides | undefined;
 };
 
@@ -662,13 +677,34 @@ export const OtpCodeInput = ({
   const value = valueProp === undefined ? inner : valueProp;
   const id = useStableId(idProp, "k-otp-code");
   const groupRef = useRef<HTMLDivElement | null>(null);
-  const latest = useRef({ value, length, readOnly, onValueChange, onComplete });
-  latest.current = { value, length, readOnly, onValueChange, onComplete };
+  const controlled = valueProp !== undefined;
+  const latest = useRef({
+    value,
+    controlled,
+    length,
+    readOnly,
+    onValueChange,
+    onComplete,
+  });
+  latest.current = {
+    value,
+    controlled,
+    length,
+    readOnly,
+    onValueChange,
+    onComplete,
+  };
+  // Re-renders a controlled input whose parent may reject the change: the
+  // segments then show the parent's value again (as a controlled input).
+  const [, rerender] = useReducer((n: number) => n + 1, 0);
   const [handlers] = useState(() => {
     const change = (next: string): void => {
       const current = latest.current;
-      if (valueProp === undefined) setInner(next);
+      // Read by the handlers until the next render, which restores the
+      // parent's value when it rejected the change.
       current.value = next;
+      if (current.controlled) rerender();
+      else setInner(next);
       current.onValueChange?.(next);
       if (isOtpCodeComplete(next, current.length)) current.onComplete?.(next);
     };
@@ -683,9 +719,10 @@ export const OtpCodeInput = ({
       }),
     };
   });
+  const effectiveLocale = useOtpLocale(locale);
   const t = useMemo(
-    () => createOtpTranslator({ locale, messages }),
-    [locale, messages],
+    () => createOtpTranslator({ locale: effectiveLocale, messages }),
+    [effectiveLocale, messages],
   );
   const parts = getOtpCodeInputParts({
     id,
