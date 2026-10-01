@@ -3,7 +3,7 @@ import type { HTMLAttributes } from "svelte/elements";
 import type { OtpFormPhoneFieldSlotProps } from "./runtime.js";
 
 /**
- * Label + phone input + description/error, wired with ARIA. A custom input spreads `inputProps` and binds `readonly={state.phoneLocked}`, `on:input={onInput}` and `on:blur={onBlur}`.
+ * Label + phone input + description/error, wired with ARIA. A custom input spreads `inputProps` and adds `use:phoneInput` (wires the input and keeps `readonly` in sync).
  *
  * Svelte 4: slot props with `let:`. Svelte 5: also a `children` snippet
  * receiving the same object.

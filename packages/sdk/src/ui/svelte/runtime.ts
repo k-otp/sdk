@@ -125,6 +125,12 @@ export type OtpFormPhoneFieldSlotProps = OtpFormSlotProps & {
   onInput: (event: Event) => void;
   /** `on:blur` / `onblur` handler of the input. */
   onBlur: () => void;
+  /**
+   * Action for a custom input (`<input {...inputProps} use:phoneInput />`):
+   * wires the handlers and keeps `readonly` in sync. Use it instead of
+   * `onInput`/`onBlur` + `readonly={state.phoneLocked}`.
+   */
+  phoneInput: (node: HTMLInputElement) => { destroy: () => void };
 };
 
 /** What `OtpFormRoot` shares with its parts (Svelte context). */
@@ -287,18 +293,50 @@ export const slotProps = (
 const caretAtEnd = (input: HTMLInputElement): boolean =>
   input.selectionStart === null || input.selectionStart >= input.value.length;
 
-/** Handlers of the phone input (`on:input`, `on:blur`). */
+/** Handlers of the phone input (`on:input`, `on:blur`), and an action. */
 export const phoneInputHandlers = (
   context: OtpFormSvelteContext,
-): { input: (event: Event) => void; blur: () => void } => ({
-  input: (event) => {
-    const input = event.currentTarget as HTMLInputElement;
-    context.form.setPhoneNumber(input.value, { format: caretAtEnd(input) });
+): {
+  input: (event: Event) => void;
+  blur: () => void;
+  action: (node: HTMLInputElement) => { destroy: () => void };
+} => {
+  const input = (event: Event): void => {
+    const element = event.currentTarget as HTMLInputElement;
+    context.form.setPhoneNumber(element.value, {
+      format: caretAtEnd(element),
+    });
     const next = context.form.getState().phoneNumber;
-    if (input.value !== next) input.value = next;
-  },
-  blur: () => context.form.setPhoneNumber(context.form.getState().phoneNumber),
-});
+    if (element.value !== next) element.value = next;
+  };
+  const blur = (): void =>
+    context.form.setPhoneNumber(context.form.getState().phoneNumber);
+  return {
+    input,
+    blur,
+    /**
+     * `use:phoneInput` for a custom input: wires input/blur and keeps
+     * `readOnly` in sync with `state.phoneLocked` (a `readonly` attribute
+     * in a spread is unreliable across Svelte 4 and 5).
+     */
+    action: (node) => {
+      const sync = (): void => {
+        node.readOnly = context.form.getState().phoneLocked;
+      };
+      sync();
+      node.addEventListener("input", input);
+      node.addEventListener("blur", blur);
+      const unsubscribe = context.form.subscribe(sync);
+      return {
+        destroy: () => {
+          unsubscribe();
+          node.removeEventListener("input", input);
+          node.removeEventListener("blur", blur);
+        },
+      };
+    },
+  };
+};
 
 /** Click handlers of the button parts. */
 export const buttonHandlers = (
@@ -380,7 +418,7 @@ type CodeInputModel = {
   id: string;
   parts: (props: {
     id: string | undefined;
-    value: string;
+    value: string | undefined;
     length: number;
     readOnly: boolean;
     invalid: boolean;
@@ -398,7 +436,7 @@ type CodeInputModel = {
 
 /** Model of a standalone `OtpCodeInput` (component init only). */
 export const createOtpCodeInputModel = (options: {
-  getValue: () => string;
+  getValue: () => string | undefined;
   getLength: () => number;
   isReadOnly: () => boolean;
   /** Writes the new value to the component's `value` prop. */
@@ -408,6 +446,7 @@ export const createOtpCodeInputModel = (options: {
   const dispatch = createEventDispatcher();
   let container: HTMLElement | undefined;
   const length = (): number => options.getLength() || DEFAULT_OTP_CODE_LENGTH;
+  const current = (): string => options.getValue() ?? "";
   const change = (value: string): void => {
     options.setValue(value);
     options.getProps().onValueChange?.(value);
@@ -417,7 +456,7 @@ export const createOtpCodeInputModel = (options: {
     }
   };
   const handlers = createOtpCodeInputHandlers({
-    getValue: options.getValue,
+    getValue: current,
     getLength: length,
     isReadOnly: options.isReadOnly,
     onChange: change,
@@ -440,7 +479,7 @@ export const createOtpCodeInputModel = (options: {
         };
       }
       const size = props.length || DEFAULT_OTP_CODE_LENGTH;
-      const value = sanitizeOtpCode(props.value, size);
+      const value = sanitizeOtpCode(props.value ?? "", size);
       return {
         ...getOtpCodeInputParts({
           id: props.id ?? generatedId,
@@ -458,10 +497,7 @@ export const createOtpCodeInputModel = (options: {
     group: (node, groupOptions) => {
       container = node;
       if (groupOptions.autoFocus) {
-        focusOtpCodeSegment(
-          node,
-          Math.min(options.getValue().length, length() - 1),
-        );
+        focusOtpCodeSegment(node, Math.min(current().length, length() - 1));
       }
       const controller = new AbortController();
       if (groupOptions.webOtp) {

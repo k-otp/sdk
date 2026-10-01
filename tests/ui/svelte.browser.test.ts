@@ -90,6 +90,11 @@ describe("<OtpForm /> preset (Svelte)", () => {
     await flush();
     expect(document.querySelector("output")?.textContent).toBe("code");
     expect(segments()).toHaveLength(6);
+    // use:phoneInput keeps readonly in sync with the phase.
+    expect(input.readOnly).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Change number" }));
+    await flush();
+    expect(input.readOnly).toBe(false);
   });
 });
 

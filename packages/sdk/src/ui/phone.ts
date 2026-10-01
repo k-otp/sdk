@@ -3,16 +3,14 @@
  *
  * Korean mobile numbers are the primary target. International spellings of a
  * Korean mobile (`+82 10-...`, `82 10...`, `0082 10...` and the common
- * mis-dial `+82 010...`) are folded into the national form `010...`, the same
- * canonicalization the K-OTP API applies to its per-phone rate limit. Other
- * countries are accepted as E.164 (`+<country code><number>`) only when
- * `allowInternational` is set.
+ * mis-dial `+82 010...`) are folded into the national form `010...` before
+ * sending. Other countries are accepted as E.164 (`+<country code><number>`)
+ * only when `allowInternational` is set.
  *
  * What is sent as `phoneNumber` ({@link OtpPhoneNumber.value}): the national
- * digits for a Korean mobile (`01012345678`, the API's documented format) and
- * E.164 for other numbers (`+14155550123`). The API hashes the number exactly
- * as received, so sending one canonical spelling keeps "a new issue for the
- * same phone and purpose replaces the previous one" reliable.
+ * digits for a Korean mobile (`01012345678`, the format of the API's
+ * examples) and E.164 for other numbers (`+14155550123`). The same number is
+ * thus always sent the same way, whatever the user typed.
  *
  * Pure functions: no DOM, no globals.
  */

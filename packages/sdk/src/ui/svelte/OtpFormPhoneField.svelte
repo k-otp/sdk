@@ -36,6 +36,7 @@
       errorProps={attrs($parts.phoneError)}
       onInput={handlers.input}
       onBlur={handlers.blur}
+      phoneInput={handlers.action}
     />
   {:else}
     <label {...attrs($parts.phoneLabel)}>{label ?? $parts.text.phoneLabel}</label>
