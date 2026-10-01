@@ -212,7 +212,8 @@
     "build": "rm -rf dist && tsdown",
     "typecheck": "ttsc --noEmit -p tsconfig.json && ttsc --noEmit -p tsconfig.test.json",
     "test": "bun test",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "node -e \"const p=require('./package.json');const bad=Object.entries({...p.dependencies,...p.peerDependencies,...p.optionalDependencies}).filter(([,v])=>/^(catalog|workspace):/.test(String(v)));if(bad.length){console.error('Refusing to publish from the package directory: unresolved '+bad.map(([k,v])=>k+'@'+v).join(', ')+'. Publish the tarball from bun pm pack instead (docs/releasing.md).');process.exit(1)}\""
   },
   "dependencies": {
     "@orpc/client": "catalog:",
