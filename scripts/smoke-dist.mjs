@@ -3,14 +3,17 @@
 // (ESM import and CJS require of every subpath, the IIFE bundle in a vm
 // context) and performs one mocked call through each. The adapters are
 // exercised the way SSR frameworks load them: React through react-dom/server,
-// Vue through vue/server-renderer, Svelte stores directly.
+// Vue through vue/server-renderer, Svelte stores directly. The UI subpaths
+// are server-rendered without any DOM (the `.svelte` sources through a module
+// hook that compiles them like an SSR bundler would).
 // Run after `bun run build`: `node scripts/smoke-dist.mjs`.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import * as nodeModule from "node:module";
 import { createRequire } from "node:module";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import vm from "node:vm";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -236,6 +239,126 @@ assert.deepEqual(svelteResult.data, issueOutput, "svelte esm");
 assert.deepEqual(statuses, ["idle", "loading", "success"], "svelte esm");
 console.log("ok - svelte esm");
 
+// UI subpaths, server-side, with no DOM.
+assert.equal(typeof globalThis.window, "undefined", "no window in smoke");
+assert.equal(typeof globalThis.document, "undefined", "no document in smoke");
+const uiExpect = (html, label) => {
+  assert.match(html, /data-k-otp="root"/, label);
+  assert.match(html, /data-state="phone"/, label);
+  assert.match(html, /id="otp-phone"/, label);
+  assert.match(html, /data-k-otp="message"/, label);
+};
+for (const [label, mod] of [
+  ["ui esm", await import("@k-otp/sdk/ui")],
+  ["ui cjs", require("@k-otp/sdk/ui")],
+]) {
+  assert.equal(
+    mod.parseOtpPhoneNumber("+82 10-1234-5678").value,
+    "01012345678",
+  );
+  const form = mod.createOtpForm(
+    esmCore.createOtpClient({ apiKey: "pk_smoke", fetch }),
+    { purpose: "smoke", createIdempotencyKey: () => "smoke-1" },
+  );
+  form.setPhoneNumber("010-1234-5678");
+  const sent = await form.send();
+  assert.deepEqual(sent.data, issueOutput, label);
+  assert.equal(form.getState().phase, "code", label);
+  assert.equal(form.getState().sentTo, "010-****-5678", label);
+  console.log(`ok - ${label}`);
+}
+for (const [label, mod] of [
+  ["ui/react esm", await import("@k-otp/sdk/ui/react")],
+  ["ui/react cjs", require("@k-otp/sdk/ui/react")],
+]) {
+  const html = renderToString(
+    react.createElement(mod.OtpForm, {
+      options: { apiKey: "pk_smoke", fetch },
+      purpose: "smoke",
+      id: "otp",
+    }),
+  );
+  uiExpect(html, label);
+  assert.equal(typeof mod.OtpForm.Root, "function", label);
+  console.log(`ok - ${label}`);
+}
+for (const file of ["ui-react.js", "ui-react.cjs"]) {
+  const code = readFileSync(path.join(root, "packages/sdk/dist", file), "utf8");
+  assert.match(code, /^"use client";/, `${file} is a client module`);
+}
+for (const [label, mod] of [
+  ["ui/vue esm", await import("@k-otp/sdk/ui/vue")],
+  ["ui/vue cjs", require("@k-otp/sdk/ui/vue")],
+]) {
+  const app = vue.createSSRApp({
+    render: () =>
+      vue.h(mod.OtpForm, {
+        options: { apiKey: "pk_smoke", fetch },
+        purpose: "smoke",
+        id: "otp",
+      }),
+  });
+  uiExpect(await renderVue(app), label);
+  console.log(`ok - ${label}`);
+}
+{
+  // `.svelte` sources resolve through the `exports` map and are compiled
+  // for the server, as SvelteKit/Vite SSR would.
+  const compiler = import.meta.resolve("svelte/compiler");
+  if (typeof nodeModule.registerHooks === "function") {
+    // Node >= 22.15: synchronous in-thread hooks.
+    const { compile, VERSION } = await import(compiler);
+    nodeModule.registerHooks({
+      load(url, context, next) {
+        if (!url.endsWith(".svelte")) return next(url, context);
+        const filename = fileURLToPath(url);
+        const { js } = compile(readFileSync(filename, "utf8"), {
+          filename,
+          generate: VERSION.startsWith("4.") ? "ssr" : "server",
+        });
+        return { format: "module", source: js.code, shortCircuit: true };
+      },
+    });
+  } else {
+    // Node 20: off-thread hooks.
+    const hooks = `
+      import { readFile } from "node:fs/promises";
+      import { fileURLToPath } from "node:url";
+      const { compile, VERSION } = await import(${JSON.stringify(compiler)});
+      export async function load(url, context, next) {
+        if (!url.endsWith(".svelte")) return next(url, context);
+        const filename = fileURLToPath(url);
+        const { js } = compile(await readFile(filename, "utf8"), {
+          filename,
+          generate: VERSION.startsWith("4.") ? "ssr" : "server",
+        });
+        return { format: "module", source: js.code, shortCircuit: true };
+      }`;
+    nodeModule.register(
+      `data:text/javascript,${encodeURIComponent(hooks)}`,
+      pathToFileURL(`${root}/`),
+    );
+  }
+  const mod = await import("@k-otp/sdk/ui/svelte");
+  const { VERSION } = await import("svelte/compiler");
+  const props = {
+    options: { apiKey: "pk_smoke", fetch },
+    purpose: "smoke",
+    id: "otp",
+  };
+  const html = VERSION.startsWith("4.")
+    ? mod.OtpForm.render(props).html
+    : (await import("svelte/server")).render(mod.OtpForm, { props }).body;
+  uiExpect(html, "ui/svelte");
+  assert.equal(typeof mod.createOtpFormRoot, "function");
+  console.log(`ok - ui/svelte (Svelte ${VERSION}, server-compiled sources)`);
+}
+assert.match(
+  readFileSync(require.resolve("@k-otp/sdk/ui/theme.css"), "utf8"),
+  /\[data-k-otp="root"\]/,
+);
+console.log("ok - ui/theme.css");
+
 // Subpaths share one copy of the core modules per format (no duplicated
 // `OtpApiError` class between `@k-otp/sdk` and an adapter).
 for (const [label, mod] of [
@@ -246,6 +369,27 @@ for (const [label, mod] of [
   assert.equal(mod.OtpApiError, esmCore.OtpApiError, `${label} OtpApiError`);
   assert.equal(mod.createOtpClient, esmCore.createOtpClient, label);
 }
+// `@k-otp/sdk/ui/react` shares the hooks' modules: one OtpProvider context.
+for (const [label, hooks, ui] of [
+  [
+    "esm",
+    await import("@k-otp/sdk/react"),
+    await import("@k-otp/sdk/ui/react"),
+  ],
+  ["cjs", require("@k-otp/sdk/react"), require("@k-otp/sdk/ui/react")],
+]) {
+  const html = renderToString(
+    react.createElement(
+      hooks.OtpProvider,
+      { options: { apiKey: "pk_smoke", fetch } },
+      react.createElement(ui.OtpForm, { purpose: "smoke", id: "otp" }),
+    ),
+  );
+  assert.match(html, /data-k-otp="root"/, `OtpProvider + OtpForm (${label})`);
+}
+console.log(
+  "ok - OtpProvider (react) provides the client to OtpForm (ui/react)",
+);
 assert.equal(require("@k-otp/sdk/react").OtpApiError, cjsCore.OtpApiError);
 console.log("ok - one OtpApiError per format across subpaths");
 

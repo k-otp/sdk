@@ -13,11 +13,13 @@
  * - dependencies are an explicit allowlist (no private/internal packages,
  *   no `workspace:`/`catalog:` leftovers); React, Vue and Svelte are
  *   optional peer dependencies
- * - every bare import in the built JS is a declared dependency, and a
- *   framework is only imported by its own subpath (`react` only from
- *   `dist/react.*`, never from a shared chunk)
- * - `dist/react.js` and `dist/react.cjs` start with `"use client"`, and no
- *   other file contains it
+ * - every bare import in the built JS (and the shipped `.svelte` sources)
+ *   is a declared dependency, and a framework is only imported by its own
+ *   subpaths: `react` only from `dist/react.*`, `dist/ui-react.*` and the
+ *   chunk they share (`dist/react-<hash>.js`), never from the core or a
+ *   chunk of another subpath
+ * - `sideEffects` lists only the CSS files (the optional theme)
+ * - `"use client"` opens the react entries and nothing else (see below)
  *
  * Run `bun run build` first.
  */
@@ -59,6 +61,11 @@ const EXPECTED_EXPORTS = [
   "./react",
   "./vue",
   "./svelte",
+  "./ui",
+  "./ui/react",
+  "./ui/vue",
+  "./ui/svelte",
+  "./ui/theme.css",
   "./k-otp.iife.js",
   "./k-otp.iife.min.js",
   "./package.json",
@@ -76,12 +83,28 @@ const ALLOWED_DEPENDENCIES = [
 
 /**
  * Frameworks are optional peer dependencies (never bundled, never installed
- * for apps that do not use them), each imported only by its own subpath.
+ * for apps that do not use them), each imported only by the files of its own
+ * subpaths (see `owner`).
  */
-const FRAMEWORKS: Record<string, string> = {
-  react: "react",
-  vue: "vue",
-  svelte: "svelte",
+const FRAMEWORKS: Record<string, string[]> = {
+  react: ["react", "ui-react"],
+  vue: ["vue", "ui-vue"],
+  svelte: ["svelte", "ui-svelte"],
+};
+
+/** Only the theme has side effects (importing it applies styles). */
+const SIDE_EFFECTS = ["*.css"];
+
+/**
+ * The subpath a built file belongs to: `dist/react.js` and its shared
+ * chunk `dist/react-<hash>.js` -> `react`; `dist/ui-svelte/*` ->
+ * `ui-svelte`; `dist/ui-<hash>.js` -> `ui`.
+ */
+const owner = (file: string): string => {
+  const [top, ...rest] = path.normalize(file).split(path.sep);
+  if (top === "dist" && rest.length > 1) return rest[0] ?? "";
+  const base = (rest[0] ?? top ?? "").split(".")[0] ?? "";
+  return base.replace(/-[\w-]{8}$/, "");
 };
 
 const ALLOWED_TOP_LEVEL = new Set([
@@ -210,8 +233,15 @@ const checkPackage = async (dir: string): Promise<void> => {
 
   if (manifest.private) fail(name, "package is private");
   if (name !== PACKAGE_NAME) fail(name, `expected ${PACKAGE_NAME}`);
-  if (manifest.sideEffects !== false) {
-    fail(name, "sideEffects must be false (tree-shaking of unused subpaths)");
+  if (JSON.stringify(manifest.sideEffects) !== JSON.stringify(SIDE_EFFECTS)) {
+    fail(
+      name,
+      `sideEffects must be ${JSON.stringify(SIDE_EFFECTS)} (tree-shaking of unused subpaths; CSS is a side effect)`,
+    );
+  }
+  const css = files.filter((f) => f.endsWith(".css"));
+  if (!css.includes(path.normalize("dist/ui/theme.css"))) {
+    fail(name, "dist/ui/theme.css (./ui/theme.css) is missing");
   }
 
   // The public subpaths, exactly.
@@ -288,7 +318,7 @@ const checkPackage = async (dir: string): Promise<void> => {
   }
 
   // Imports in the built output must be declared dependencies.
-  for (const file of files.filter((f) => /\.(c?js|mjs)$/.test(f))) {
+  for (const file of files.filter((f) => /\.(c?js|mjs|svelte)$/.test(f))) {
     const code = await readFile(path.join(unpacked, file), "utf8");
     // `"use client"` opens the react entry (Next.js App Router) and nothing
     // else: on a shared chunk it would turn the core into client code.
@@ -306,10 +336,13 @@ const checkPackage = async (dir: string): Promise<void> => {
       if (!Object.hasOwn(runtimeDeps, dep)) {
         fail(name, `${file} imports undeclared package "${specifier}"`);
       }
-      // dist/react.js may import react; a shared chunk or dist/vue.js may not.
-      const subpath = FRAMEWORKS[dep];
-      if (subpath && path.basename(file).split(".")[0] !== subpath) {
-        fail(name, `${file} imports "${specifier}" outside ./${subpath}`);
+      // dist/react.js may import react; the core or dist/vue.js may not.
+      const subpaths = FRAMEWORKS[dep];
+      if (subpaths && !subpaths.includes(owner(file))) {
+        fail(
+          name,
+          `${file} imports "${specifier}" outside ${subpaths.join("/")}`,
+        );
       }
     }
   }

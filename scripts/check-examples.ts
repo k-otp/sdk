@@ -10,8 +10,10 @@
  *
  * Bundle check: the framework examples are built once more with source maps,
  * and the modules that ended up in the browser bundle must come from their
- * own `@k-otp/sdk/<framework>` subpath only: e.g. the React app must not
- * contain Vue, Svelte, `dist/vue.js` or the server client.
+ * own `@k-otp/sdk/<framework>` and `@k-otp/sdk/ui/<framework>` subpaths
+ * only: e.g. the React app must not contain Vue, Svelte, `dist/vue.js`,
+ * `dist/ui-vue.js` or the server client, and must contain the UI
+ * components it renders.
  */
 import { mkdtemp, readdir, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -38,6 +40,7 @@ const FRAMEWORK_PACKAGES: Record<string, RegExp> = {
   svelte: /(^|\/)node_modules\/svelte\//,
 };
 const SDK_DIST = path.join(root, "packages/sdk/dist");
+/** Subpaths (owners of built files, see `owner`) of the SDK. */
 const SDK_ENTRIES = [
   "core",
   "headless",
@@ -46,7 +49,27 @@ const SDK_ENTRIES = [
   "react",
   "vue",
   "svelte",
+  "ui",
+  "ui-react",
+  "ui-vue",
+  "ui-svelte",
 ];
+/** Subpaths a framework example may (and must) bundle. */
+const ALLOWED: Record<string, string[]> = {
+  react: ["core", "headless", "ui", "react", "ui-react"],
+  vue: ["core", "headless", "ui", "vue", "ui-vue"],
+  svelte: ["core", "headless", "ui", "svelte", "ui-svelte"],
+};
+
+/**
+ * The subpath a built file belongs to: `dist/react.js` and its shared chunk
+ * `dist/react-<hash>.js` -> `react`; `dist/ui-svelte/*` -> `ui-svelte`.
+ */
+const owner = (file: string): string => {
+  const [top, ...rest] = path.relative(SDK_DIST, file).split(path.sep);
+  if (rest.length) return top ?? "";
+  return (top ?? "").replace(/\.(c?js|svelte)$/, "").replace(/-[\w-]{8}$/, "");
+};
 
 /**
  * Builds `dir` with source maps into a temp dir and returns every source
@@ -110,25 +133,25 @@ const bundleProblems = async (
 ): Promise<string[]> => {
   const sources = await bundledSources(dir);
   const problems: string[] = [];
-  const sdkFiles = new Set(
-    sources
-      .filter((source) => path.dirname(source) === SDK_DIST)
-      .map((source) => path.basename(source).replace(/\.js$/, "")),
+  const sdkFiles = sources.filter(
+    (source) => !path.relative(SDK_DIST, source).startsWith(".."),
   );
-  if (!sdkFiles.has(framework)) {
-    problems.push(
-      `bundle does not contain @k-otp/sdk/${framework} (dist/${framework}.js)`,
-    );
+  const owners = new Set(sdkFiles.map(owner));
+  for (const required of [framework, `ui-${framework}`]) {
+    if (!owners.has(required)) {
+      problems.push(
+        `bundle does not contain @k-otp/sdk/${required.replace("-", "/")}`,
+      );
+    }
   }
   for (const file of sdkFiles) {
+    const by = owner(file);
     if (
-      SDK_ENTRIES.includes(file) &&
-      !["core", "headless", framework].includes(file)
+      (SDK_ENTRIES.includes(by) && !ALLOWED[framework]?.includes(by)) ||
+      by.startsWith("server")
     ) {
-      problems.push(`bundle contains dist/${file}.js`);
+      problems.push(`bundle contains dist/${path.relative(SDK_DIST, file)}`);
     }
-    if (file.startsWith("server"))
-      problems.push(`bundle contains dist/${file}.js`);
   }
   for (const [other, pattern] of Object.entries(FRAMEWORK_PACKAGES)) {
     if (other === framework) continue;
