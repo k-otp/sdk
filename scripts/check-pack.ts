@@ -1,17 +1,21 @@
 #!/usr/bin/env bun
 /**
- * Packs every publishable package exactly like the release does
+ * Packs the publishable package exactly like the release does
  * (`bun pm pack`, which rewrites `workspace:` / `catalog:` ranges) and checks
  * the tarball:
  *
- * - every non-private `packages/*` package is covered
+ * - `@k-otp/sdk` is the only publishable `packages/*` package
  * - only `dist/`, README.md, CHANGELOG.md, LICENSE and package.json are
  *   published
- * - every `exports`/`main`/`module`/`types`/`unpkg`/`jsdelivr` target exists
- *   in the tarball
+ * - the `exports` map has exactly the public subpaths below, and every
+ *   `exports`/`main`/`module`/`types`/`unpkg`/`jsdelivr` target exists in the
+ *   tarball
  * - dependencies are an explicit allowlist (no private/internal packages,
- *   no `workspace:`/`catalog:` leftovers, lockstep versions between SDKs)
- * - every bare import in the built JS is a declared dependency
+ *   no `workspace:`/`catalog:` leftovers); React, Vue and Svelte are
+ *   optional peer dependencies
+ * - every bare import in the built JS is a declared dependency, and a
+ *   framework is only imported by its own subpath (`react` only from
+ *   `dist/react.*`, never from a shared chunk)
  *
  * Run `bun run build` first.
  */
@@ -32,35 +36,52 @@ type Manifest = {
   unpkg?: string;
   jsdelivr?: string;
   exports?: unknown;
+  sideEffects?: unknown;
   dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
+  peerDependenciesMeta?: Record<string, { optional?: boolean }>;
   optionalDependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
 };
 
-/** Allowed runtime dependencies per package. */
-const ALLOWED_DEPENDENCIES: Record<string, readonly string[]> = {
-  "@k-otp/sdk-core": ["@orpc/client", "@orpc/contract", "@orpc/openapi-client"],
-  "@k-otp/sdk-server": ["@k-otp/sdk-core"],
-  "@k-otp/sdk-react": ["@k-otp/sdk-core", "react"],
-  "@k-otp/sdk-vue": ["@k-otp/sdk-core", "vue"],
-  "@k-otp/sdk-svelte": ["@k-otp/sdk-core", "svelte"],
-};
+const PACKAGE_DIR = "packages/sdk";
+const PACKAGE_NAME = "@k-otp/sdk";
 
-/** Frameworks must be peer dependencies (never bundled or installed twice). */
-const REQUIRED_PEERS: Record<string, readonly string[]> = {
-  "@k-otp/sdk-react": ["react"],
-  "@k-otp/sdk-vue": ["vue"],
-  "@k-otp/sdk-svelte": ["svelte"],
-};
-
-const PACKAGES = [
-  "packages/sdk-core",
-  "packages/sdk-server",
-  "packages/sdk-react",
-  "packages/sdk-vue",
-  "packages/sdk-svelte",
+/** The public subpaths, in order. Anything else (e.g. `./internal`) fails. */
+const EXPECTED_EXPORTS = [
+  ".",
+  "./core",
+  "./headless",
+  "./contract",
+  "./server",
+  "./react",
+  "./vue",
+  "./svelte",
+  "./k-otp.iife.js",
+  "./k-otp.iife.min.js",
+  "./package.json",
 ];
+
+/** Allowed runtime dependencies (regular and peer). */
+const ALLOWED_DEPENDENCIES = [
+  "@orpc/client",
+  "@orpc/contract",
+  "@orpc/openapi-client",
+  "react",
+  "vue",
+  "svelte",
+];
+
+/**
+ * Frameworks are optional peer dependencies (never bundled, never installed
+ * for apps that do not use them), each imported only by its own subpath.
+ */
+const FRAMEWORKS: Record<string, string> = {
+  react: "react",
+  vue: "vue",
+  svelte: "svelte",
+};
+
 const ALLOWED_TOP_LEVEL = new Set([
   "dist",
   "package.json",
@@ -134,9 +155,7 @@ const readManifest = async (dir: string): Promise<Manifest> =>
 
 const rootLicense = await readFile(path.join(root, "LICENSE"), "utf8");
 
-// Every publishable package must be listed, and the lockstep versions are
-// known before any package is checked (independent of PACKAGES order).
-const versions = new Map<string, string>();
+// `@k-otp/sdk` must be the only publishable package.
 for (const entry of await readdir(path.join(root, "packages"), {
   withFileTypes: true,
 })) {
@@ -156,10 +175,9 @@ for (const entry of await readdir(path.join(root, "packages"), {
     continue;
   }
   if (manifest.private) continue;
-  if (!PACKAGES.includes(dir)) {
-    fail(manifest.name, `${dir} is publishable but missing from PACKAGES`);
+  if (dir !== PACKAGE_DIR) {
+    fail(manifest.name, `${dir} is publishable; only ${PACKAGE_DIR} may be`);
   }
-  versions.set(manifest.name, manifest.version);
 }
 
 const work = await mkdtemp(path.join(tmpdir(), "k-otp-pack-"));
@@ -189,7 +207,22 @@ const checkPackage = async (dir: string): Promise<void> => {
   const name = manifest.name;
 
   if (manifest.private) fail(name, "package is private");
-  if (!name.startsWith("@k-otp/sdk-")) fail(name, "unexpected package name");
+  if (name !== PACKAGE_NAME) fail(name, `expected ${PACKAGE_NAME}`);
+  if (manifest.sideEffects !== false) {
+    fail(name, "sideEffects must be false (tree-shaking of unused subpaths)");
+  }
+
+  // The public subpaths, exactly.
+  const exportKeys =
+    manifest.exports && typeof manifest.exports === "object"
+      ? Object.keys(manifest.exports)
+      : [];
+  if (JSON.stringify(exportKeys) !== JSON.stringify(EXPECTED_EXPORTS)) {
+    fail(
+      name,
+      `exports subpaths ${JSON.stringify(exportKeys)} != ${JSON.stringify(EXPECTED_EXPORTS)}`,
+    );
+  }
 
   // Published files.
   for (const file of files) {
@@ -221,7 +254,7 @@ const checkPackage = async (dir: string): Promise<void> => {
   }
 
   // Dependencies.
-  const allowed = new Set(ALLOWED_DEPENDENCIES[name] ?? []);
+  const allowed = new Set(ALLOWED_DEPENDENCIES);
   const runtimeDeps: Record<string, string> = {
     ...manifest.dependencies,
     ...manifest.peerDependencies,
@@ -240,22 +273,15 @@ const checkPackage = async (dir: string): Promise<void> => {
     // Harmless for consumers, but keep published manifests minimal.
     fail(name, "devDependencies should not be published");
   }
-  for (const peer of REQUIRED_PEERS[name] ?? []) {
-    if (!manifest.peerDependencies?.[peer]) {
-      fail(name, `${peer} must be a peer dependency`);
+  for (const framework of Object.keys(FRAMEWORKS)) {
+    if (!manifest.peerDependencies?.[framework]) {
+      fail(name, `${framework} must be a peer dependency`);
     }
-    if (manifest.dependencies?.[peer]) {
-      fail(name, `${peer} must not be a regular dependency`);
+    if (manifest.peerDependenciesMeta?.[framework]?.optional !== true) {
+      fail(name, `${framework} must be an optional peer dependency`);
     }
-  }
-  const coreRange = manifest.dependencies?.["@k-otp/sdk-core"];
-  if (coreRange !== undefined) {
-    const coreVersion = versions.get("@k-otp/sdk-core");
-    if (coreRange !== coreVersion) {
-      fail(
-        name,
-        `@k-otp/sdk-core must be pinned to ${coreVersion} (got ${coreRange})`,
-      );
+    if (manifest.dependencies?.[framework]) {
+      fail(name, `${framework} must not be a regular dependency`);
     }
   }
 
@@ -264,33 +290,30 @@ const checkPackage = async (dir: string): Promise<void> => {
     if (file.includes(".iife.")) continue; // self-contained CDN bundle
     const code = await readFile(path.join(unpacked, file), "utf8");
     for (const specifier of bareImports(code)) {
-      if (!Object.hasOwn(runtimeDeps, packageName(specifier))) {
+      const dep = packageName(specifier);
+      if (!Object.hasOwn(runtimeDeps, dep)) {
         fail(name, `${file} imports undeclared package "${specifier}"`);
+      }
+      // dist/react.js may import react; a shared chunk or dist/vue.js may not.
+      const subpath = FRAMEWORKS[dep];
+      if (subpath && path.basename(file).split(".")[0] !== subpath) {
+        fail(name, `${file} imports "${specifier}" outside ./${subpath}`);
       }
     }
   }
 
   const packed = await Bun.file(tarball).arrayBuffer();
   console.log(
-    `${name}@${manifest.version}: ${files.length} files, ${(packed.byteLength / 1024).toFixed(1)} kB packed`,
+    `${name}@${manifest.version}: ${path.basename(tarball)}, ${files.length} files, ${(packed.byteLength / 1024).toFixed(1)} kB packed`,
   );
+  console.log(`  exports: ${exportKeys.join(" ")}`);
 };
 
 try {
-  for (const dir of PACKAGES) {
-    try {
-      await checkPackage(dir);
-    } catch (error) {
-      // Keep checking the other packages; report everything at the end.
-      fail(dir, error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  const unique = new Set(versions.values());
-  if (unique.size > 1) {
-    errors.push(
-      `lockstep versions differ: ${[...versions].map(([n, v]) => `${n}@${v}`).join(", ")}`,
-    );
+  try {
+    await checkPackage(PACKAGE_DIR);
+  } catch (error) {
+    fail(PACKAGE_DIR, error instanceof Error ? error.message : String(error));
   }
 } finally {
   await rm(work, { recursive: true, force: true });

@@ -7,8 +7,14 @@
  *
  * Examples run one after another on purpose: each step's output stays in
  * one readable block, and vite/tsc already use every core.
+ *
+ * Bundle check: the framework examples are built once more with source maps,
+ * and the modules that ended up in the browser bundle must come from their
+ * own `@k-otp/sdk/<framework>` subpath only: e.g. the React app must not
+ * contain Vue, Svelte, `dist/vue.js` or the server client.
  */
-import { readdir } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dir, "..");
@@ -18,6 +24,120 @@ const STEPS = ["typecheck", "build", "smoke"] as const;
 const STEP_TIMEOUT_MS = 5 * 60_000;
 /** After the step exits, leftover grandchildren may keep the pipes open. */
 const PIPE_DRAIN_MS = 5_000;
+
+/** Framework examples and the subpath each one must be built from. */
+const BUNDLE_CHECKS: Record<string, "react" | "vue" | "svelte"> = {
+  "react-vite": "react",
+  "vue-vite": "vue",
+  "svelte-vite": "svelte",
+};
+/** npm packages that belong to each framework. */
+const FRAMEWORK_PACKAGES: Record<string, RegExp> = {
+  react: /(^|\/)node_modules\/(react|react-dom|scheduler)\//,
+  vue: /(^|\/)node_modules\/(vue|@vue\/[^/]+)\//,
+  svelte: /(^|\/)node_modules\/svelte\//,
+};
+const SDK_DIST = path.join(root, "packages/sdk/dist");
+const SDK_ENTRIES = [
+  "core",
+  "headless",
+  "contract",
+  "server",
+  "react",
+  "vue",
+  "svelte",
+];
+
+/**
+ * Builds `dir` with source maps into a temp dir and returns every source
+ * module (absolute paths) that contributed code to the bundle.
+ */
+const bundledSources = async (dir: string): Promise<string[]> => {
+  // Real path: source map paths are relative to it (macOS /var -> /private/var).
+  const out = await realpath(
+    await mkdtemp(path.join(tmpdir(), "k-otp-bundle-")),
+  );
+  try {
+    const vite = path.join(dir, "node_modules", ".bin", "vite");
+    const child = Bun.spawn(
+      [
+        vite,
+        "build",
+        "--sourcemap",
+        "--outDir",
+        out,
+        "--emptyOutDir",
+        "--logLevel",
+        "error",
+      ],
+      { cwd: dir, stdout: "pipe", stderr: "pipe" },
+    );
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]);
+    if (code !== 0) throw new Error(`vite build failed:\n${stdout}${stderr}`);
+    const sources: string[] = [];
+    const walk = async (current: string): Promise<void> => {
+      for (const entry of await readdir(current, { withFileTypes: true })) {
+        const full = path.join(current, entry.name);
+        if (entry.isDirectory()) await walk(full);
+        else if (entry.name.endsWith(".js.map")) {
+          const map = JSON.parse(await readFile(full, "utf8")) as {
+            sources?: string[];
+            sourceRoot?: string;
+          };
+          for (const source of map.sources ?? []) {
+            sources.push(
+              path.resolve(path.dirname(full), map.sourceRoot ?? "", source),
+            );
+          }
+        }
+      }
+    };
+    await walk(out);
+    return sources;
+  } finally {
+    await rm(out, { recursive: true, force: true });
+  }
+};
+
+/** Problems with what the framework example's bundle contains. */
+const bundleProblems = async (
+  dir: string,
+  framework: "react" | "vue" | "svelte",
+): Promise<string[]> => {
+  const sources = await bundledSources(dir);
+  const problems: string[] = [];
+  const sdkFiles = new Set(
+    sources
+      .filter((source) => path.dirname(source) === SDK_DIST)
+      .map((source) => path.basename(source).replace(/\.js$/, "")),
+  );
+  if (!sdkFiles.has(framework)) {
+    problems.push(
+      `bundle does not contain @k-otp/sdk/${framework} (dist/${framework}.js)`,
+    );
+  }
+  for (const file of sdkFiles) {
+    if (
+      SDK_ENTRIES.includes(file) &&
+      !["core", "headless", framework].includes(file)
+    ) {
+      problems.push(`bundle contains dist/${file}.js`);
+    }
+    if (file.startsWith("server"))
+      problems.push(`bundle contains dist/${file}.js`);
+  }
+  for (const [other, pattern] of Object.entries(FRAMEWORK_PACKAGES)) {
+    if (other === framework) continue;
+    const leaked = sources.find((source) => pattern.test(source));
+    if (leaked)
+      problems.push(`bundle contains ${other}: ${path.relative(root, leaked)}`);
+  }
+  return problems;
+};
 
 /**
  * A line reporting a warning ("warn", "warning", "3 warnings"), ignoring the
@@ -113,6 +233,23 @@ for (const entry of await readdir(examplesDir, { withFileTypes: true })) {
       break;
     }
     if (output.split("\n").some(isWarningLine)) console.log(output);
+    const framework = BUNDLE_CHECKS[entry.name];
+    if (step === "build" && framework) {
+      let problems: string[];
+      try {
+        problems = await bundleProblems(dir, framework);
+      } catch (error) {
+        problems = [error instanceof Error ? error.message : String(error)];
+      }
+      console.log(
+        `[examples] ${entry.name} bundle (only @k-otp/sdk/${framework}): ${problems.length ? "FAILED" : "ok"}`,
+      );
+      if (problems.length) {
+        failed = true;
+        console.log(problems.map((problem) => `  - ${problem}`).join("\n"));
+        break;
+      }
+    }
   }
 }
 process.exitCode = failed ? 1 : 0;

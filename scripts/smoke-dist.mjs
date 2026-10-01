@@ -1,19 +1,22 @@
 #!/usr/bin/env node
-// Loads the BUILT packages with plain Node.js (ESM import, CJS require, and the
-// IIFE bundle in a vm context) and performs one mocked call through each. The
-// adapters are exercised the way SSR frameworks load them: React through
-// react-dom/server, Vue through vue/server-renderer, Svelte stores directly.
+// Loads the BUILT `@k-otp/sdk` with plain Node.js through its `exports` map
+// (ESM import and CJS require of every subpath, the IIFE bundle in a vm
+// context) and performs one mocked call through each. The adapters are
+// exercised the way SSR frameworks load them: React through react-dom/server,
+// Vue through vue/server-renderer, Svelte stores directly.
 // Run after `bun run build`: `node scripts/smoke-dist.mjs`.
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// The root workspace depends on `@k-otp/sdk` (workspace:*), so the package
+// resolves from here like it would from an app's node_modules.
 const require = createRequire(import.meta.url);
-const dist = (pkg, file) => path.join(root, "packages", pkg, "dist", file);
 
 const issueOutput = {
   issueId: "i_1",
@@ -39,12 +42,27 @@ const input = {
   idempotencyKey: "smoke-1",
 };
 
-const esmCore = await import(pathToFileURL(dist("sdk-core", "index.js")).href);
-const cjsCore = require(dist("sdk-core", "index.cjs"));
-const esmServer = await import(
-  pathToFileURL(dist("sdk-server", "index.js")).href
+const esmCore = await import("@k-otp/sdk");
+const cjsCore = require("@k-otp/sdk");
+const esmServer = await import("@k-otp/sdk/server");
+const cjsServer = require("@k-otp/sdk/server");
+
+// `@k-otp/sdk` and `@k-otp/sdk/core` are the same module.
+assert.equal(await import("@k-otp/sdk/core"), esmCore, "core subpath (esm)");
+assert.equal(require("@k-otp/sdk/core"), cjsCore, "core subpath (cjs)");
+// `./internal` is not a public subpath.
+assert.throws(
+  () => require("@k-otp/sdk/internal"),
+  /ERR_PACKAGE_PATH_NOT_EXPORTED|not defined by "exports"/,
 );
-const cjsServer = require(dist("sdk-server", "index.cjs"));
+for (const [label, mod] of [
+  ["contract esm", await import("@k-otp/sdk/contract")],
+  ["contract cjs", require("@k-otp/sdk/contract")],
+]) {
+  assert.equal(typeof mod.otpPublicContract.issue, "object", label);
+  assert.equal(typeof mod.otpServerContract.balance, "object", label);
+  console.log(`ok - ${label}`);
+}
 
 for (const [label, mod] of [
   ["core esm", esmCore],
@@ -101,7 +119,10 @@ const browserGlobals = {
 for (const file of ["k-otp.iife.js", "k-otp.iife.min.js"]) {
   const bundleContext = vm.createContext({ ...browserGlobals });
   bundleContext.window = bundleContext;
-  vm.runInContext(readFileSync(dist("sdk-core", file), "utf8"), bundleContext);
+  vm.runInContext(
+    readFileSync(require.resolve(`@k-otp/sdk/${file}`), "utf8"),
+    bundleContext,
+  );
   const result = await vm.runInContext(
     `KOtp.createOtpClient({ apiKey: "pk_smoke" })
       .issue(${JSON.stringify(input)})
@@ -137,11 +158,8 @@ for (const file of ["k-otp.iife.js", "k-otp.iife.min.js"]) {
 }
 
 for (const [label, mod] of [
-  [
-    "headless esm",
-    await import(pathToFileURL(dist("sdk-core", "headless.js")).href),
-  ],
-  ["headless cjs", require(dist("sdk-core", "headless.cjs"))],
+  ["headless esm", await import("@k-otp/sdk/headless")],
+  ["headless cjs", require("@k-otp/sdk/headless")],
 ]) {
   const flow = mod.createOtpFlow(
     esmCore.createOtpClient({ apiKey: "pk_smoke", fetch }),
@@ -163,11 +181,8 @@ const adapterInput = { ...input };
 const react = await import("react");
 const { renderToString } = await import("react-dom/server");
 for (const [label, mod] of [
-  [
-    "react esm",
-    await import(pathToFileURL(dist("sdk-react", "index.js")).href),
-  ],
-  ["react cjs", require(dist("sdk-react", "index.cjs"))],
+  ["react esm", await import("@k-otp/sdk/react")],
+  ["react cjs", require("@k-otp/sdk/react")],
 ]) {
   let issue;
   const View = () => {
@@ -190,8 +205,8 @@ for (const [label, mod] of [
 const vue = await import("vue");
 const { renderToString: renderVue } = await import("vue/server-renderer");
 for (const [label, mod] of [
-  ["vue esm", await import(pathToFileURL(dist("sdk-vue", "index.js")).href)],
-  ["vue cjs", require(dist("sdk-vue", "index.cjs"))],
+  ["vue esm", await import("@k-otp/sdk/vue")],
+  ["vue cjs", require("@k-otp/sdk/vue")],
 ]) {
   let otp;
   const app = vue.createSSRApp({
@@ -208,7 +223,7 @@ for (const [label, mod] of [
   console.log(`ok - ${label}`);
 }
 
-const svelte = await import(pathToFileURL(dist("sdk-svelte", "index.js")).href);
+const svelte = await import("@k-otp/sdk/svelte");
 const stores = svelte.createOtpStores({ apiKey: "pk_smoke", fetch });
 // Observe the store wiring, not only the promise returned by run().
 const statuses = [];
@@ -220,3 +235,44 @@ unsubscribe();
 assert.deepEqual(svelteResult.data, issueOutput, "svelte esm");
 assert.deepEqual(statuses, ["idle", "loading", "success"], "svelte esm");
 console.log("ok - svelte esm");
+
+// Subpaths share one copy of the core modules per format (no duplicated
+// `OtpApiError` class between `@k-otp/sdk` and an adapter).
+for (const [label, mod] of [
+  ["react", await import("@k-otp/sdk/react")],
+  ["vue", await import("@k-otp/sdk/vue")],
+  ["svelte", svelte],
+]) {
+  assert.equal(mod.OtpApiError, esmCore.OtpApiError, `${label} OtpApiError`);
+  assert.equal(mod.createOtpClient, esmCore.createOtpClient, label);
+}
+assert.equal(require("@k-otp/sdk/react").OtpApiError, cjsCore.OtpApiError);
+console.log("ok - one OtpApiError per format across subpaths");
+
+// `@k-otp/sdk/server` under the "browser" export condition is a stub that
+// throws, unless a server runtime condition (workerd, edge-light, ...) wins.
+const importServer = (...conditions) =>
+  spawnSync(
+    process.execPath,
+    [
+      ...conditions.map((c) => `--conditions=${c}`),
+      "--input-type=module",
+      "-e",
+      'const m = await import("@k-otp/sdk/server"); console.log(typeof m.createOtpServerClient);',
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
+const browserServer = importServer("browser");
+assert.notEqual(browserServer.status, 0, "server under browser condition");
+assert.match(
+  browserServer.stderr,
+  /resolved with the "browser" export condition/,
+);
+for (const runtime of ["workerd", "worker", "edge-light", "deno"]) {
+  const result = importServer(runtime, "browser");
+  assert.equal(result.status, 0, `${runtime}: ${result.stderr}`);
+  assert.equal(result.stdout.trim(), "function", runtime);
+}
+console.log(
+  "ok - server: browser stub, real client for workerd/worker/edge-light/deno",
+);
