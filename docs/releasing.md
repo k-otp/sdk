@@ -1,43 +1,90 @@
 # Releasing
 
-All `@k-otp/sdk-*` packages are versioned in lockstep with
-[Sampo](https://github.com/bruits/sampo) (`.sampo/config.toml`, `fixed` group)
-and published to npm with
-[Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (GitHub OIDC,
-no npm token in the repository).
+The repository publishes one npm package, **`@k-otp/sdk`** (`packages/sdk`).
+Its subpaths (`/core`, `/headless`, `/contract`, `/server`, `/react`, `/vue`,
+`/svelte`, the IIFE bundle) are not separate packages and share its version.
+[Sampo](https://github.com/bruits/sampo) is the single source of version
+management (changesets -> version bump -> `CHANGELOG.md`), and the package is
+published to npm with [Trusted Publishing](https://docs.npmjs.com/trusted-publishers)
+(GitHub OIDC, no npm token in the repository).
+
+## Adding a changeset
+
+Every PR that changes what `@k-otp/sdk` users get (anything under
+`packages/sdk/src`, its `package.json`, or the vendored spec when it changes
+the generated types) adds a changeset. CI warns when one is missing.
+
+```bash
+sampo add                                              # interactive
+sampo add -p npm/@k-otp/sdk -b patch -m "Fix ..."      # non-interactive
+```
+
+This writes a Markdown file under `.sampo/changesets/`; commit it with the
+change. By hand, the same file looks like:
+
+```md
+---
+npm/@k-otp/sdk: minor
+---
+
+Add `foo` to `@k-otp/sdk/react` ...
+```
+
+- The package id is always `npm/@k-otp/sdk`, whichever subpath changed;
+  name the subpath in the text.
+- Bump: `patch` for fixes, `minor` for backwards-compatible features, `major`
+  for breaking changes to any public subpath (SemVer applies from 1.0.0).
+- Write the text for users: it becomes the changelog entry.
+
+Preview the next release locally (Sampo only releases from `main`; set
+`SAMPO_RELEASE_BRANCH=main` to preview from a feature branch):
+
+```bash
+SAMPO_RELEASE_BRANCH=main sampo release --dry-run   # e.g. "@k-otp/sdk: 1.0.0 -> 1.1.0"
+```
 
 ## Day-to-day flow
 
-1. Every PR that changes a published package adds a changeset:
-   `sampo add` (CI warns when one is missing).
-2. After merge to `main`, the **Release** workflow updates a single
-   `sampo/release` PR with version bumps and changelogs.
-3. Merging the release PR pushes new versions to `main`; the workflow sees
-   unpublished versions and runs `scripts/publish-oidc.sh`, which builds,
-   runs `check:pack`, publishes each package with `npm publish <tarball>`,
-   tags `vX.Y.Z` plus per-package tags, and creates a GitHub Release.
+1. PRs add changesets (above).
+2. After merge to `main`, the **Release** workflow
+   (`.github/workflows/release.yml`) runs Sampo, which keeps a single
+   `sampo/release` PR up to date: it consumes the pending changesets, bumps
+   `packages/sdk/package.json` and writes `packages/sdk/CHANGELOG.md`.
+3. Merging the release PR pushes the new version to `main`; the workflow sees
+   an unpublished version and runs `scripts/publish-oidc.sh`, which builds,
+   runs `check:pack` and `smoke:dist`, publishes the `bun pm pack` tarball
+   with `npm publish <tarball>`, tags `vX.Y.Z` plus `@k-otp/sdk-vX.Y.Z`, and
+   creates a GitHub Release.
 
-Version `0.0.0` is the "never released" placeholder and is never published.
+## The first release: 1.0.0
+
+`packages/sdk/package.json` keeps `"version": "0.0.0"`, the "never released"
+placeholder that `publish-oidc.sh` never publishes. The pending changeset
+`.sampo/changesets/initial-release.md` is a `major` bump for
+`npm/@k-otp/sdk`, which Sampo turns into **1.0.0** (`0.0.0 -> 1.0.0`). It
+replaces the earlier per-package changesets of the former `@k-otp/sdk-*`
+packages, which were never published. Do not edit the `version` field by
+hand; let the release PR set it.
 
 ## Recovering a half-finished release
 
 `publish-oidc.sh --check` reports two separate outputs:
 
-- `should_publish=true`: a package version is not on npm yet. The workflow
+- `should_publish=true`: the package version is not on npm yet. The workflow
   publishes, and skips the Sampo step in that run (the release PR is updated
   again on the next push).
-- `needs_finalize=true`: every package is on npm, but one of the release tags
-  (`vX.Y.Z` or a per-package `@k-otp/sdk-*-vX.Y.Z`) or the GitHub Release is
-  missing (an earlier run failed after `npm publish`). The workflow re-runs
-  the publish step, which skips the published packages and only creates what
-  is missing. This output does not gate the Sampo step, so a stuck recovery
-  can never stop the release PR from being updated. Tag and Release lookups
-  are retried; if they keep failing, `--check` warns and reports
+- `needs_finalize=true`: the version is on npm, but one of the release tags
+  (`vX.Y.Z` or `@k-otp/sdk-vX.Y.Z`) or the GitHub Release is missing (an
+  earlier run failed after `npm publish`). The workflow re-runs the publish
+  step, which skips the published package and only creates what is missing.
+  This output does not gate the Sampo step, so a stuck recovery can never
+  stop the release PR from being updated. Tag and Release lookups are
+  retried; if they keep failing, `--check` warns and reports
   `needs_finalize=false` for that run instead of failing the job.
 
 When tags must be created, recovery tags the commit that shipped the version,
 not the current `HEAD`: npm's recorded `gitHead` when present, otherwise the
-last commit that set `"version": "X.Y.Z"` in a `packages/*/package.json`. If
+last commit that set `"version": "X.Y.Z"` in `packages/sdk/package.json`. If
 neither is found the script fails and asks you to tag manually. When every
 tag exists and only the GitHub Release is missing, no commit is resolved.
 
@@ -52,34 +99,29 @@ PR up to date and logs a warning instead of publishing.
 1. **GitHub repository** `k-otp/sdk` (public). In *Settings -> Actions ->
    General*, allow GitHub Actions to create and approve pull requests (needed
    for the release PR).
-2. **npm scope.** Make sure the `@k-otp` npm organization exists and you are an
-   owner.
-3. **Create the packages on npm.** Trusted Publishing is configured per
+2. **npm organization.** Create the `k-otp` npm organization (scope
+   `@k-otp`) and make sure you are an owner.
+3. **Create the package on npm.** Trusted Publishing is configured per
    package. If npm does not let you configure it for a package that has never
-   been published, bootstrap once from a trusted machine:
+   been published, bootstrap once from a trusted machine after merging the
+   first release PR (version 1.0.0):
    ```bash
    bun install && bun run check
-   # after merging the first release PR (versions are 0.1.0):
-   cd packages/sdk-core && bun pm pack && npm publish k-otp-sdk-core-0.1.0.tgz --access public
-   cd ../sdk-server && bun pm pack && npm publish k-otp-sdk-server-0.1.0.tgz --access public
-   cd ../sdk-react && bun pm pack && npm publish k-otp-sdk-react-0.1.0.tgz --access public
-   cd ../sdk-vue && bun pm pack && npm publish k-otp-sdk-vue-0.1.0.tgz --access public
-   cd ../sdk-svelte && bun pm pack && npm publish k-otp-sdk-svelte-0.1.0.tgz --access public
+   cd packages/sdk && bun pm pack && npm publish k-otp-sdk-1.0.0.tgz --access public
    ```
-   Always publish the `bun pm pack` tarball (it rewrites `workspace:*` to the
-   exact version), never `npm publish` inside the package directory. Then tag
-   the release commit (`git tag v0.1.0 && git push origin v0.1.0`) and create
-   the GitHub Release.
-4. **Configure Trusted Publishing** for each package (`@k-otp/sdk-core`,
-   `@k-otp/sdk-server`, `@k-otp/sdk-react`, `@k-otp/sdk-vue`,
-   `@k-otp/sdk-svelte`) on npmjs.com -> package ->
-   *Settings -> Trusted publishing*:
+   Always publish the `bun pm pack` tarball (it rewrites `catalog:` ranges to
+   real versions), never `npm publish` inside the package directory. Then tag
+   the release commit (`git tag v1.0.0 && git tag @k-otp/sdk-v1.0.0 && git
+   push origin v1.0.0 @k-otp/sdk-v1.0.0`) and create the GitHub Release, or
+   let the next workflow run finalize it (`needs_finalize`).
+4. **Configure Trusted Publishing** for `@k-otp/sdk` on npmjs.com -> package
+   -> *Settings -> Trusted publishing*:
    - Publisher: GitHub Actions
    - Organization or user: `k-otp`
    - Repository: `sdk` (i.e. `k-otp/sdk`)
    - Workflow filename: `release.yml`
    - Environment: leave empty (or add one and reference it in the workflow)
-5. Optionally, in each package's npm settings, require two-factor
+5. Optionally, in the package's npm settings, require two-factor
    authentication and disallow token publishing.
 6. **Enable publishing:** *Settings -> Secrets and variables -> Actions ->
    Variables* -> add `NPM_TRUSTED_PUBLISHING` = `true`.
@@ -89,29 +131,33 @@ Trusted Publishing needs Node >= 22.14 and npm >= 11.5.1 on the runner (the
 workflow uses Node 24). Packages published this way automatically get npm
 provenance attestations.
 
-## Adding a package to the lockstep group
+## Adding a subpath
 
-1. Add it under `packages/` with `"version"` equal to the current release
-   version (or `0.0.0` before the first release).
-2. Add `npm/<name>` to the `fixed` group in `.sampo/config.toml`.
-3. Add its directory to `PACKAGE_DIRS` in `scripts/publish-oidc.sh` (after its
-   dependencies) and to `PACKAGES` / `ALLOWED_DEPENDENCIES` (and
-   `REQUIRED_PEERS` for framework adapters) in `scripts/check-pack.ts`.
-4. Add its build to the root `build` script, its `tsconfig.json` to
-   `scripts/typecheck.ts`, a source `paths` entry to `tsconfig.base.json`, a
-   size budget to `scripts/size-report.ts` and a smoke check to
-   `scripts/smoke-dist.mjs`.
-5. Framework adapters: depend on `@k-otp/sdk-core` with `workspace:*` (packed
-   as the exact lockstep version), declare the framework as a
-   `peerDependency`, and put framework dev packages in the root
-   `devDependencies` (published manifests must not carry
-   `devDependencies`).
-6. Configure Trusted Publishing for the new npm package (steps 3-4 above).
+New public APIs are subpaths of `@k-otp/sdk`, not new packages (the `ui`,
+`ui/react`, `ui/vue`, `ui/svelte` and `ui/theme.css` subpaths are reserved
+for upcoming UI components):
+
+1. Add the source under `packages/sdk/src/<name>/` and an entry in
+   `packages/sdk/tsdown.config.ts` (both the ESM and, unless ESM-only, the
+   CJS entry list). Import other parts of the SDK relatively, never through
+   `@k-otp/sdk`.
+2. Add the subpath to `exports` in `packages/sdk/package.json`, to
+   `EXPECTED_EXPORTS` in `scripts/check-pack.ts`, and a source `paths` entry
+   to `tsconfig.base.json`. A new framework peer goes to `peerDependencies` +
+   `peerDependenciesMeta` (optional), `ALLOWED_DEPENDENCIES` / `FRAMEWORKS` in
+   `scripts/check-pack.ts`, and the root `devDependencies`.
+3. Add a size budget and tree-shaking check to `scripts/size-report.ts` and a
+   smoke check to `scripts/smoke-dist.mjs`.
+4. Document it in `packages/sdk/README.md` and add a changeset (`minor`).
+
+CSS files would be the first files with side effects: list them in
+`sideEffects` (for example `"sideEffects": ["**/*.css"]`) and update the
+`sideEffects` check in `scripts/check-pack.ts`.
 
 ## Manual checks
 
 ```bash
-./scripts/publish-oidc.sh --check   # should_publish / needs_finalize
-sampo release --dry-run             # planned version bumps
-bun run check                       # full local gate
+./scripts/publish-oidc.sh --check                  # should_publish / needs_finalize
+SAMPO_RELEASE_BRANCH=main sampo release --dry-run  # planned version bump
+bun run check                                      # full local gate
 ```
