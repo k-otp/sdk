@@ -2,7 +2,8 @@
 
 The repository publishes one npm package, **`@k-otp/sdk`** (`packages/sdk`).
 Its subpaths (`/core`, `/headless`, `/contract`, `/server`, `/react`, `/vue`,
-`/svelte`, the IIFE bundle) are not separate packages and share its version.
+`/svelte`, `/ui`, `/ui/react`, `/ui/vue`, `/ui/svelte`, `/ui/theme.css`, the
+IIFE bundle) are not separate packages and share its version.
 [Sampo](https://github.com/bruits/sampo) is the single source of version
 management (changesets -> version bump -> `CHANGELOG.md`), and the package is
 published to npm with [Trusted Publishing](https://docs.npmjs.com/trusted-publishers)
@@ -133,9 +134,7 @@ provenance attestations.
 
 ## Adding a subpath
 
-New public APIs are subpaths of `@k-otp/sdk`, not new packages (the `ui`,
-`ui/react`, `ui/vue`, `ui/svelte` and `ui/theme.css` subpaths are reserved
-for upcoming UI components):
+New public APIs are subpaths of `@k-otp/sdk`, not new packages:
 
 1. Add the source under `packages/sdk/src/<name>/` and an entry in
    `packages/sdk/tsdown.config.ts` (both the ESM and, unless ESM-only, the
@@ -150,9 +149,12 @@ for upcoming UI components):
    smoke check to `scripts/smoke-dist.mjs`.
 4. Document it in `packages/sdk/README.md` and add a changeset (`minor`).
 
-CSS files would be the first files with side effects: list them in
-`sideEffects` (for example `"sideEffects": ["**/*.css"]`) and update the
-`sideEffects` check in `scripts/check-pack.ts`.
+CSS files are the only files with side effects (`"sideEffects":
+["**/*.css"]`, checked by `scripts/check-pack.ts`). Use the `**/` form: a
+bare `*.css` only matches the package root in Rolldown-based Vite, which then
+drops `dist/ui/theme.css` from app builds. Files that tsdown does not build
+(the `.svelte` sources of `ui/svelte`, the theme) are copied by the `copy`
+option in `packages/sdk/tsdown.config.ts`.
 
 ## Manual checks
 

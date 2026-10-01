@@ -29,10 +29,23 @@ Public, MIT-licensed SDK for the K-OTP Korean OTP API (`https://api.k-otp.dev/v1
   - `src/react|vue|svelte` -> `@k-otp/sdk/react|vue|svelte`: thin adapters.
     The framework is an optional `peerDependency` (framework dev packages
     live in the root `devDependencies`); svelte is ESM-only.
+  - `src/ui` -> `@k-otp/sdk/ui`: the framework-agnostic UI model (phone
+    canonicalization, code input model, `createOtpForm` state machine over
+    the headless flow, KO/EN messages, WebOTP, part attributes). Put shared
+    UI behavior there, never in one framework's components.
+  - `src/ui/react|vue` -> `@k-otp/sdk/ui/react|vue`: headless components
+    (`createElement` / `h` render functions, no JSX/SFC build).
+    `src/ui/svelte` -> `@k-otp/sdk/ui/svelte`: `.svelte` sources in Svelte 4
+    syntax (no runes, plain JS, compiled by the app's Svelte 4 or 5 through
+    the `svelte` export condition; hand-written `.svelte.d.ts`) over the
+    compiled `runtime.ts`. `src/ui/theme.css` -> `@k-otp/sdk/ui/theme.css`
+    (only `[data-k-otp]`, `:where()` selectors).
   - `src/iife.ts` -> `dist/k-otp.iife(.min).js` exposing `window.KOtp`.
-- `tests/`: private workspace running under happy-dom: adapter tests and the
-  cross-adapter parity suite (`tests/parity`), which must pass for every
-  behavior change.
+- `tests/`: private workspace running under happy-dom: adapter tests, the
+  cross-adapter parity suite (`tests/parity`) and the UI component tests
+  (`tests/ui`, including the cross-framework UI parity suite; the
+  `*.browser.test.*` files run with `--conditions=browser` for the Svelte
+  client runtime), which must pass for every behavior change.
 - `examples/*`: private, runnable apps (`workspace:*`, mock API without
   keys), checked by `bun run check:examples` against the built package
   (including a bundle check that each framework app only contains its own
@@ -64,8 +77,13 @@ Public, MIT-licensed SDK for the K-OTP Korean OTP API (`https://api.k-otp.dev/v1
   request and send it as header + body.
 - Adapters: no top-level `window` access, no module-level state, no mutation
   of protocol semantics. `run`/flow actions resolve `{ data } | { error }`
-  (never reject for API errors). Keep `"use client"` on the react entry
-  only (`banner` in `packages/sdk/tsdown.config.ts`).
+  (never reject for API errors). Keep `"use client"` on the react and
+  ui-react entries only (`banner` in `packages/sdk/tsdown.config.ts`).
+- UI: the three frameworks must render the same `data-*`/ARIA state
+  (`tests/ui/parity.browser.test.tsx`). The hooks subpaths, core, headless
+  and server must never load `src/ui` (`bun run size` checks it). The
+  `.svelte` sources must compile with Svelte 4 and 5 (the compat matrix runs
+  the tests on both).
 
 ## Toolchain
 
@@ -89,6 +107,7 @@ bun run check:pack
 bun run smoke:dist
 bun run size
 bun run check:examples # typecheck/build/smoke examples (after build)
+bun run e2e:examples   # UI flows of the framework examples in Chromium
 bun run check          # all of the above
 bun run gen:types      # after changing spec/openapi.json
 bun run sync:openapi --from <local API checkout>   # refresh the spec
@@ -104,6 +123,4 @@ client methods -> `check:openapi` -> update READMEs and `docs/` -> changeset.
 
 New APIs are subpaths of `@k-otp/sdk`, never new packages. Follow "Adding a
 subpath" in `docs/releasing.md` (tsdown entry, `exports`, `check-pack.ts`
-`EXPECTED_EXPORTS`, tsconfig `paths`, size budget, smoke check). `ui`,
-`ui/react`, `ui/vue`, `ui/svelte` and `ui/theme.css` are reserved for the
-upcoming UI components.
+`EXPECTED_EXPORTS`, tsconfig `paths`, size budget, smoke check).
