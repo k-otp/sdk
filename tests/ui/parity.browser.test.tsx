@@ -92,7 +92,10 @@ const snapshot = () =>
     },
   );
 
-type Step = (api: MockApi) => Promise<void> | void;
+type Step = ((api: MockApi) => Promise<void> | void) & {
+  /** Runs outside act(): React 18 defers renders inside it. */
+  outsideAct?: boolean;
+};
 
 const typePhone =
   (value: string): Step =>
@@ -122,9 +125,8 @@ const paste =
  * a fixed time: the wait starts when the mocked 429 lands, which a loaded
  * runner can delay.
  */
-const waitUntilIdle =
-  (part: string): Step =>
-  async () => {
+const waitUntilIdle = (part: string): Step => {
+  const step: Step = async () => {
     const deadline = Date.now() + 10_000;
     while (
       document
@@ -132,9 +134,15 @@ const waitUntilIdle =
         ?.getAttribute("data-state") === "cooldown"
     ) {
       if (Date.now() > deadline) throw new Error(`${part} stayed in cooldown`);
-      await new Promise((resolve) => setTimeout(resolve, 25));
+      // Lets React render the cooldown ticks (outside act()).
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      });
     }
   };
+  step.outsideAct = true;
+  return step;
+};
 
 const typeCode =
   (code: string): Step =>
@@ -162,10 +170,14 @@ const run = async (
   await settle();
   const snapshots = [snapshot()];
   for (const step of steps) {
-    // act() also covers the cooldown ticks of the React form while waiting.
-    await act(async () => {
+    if (step.outsideAct) {
       await step(api);
-    });
+    } else {
+      // act() also covers the cooldown ticks of the React form.
+      await act(async () => {
+        await step(api);
+      });
+    }
     await settle();
     snapshots.push(snapshot());
   }
