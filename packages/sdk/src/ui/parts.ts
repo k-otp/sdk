@@ -93,9 +93,22 @@ export type OtpCodeInputPartsOptions = {
   /** `data-state` of the group (the form phase, or `filled`/`empty`). */
   state?: string | undefined;
   labelledBy?: string | undefined;
+  /**
+   * Accessible name of the group when it has no `labelledBy` (defaults to
+   * the `code.label` message).
+   */
+  label?: string | undefined;
   describedBy?: string | undefined;
   t: OtpTranslator;
 };
+
+/**
+ * The segment that is in the tab order (roving tabindex): the first empty
+ * one, or the last when the code is complete. The group is a single tab stop;
+ * arrow keys move between segments.
+ */
+export const otpCodeTabIndex = (value: string, length: number): number =>
+  otpCodeFocusIndex(value, length, length);
 
 /** Attributes of a segmented code input: the group and each segment. */
 export const getOtpCodeInputParts = (
@@ -104,6 +117,7 @@ export const getOtpCodeInputParts = (
   const { id, value, length, t } = options;
   const segments = otpCodeSegments(value, length);
   const complete = segments.every(Boolean);
+  const tabbable = otpCodeTabIndex(value, length);
   return {
     group: {
       "data-k-otp": "code-input",
@@ -113,7 +127,13 @@ export const getOtpCodeInputParts = (
       id,
       role: "group",
       "aria-labelledby": options.labelledBy,
+      "aria-label": options.labelledBy
+        ? undefined
+        : (options.label ?? t("code.label")),
+      // Described once, on the group (not again on a segment).
       "aria-describedby": options.describedBy,
+      // Codes are digits read left to right, whatever the page direction.
+      dir: "ltr",
     },
     segments: segments.map((digit, index) => ({
       "data-k-otp": "code-segment",
@@ -131,9 +151,9 @@ export const getOtpCodeInputParts = (
       autocapitalize: "off",
       spellcheck: "false",
       readonly: options.readOnly === true,
+      tabindex: index === tabbable ? 0 : -1,
       "aria-label": t("code.segment", { index: index + 1, length }),
       "aria-invalid": options.invalid ? "true" : undefined,
-      "aria-describedby": index === 0 ? options.describedBy : undefined,
     })),
   };
 };
@@ -177,7 +197,11 @@ export type OtpFormParts = {
 
 const sendLabelKey = (state: OtpFormState) => {
   if (state.phase === "sending") return "send.sending" as const;
-  if (state.resendIn > 0) return "send.resendIn" as const;
+  if (state.resendIn > 0) {
+    // Before any code reached this number (e.g. after "change number"),
+    // "resend" would be wrong.
+    return state.issued ? ("send.resendIn" as const) : ("send.sendIn" as const);
+  }
   if (state.retryPending) return "send.retry" as const;
   return state.issued ? ("send.resend" as const) : ("send.idle" as const);
 };
@@ -419,9 +443,14 @@ export const focusOtpFormTarget = (
 type InputLike = {
   currentTarget: EventTarget | null;
   target: EventTarget | null;
+  /** `InputEvent.isComposing` (React: `event.nativeEvent.isComposing`). */
+  isComposing?: boolean;
+  nativeEvent?: object;
 };
 type KeyLike = {
   key: string;
+  shiftKey?: boolean;
+  isComposing?: boolean;
   altKey?: boolean;
   ctrlKey?: boolean;
   metaKey?: boolean;
@@ -441,6 +470,12 @@ export type OtpCodeInputHandlers = {
   paste: (index: number, event: PasteLike) => void;
   /** `focus` event of segment `index` (redirects to the first empty one). */
   focus: (index: number, event: InputLike) => void;
+  /** `compositionstart` event (IME): input is ignored until it ends. */
+  compositionstart: () => void;
+  /** `compositionend` event of segment `index`: applies the composed text. */
+  compositionend: (index: number, event: InputLike) => void;
+  /** `true` while an IME composition is in progress. */
+  isComposing: () => boolean;
 };
 
 export type OtpCodeInputHandlerOptions = {
@@ -469,26 +504,80 @@ const elementOf = (event: InputLike): HTMLInputElement | undefined => {
 export const createOtpCodeInputHandlers = (
   options: OtpCodeInputHandlerOptions,
 ): OtpCodeInputHandlers => {
+  let composing = false;
   const commit = (value: string, focus: number): void => {
     if (value !== options.getValue()) options.onChange(value);
     focusOtpCodeSegment(options.getContainer(), focus);
   };
+  /** The roving tabindex the frameworks render (see `otpCodeTabIndex`). */
+  const restoreTabIndex = (): void => {
+    const segments = segmentsOf(options.getContainer());
+    const tabbable = otpCodeTabIndex(options.getValue(), options.getLength());
+    segments.forEach((segment, i) => {
+      segment.setAttribute("tabindex", i === tabbable ? "0" : "-1");
+    });
+  };
+  /**
+   * Tab / Shift+Tab leave the group from any segment: every segment is taken
+   * out of the tab order until the browser has moved focus.
+   */
+  const leaveGroup = (): void => {
+    const container = options.getContainer();
+    for (const segment of segmentsOf(container)) {
+      segment.setAttribute("tabindex", "-1");
+    }
+    // The browser picks the next element before it fires `focusout`, so the
+    // tabindex can come back right then; the timer covers a Tab that moves
+    // nowhere (e.g. prevented by the app).
+    (container as Element | null | undefined)?.addEventListener?.(
+      "focusout",
+      restoreTabIndex,
+      { once: true },
+    );
+    setTimeout(restoreTabIndex, 0);
+  };
+  const apply = (index: number, element: HTMLInputElement): void => {
+    const value = options.getValue();
+    if (options.isReadOnly()) {
+      element.value = value[index] ?? "";
+      return;
+    }
+    const change = applyOtpCodeInput(
+      value,
+      index,
+      element.value,
+      options.getLength(),
+    );
+    element.value = change.value[index] ?? "";
+    commit(change.value, change.focus);
+  };
   return {
     input: (index, event) => {
-      const element = elementOf(event);
-      if (!element) return;
-      const value = options.getValue();
-      const length = options.getLength();
-      if (options.isReadOnly()) {
-        element.value = value[index] ?? "";
+      // An IME is composing (full-width digits, Android keyboards): wait for
+      // `compositionend`, or the composed text would be applied twice.
+      const native = event.nativeEvent as { isComposing?: boolean } | undefined;
+      if (composing || event.isComposing || native?.isComposing) {
         return;
       }
-      const change = applyOtpCodeInput(value, index, element.value, length);
-      element.value = change.value[index] ?? "";
-      commit(change.value, change.focus);
+      const element = elementOf(event);
+      if (element) apply(index, element);
     },
+    compositionstart: () => {
+      composing = true;
+    },
+    compositionend: (index, event) => {
+      composing = false;
+      const element = elementOf(event);
+      if (element) apply(index, element);
+    },
+    isComposing: () => composing,
     keydown: (index, event) => {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.key === "Tab") {
+        leaveGroup();
+        return;
+      }
+      if (composing || event.isComposing) return;
       const value = options.getValue();
       const change = applyOtpCodeKey(
         value,
@@ -514,6 +603,8 @@ export const createOtpCodeInputHandlers = (
       commit(change.value, change.focus);
     },
     focus: (index, event) => {
+      // Segments after the first empty one are not in the tab order, so this
+      // only redirects a pointer focus (no gaps in the code).
       const target = otpCodeFocusIndex(
         options.getValue(),
         index,

@@ -95,7 +95,10 @@ const slotProps = (context: OtpFormContext): OtpFormSlotProps => ({
   t: context.t.value,
 });
 
-/** Vue 3.5 `useId`, else a per-app sequence (pass `id` for SSR on < 3.5). */
+/**
+ * Vue 3.5 `useId`, else the component instance uid (a process-wide counter:
+ * pass `id` when server-rendering with Vue < 3.5).
+ */
 const useStableId = (prefix: string): string => {
   const useId = (Vue as { useId?: () => string }).useId;
   const generated = useId?.() ?? String(getCurrentInstance()?.uid ?? 0);
@@ -480,6 +483,9 @@ const renderSegments = (
         onKeydown: (event: KeyboardEvent) => handlers.keydown(index, event),
         onPaste: (event: ClipboardEvent) => handlers.paste(index, event),
         onFocus: (event: FocusEvent) => handlers.focus(index, event),
+        onCompositionstart: handlers.compositionstart,
+        onCompositionend: (event: CompositionEvent) =>
+          handlers.compositionend(index, event),
       }),
     ),
     extra ?? null,

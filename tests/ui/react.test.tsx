@@ -10,6 +10,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { StrictMode, useState } from "react";
+import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { part, segment, segments, sentPhone } from "./dom";
 import { createMockApi, flush, MOCK_CODE, rateLimited } from "./mock-api";
@@ -196,7 +197,8 @@ describe("<OtpForm /> preset (React)", () => {
     expect(part("message").textContent).toBe(
       "Too many attempts. Please wait and try again.",
     );
-    expect(part("send-button").textContent).toBe("Resend in 0:05");
+    // No code reached this number yet: "send", not "resend".
+    expect(part("send-button").textContent).toBe("Send code in 0:05");
     expect(part("send-button").getAttribute("data-state")).toBe("cooldown");
   });
 
@@ -218,6 +220,82 @@ describe("<OtpForm /> preset (React)", () => {
       "010-****-5678(으)로 인증번호를 보냈습니다.",
     );
     expect(api.calls).toHaveLength(1);
+  });
+
+  test("the code input is one tab stop and Tab leaves it", async () => {
+    const api = createMockApi();
+    render(<OtpForm client={api.client} purpose="signup" locale="en" />);
+    typePhone("01012345678");
+    await sendCode();
+    const tabindexes = () => segments().map((s) => s.getAttribute("tabindex"));
+    expect(tabindexes()).toEqual(["0", "-1", "-1", "-1", "-1", "-1"]);
+    fireEvent.change(segment(0), { target: { value: "1" } });
+    fireEvent.change(segment(1), { target: { value: "2" } });
+    expect(tabindexes()).toEqual(["-1", "-1", "0", "-1", "-1", "-1"]);
+    // Tab from any segment: all segments leave the tab order until the
+    // browser has moved focus, then the roving tabindex comes back.
+    fireEvent.keyDown(segment(0), { key: "Tab" });
+    expect(tabindexes()).toEqual(["-1", "-1", "-1", "-1", "-1", "-1"]);
+    await settle();
+    expect(tabindexes()).toEqual(["-1", "-1", "0", "-1", "-1", "-1"]);
+  });
+
+  test("IME composition: the composed digit is applied once, on compositionend", async () => {
+    const api = createMockApi();
+    render(
+      <OtpForm
+        client={api.client}
+        purpose="signup"
+        locale="en"
+        autoSubmit={false}
+      />,
+    );
+    typePhone("01012345678");
+    await sendCode();
+    fireEvent.compositionStart(segment(0));
+    fireEvent.input(segment(0), {
+      target: { value: "３" },
+      isComposing: true,
+    });
+    // Nothing applied (and the composition text is left alone).
+    expect(document.activeElement).toBe(segment(0));
+    expect(segment(0).value).toBe("３");
+    fireEvent.compositionEnd(segment(0), { data: "３" });
+    // A browser may still send a trailing input event: it is idempotent.
+    fireEvent.input(segment(0), { target: { value: "3" } });
+    await settle();
+    expect(segments().map((s) => s.value)).toEqual(["3", "", "", "", "", ""]);
+    expect(document.activeElement).toBe(segment(1));
+  });
+
+  test("hydrates server markup (explicit id) without mismatches", async () => {
+    const api = createMockApi();
+    const element = (
+      <OtpForm client={api.client} purpose="signup" id="otp" locale="en" />
+    );
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(element);
+    document.body.append(container);
+    const errors: unknown[] = [];
+    const error = console.error;
+    console.error = (...args: unknown[]) => errors.push(args);
+    try {
+      let root!: ReturnType<typeof hydrateRoot>;
+      await act(async () => {
+        root = hydrateRoot(container, element, {
+          onRecoverableError: (cause) => errors.push(cause),
+        });
+      });
+      expect(errors).toEqual([]);
+      expect(part("phone-input").id).toBe("otp-phone");
+      typePhone("01012345678");
+      await sendCode();
+      expect(part("root").getAttribute("data-state")).toBe("code");
+      act(() => root.unmount());
+    } finally {
+      console.error = error;
+      container.remove();
+    }
   });
 
   test("server rendering: no request, stable markup", () => {

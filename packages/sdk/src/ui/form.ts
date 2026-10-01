@@ -19,6 +19,7 @@ import type {
 } from "../core/types";
 import {
   createOtpFlow,
+  DEFAULT_RESEND_COOLDOWN_MS,
   type OtpFlowController,
   type OtpFlowOptions,
   type OtpFlowResult,
@@ -142,7 +143,11 @@ export type OtpFormState = {
   readonly canSend: boolean;
   /** `verify` would start a request now (complete code, usable issue). */
   readonly canVerify: boolean;
-  /** The send button does nothing now (in flight, cooldown, verified). */
+  /**
+   * The send button does nothing now: a request is in flight, a cooldown
+   * runs, or the code was verified. (A terminal verify outcome keeps it
+   * enabled: sending again starts over.)
+   */
   readonly sendDisabled: boolean;
   /** The verify button does nothing now. */
   readonly verifyDisabled: boolean;
@@ -199,13 +204,27 @@ export type OtpFormController = {
   submit: () => Promise<
     OtpFormActionResult<IssueResult> | OtpFormActionResult<VerifyResult>
   >;
-  /** Back to the phone step (keeps the number, unlocks it). */
+  /**
+   * Back to the phone step (keeps the number, unlocks it). Drops in-flight
+   * requests without callbacks, clears the local resend cooldown and keeps
+   * a server-imposed wait.
+   */
   editPhoneNumber: () => void;
-  /** Clears everything (the cooldowns are kept, like the flow's). */
+  /**
+   * Clears everything. Like "change number", it clears the local resend
+   * cooldown but keeps a server-imposed wait (429/503 `Retry-After`).
+   */
   reset: () => void;
-  /** Aborts in-flight requests and WebOTP (e.g. on unmount). */
+  /**
+   * Aborts in-flight requests and WebOTP (e.g. on unmount). Their outcome
+   * is dropped: no `onError` (`ABORTED`), `onSent` or `onVerified`.
+   */
   abort: () => void;
-  /** Updates callbacks and settings without re-creating the form. */
+  /**
+   * Updates callbacks and settings without re-creating the form. Notifies
+   * subscribers only when `allowInternational` changes (it changes the
+   * phone validation); everything else is read when it is used.
+   */
   configure: (config: Partial<OtpFormConfig>) => void;
   /** The headless flow behind the form. */
   readonly flow: OtpFlowController;
@@ -218,6 +237,12 @@ const TERMINAL_REASONS: ReadonlySet<VerifyReasonCode> = new Set([
   "NOT_FOUND",
   "ALREADY_VERIFIED",
 ]);
+
+const skipped = <T>(reason: OtpFlowSkipReason): OtpFormActionResult<T> => ({
+  data: undefined,
+  error: undefined,
+  skipped: reason,
+});
 
 const invalid = <T>(): OtpFormActionResult<T> => ({
   data: undefined,
@@ -256,7 +281,14 @@ export const createOtpForm = (
   options: OtpFormOptions,
 ): OtpFormController => {
   const now = options.now ?? Date.now;
-  const flow = options.flow ?? createOtpFlow(client, options);
+  // The form keeps the local resend cooldown itself (so "change number" can
+  // clear it); the flow only applies the server's retry hints. A `flow`
+  // passed in keeps its own cooldown.
+  const localCooldownMs = options.flow
+    ? 0
+    : Math.max(0, options.resendCooldownMs ?? DEFAULT_RESEND_COOLDOWN_MS);
+  const flow =
+    options.flow ?? createOtpFlow(client, { ...options, resendCooldownMs: 0 });
   const codeLength =
     Number.isInteger(options.codeLength) && (options.codeLength ?? 0) > 0
       ? (options.codeLength as number)
@@ -268,7 +300,16 @@ export const createOtpForm = (
   let code = "";
   let showPhoneError = false;
   let showCodeError = false;
-  let lastSkip: OtpFlowSkipReason | undefined;
+  let lastSkip:
+    | { reason: OtpFlowSkipReason; operation: OtpFormOperation }
+    | undefined;
+  let localCooldownUntil: number | undefined;
+  /**
+   * Bumped by `abort()`, `reset()` and `editPhoneNumber()`: a response of a
+   * request started before is dropped without callbacks or side effects.
+   */
+  let epoch = 0;
+  let lastFlow: OtpFlowState | undefined;
   let errorOperation: OtpFormOperation | undefined;
   /** Phone of the latest send attempt (the code was sent to it if issued). */
   let attemptPhone: OtpPhoneNumber | undefined;
@@ -287,6 +328,11 @@ export const createOtpForm = (
     parseOtpPhoneNumber(phoneNumber, {
       allowInternational: config.allowInternational === true,
     });
+
+  const localLeft = (): number =>
+    localCooldownUntil === undefined
+      ? 0
+      : Math.max(0, localCooldownUntil - now());
 
   const expiresInSeconds = (f: OtpFlowState): number | undefined =>
     f.issueId === undefined || expiresAt === undefined
@@ -308,8 +354,14 @@ export const createOtpForm = (
     f: OtpFlowState,
     phase: OtpFormPhase,
     expired: boolean,
+    waits: { send: number; verify: number },
   ): OtpFormMessage | undefined => {
-    if (f.error) {
+    // A wait-and-retry error (429, 503 with Retry-After) is shown while the
+    // wait runs, not after it.
+    const waitOver =
+      f.error?.retryAfterMs !== undefined &&
+      waits[errorOperation ?? "send"] === 0;
+    if (f.error && !waitOver) {
       return {
         key: otpErrorMessageKey(f.error, errorOperation),
         params: {},
@@ -326,8 +378,16 @@ export const createOtpForm = (
     if (phase === "failed" && expired) {
       return { key: "reason.EXPIRED", params: {}, tone: "error" };
     }
-    if (lastSkip && lastSkip !== "busy") {
-      return { key: otpSkipMessageKey(lastSkip), params: {}, tone: "info" };
+    if (
+      lastSkip &&
+      lastSkip.reason !== "busy" &&
+      (lastSkip.reason !== "cooldown" || waits[lastSkip.operation] > 0)
+    ) {
+      return {
+        key: otpSkipMessageKey(lastSkip.reason),
+        params: {},
+        tone: "info",
+      };
     }
     switch (phase) {
       case "sending":
@@ -360,7 +420,9 @@ export const createOtpForm = (
     const codeComplete = isOtpCodeComplete(code, codeLength);
     const issued = f.issueId !== undefined;
     const busy = f.isLoading;
-    const resendIn = otpSecondsLeft(f.cooldownRemainingMs);
+    const resendIn = otpSecondsLeft(
+      Math.max(f.cooldownRemainingMs, localLeft()),
+    );
     const retryIn = otpSecondsLeft(f.verifyCooldownRemainingMs);
     const sendDisabled =
       busy || resendIn > 0 || phase === "verified" || !f.canSend;
@@ -397,16 +459,39 @@ export const createOtpForm = (
       errorOperation: f.error ? errorOperation : undefined,
       retryPending: f.idempotencyKey !== undefined,
       isLoading: busy,
-      message: deriveMessage(f, phase, expired),
+      message: deriveMessage(f, phase, expired, {
+        send: resendIn,
+        verify: retryIn,
+      }),
       focus,
       flow: f,
     };
   };
 
+  /** Same flow state, cooldowns compared to the second. */
+  const sameFlow = (a: OtpFlowState, b: OtpFlowState): boolean =>
+    (Object.keys(a) as (keyof OtpFlowState)[]).every((key) =>
+      key === "cooldownRemainingMs" || key === "verifyCooldownRemainingMs"
+        ? otpSecondsLeft(a[key]) === otpSecondsLeft(b[key])
+        : a[key] === b[key],
+    );
+
+  /**
+   * The flow snapshot. An unobserved flow rebuilds its snapshot on every
+   * read while a cooldown runs; reusing an equal one keeps `getState()`
+   * referentially stable (the `useSyncExternalStore` contract).
+   */
+  const flowState = (): OtpFlowState => {
+    const f = flow.getState();
+    if (lastFlow && f !== lastFlow && sameFlow(f, lastFlow)) return lastFlow;
+    lastFlow = f;
+    return f;
+  };
+
   /** The snapshot, rebuilt only when an input of it changed. */
   const current = (): OtpFormState => {
-    const f = flow.getState();
-    const key = [f, version, expiresInSeconds(f)];
+    const f = flowState();
+    const key = [f, version, expiresInSeconds(f), otpSecondsLeft(localLeft())];
     if (
       !snapshot ||
       key.length !== snapshotKey.length ||
@@ -423,17 +508,25 @@ export const createOtpForm = (
     timer = undefined;
   };
 
-  /** Ticks the expiry countdown once a second while observed. */
+  /**
+   * Ticks the expiry countdown and the local resend cooldown once a second
+   * while observed (the flow ticks the server waits).
+   */
   const scheduleTimer = (state: OtpFormState): void => {
     if (timer !== undefined || listeners.size === 0) return;
-    if (expiresAt === undefined || !state.expiresIn || state.verified) return;
-    const left = expiresAt - now();
+    const delays: number[] = [];
+    if (expiresAt !== undefined && state.expiresIn && !state.verified) {
+      delays.push(expiresAt - now());
+    }
+    const local = localLeft();
+    if (local > 0) delays.push(local);
+    if (delays.length === 0) return;
     timer = setTimeout(
       () => {
         timer = undefined;
         refresh();
       },
-      left % 1000 || 1000,
+      Math.min(...delays.map((ms) => ms % 1000 || 1000)),
     );
   };
 
@@ -490,8 +583,14 @@ export const createOtpForm = (
       touch();
       return invalid();
     }
+    if (localLeft() > 0 && !flow.getState().issueState.isLoading) {
+      lastSkip = { reason: "cooldown", operation: "send" };
+      touch();
+      return skipped("cooldown");
+    }
     lastSkip = undefined;
     attemptPhone = phone;
+    const started = epoch;
     const promise = flow.send({
       ...config.issue,
       purpose: config.purpose,
@@ -500,8 +599,10 @@ export const createOtpForm = (
     // The flow is already "loading" synchronously.
     touch();
     const result = await promise;
+    // Aborted, reset or "change number" meanwhile: drop it silently.
+    if (started !== epoch) return result;
     if (result.skipped) {
-      lastSkip = result.skipped;
+      lastSkip = { reason: result.skipped, operation: "send" };
     } else if (result.error) {
       errorOperation = "send";
       config.onError?.(result.error, "send");
@@ -509,6 +610,7 @@ export const createOtpForm = (
       showCodeError = false;
       code = "";
       expiresAt = localExpiry(result.data, now());
+      if (localCooldownMs > 0) localCooldownUntil = now() + localCooldownMs;
       requestFocus("code");
       startWebOtp(result.data.issueId);
       config.onSent?.(result.data);
@@ -525,11 +627,13 @@ export const createOtpForm = (
       return invalid();
     }
     lastSkip = undefined;
+    const started = epoch;
     const promise = flow.verify(code);
     touch();
     const result = await promise;
+    if (started !== epoch) return result;
     if (result.skipped) {
-      lastSkip = result.skipped;
+      lastSkip = { reason: result.skipped, operation: "verify" };
     } else if (result.error) {
       errorOperation = "verify";
       config.onError?.(result.error, "verify");
@@ -565,9 +669,12 @@ export const createOtpForm = (
     }
   }
 
+  /** Back to the phone step; the server's waits are kept, the local one not. */
   const clearIssue = (): void => {
+    epoch++;
     stopWebOtp();
     flow.reset();
+    localCooldownUntil = undefined;
     attemptPhone = undefined;
     expiresAt = undefined;
     code = "";
@@ -626,6 +733,7 @@ export const createOtpForm = (
       touch();
     },
     abort: () => {
+      epoch++;
       stopWebOtp();
       flow.abort();
     },

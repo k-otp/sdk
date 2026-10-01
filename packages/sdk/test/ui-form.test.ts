@@ -32,7 +32,7 @@ const verified = (input: VerifyInput, ok: boolean): VerifyResult => ({
   expiresAt: "2026-01-01T00:03:00.000Z",
 });
 
-type Step = (input: never) => unknown;
+type Step = (input: never, options: { signal?: AbortSignal }) => unknown;
 
 /** A client whose next answers can be scripted; defaults succeed. */
 const scripted = () => {
@@ -41,17 +41,27 @@ const scripted = () => {
   const next = { issue: [] as Step[], verify: [] as Step[] };
   let count = 0;
   const client: OtpIssueVerifyClient = {
-    issue: async (input) => {
+    issue: async (input, options = {}) => {
       issues.push(input);
       const step = next.issue.shift();
-      if (step) return (step as (i: IssueInput) => IssueResult)(input);
+      if (step) {
+        return (step as (i: IssueInput, o: typeof options) => IssueResult)(
+          input,
+          options,
+        );
+      }
       count++;
       return issued(count);
     },
-    verify: async (input) => {
+    verify: async (input, options = {}) => {
       verifies.push(input);
       const step = next.verify.shift();
-      if (step) return (step as (i: VerifyInput) => VerifyResult)(input);
+      if (step) {
+        return (step as (i: VerifyInput, o: typeof options) => VerifyResult)(
+          input,
+          options,
+        );
+      }
       return verified(input, input.code === "123456");
     },
   };
@@ -66,6 +76,59 @@ const apiError = (
   (() => {
     throw new OtpApiError({ code, status, message: code, retryAfterMs });
   }) as Step;
+
+/** Hangs until the request is aborted, then rejects like the SDK does. */
+const hang = ((_input: unknown, options: { signal?: AbortSignal }) =>
+  new Promise((_, reject) => {
+    options.signal?.addEventListener("abort", () =>
+      reject(
+        new OtpApiError({ code: "ABORTED", status: 0, message: "aborted" }),
+      ),
+    );
+  })) as Step;
+
+/** Answers with `value` once `release()` is called (ignores aborts). */
+const deferred = <T>(value: () => T) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const step = (async () => {
+    await gate;
+    return value();
+  }) as Step;
+  return { step, release: () => release() };
+};
+
+/** Lets pending promise callbacks run. */
+const microtasks = async (): Promise<void> => {
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+};
+
+/** Runs `fn` with WebOTP available; `get` answers credential requests. */
+const withWebOtp = async (
+  get: (options: unknown) => Promise<unknown>,
+  fn: () => Promise<void>,
+): Promise<void> => {
+  const globals = globalThis as Record<string, unknown>;
+  const saved = {
+    window: globals.window,
+    navigator: Object.getOwnPropertyDescriptor(globalThis, "navigator"),
+  };
+  globals.window = { OTPCredential: class {} };
+  Object.defineProperty(globalThis, "navigator", {
+    value: { credentials: { get } },
+    configurable: true,
+  });
+  try {
+    await fn();
+  } finally {
+    globals.window = saved.window;
+    if (saved.navigator) {
+      Object.defineProperty(globalThis, "navigator", saved.navigator);
+    }
+  }
+};
 
 const setup = (options: Partial<OtpFormOptions> = {}) => {
   let clock = 1_000_000;
@@ -390,10 +453,11 @@ describe("createOtpForm", () => {
     });
   });
 
-  test("change number goes back to the phone step; cooldown is kept", async () => {
-    const { form, phases } = setup();
+  test("change number goes back to the phone step and clears the local cooldown", async () => {
+    const { form, phases, issues } = setup();
     form.setPhoneNumber("01012345678");
     await form.send();
+    expect(form.getState().resendIn).toBe(30);
     form.setCode("12");
     form.editPhoneNumber();
     expect(form.getState()).toMatchObject({
@@ -402,14 +466,122 @@ describe("createOtpForm", () => {
       phoneLocked: false,
       phoneNumber: "010-1234-5678",
       code: "",
-      resendIn: 30,
+      resendIn: 0,
+      sendDisabled: false,
+      message: undefined,
       focus: { target: "phone" },
     });
     form.setPhoneNumber("010-9999-8888");
-    expect((await form.send()).skipped).toBe("cooldown");
-    expect(phases).toEqual(["sending", "code", "phone"]);
+    expect((await form.send()).data?.issueId).toBe("issue-2");
+    expect(issues[1]?.phoneNumber).toBe("01099998888");
+    expect(phases).toEqual(["sending", "code", "phone", "sending", "code"]);
     form.reset();
-    expect(form.getState().phoneNumber).toBe("");
+    expect(form.getState()).toMatchObject({ phoneNumber: "", resendIn: 0 });
+  });
+
+  test("change number keeps a server-imposed wait (Retry-After)", async () => {
+    const { form, next } = setup({ resendCooldownMs: 0 });
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    next.issue.push(apiError("TOO_MANY_REQUESTS", 429, 12_000));
+    await form.send();
+    form.editPhoneNumber();
+    const parts = getOtpFormParts(form.getState(), {
+      id: "f",
+      t: createOtpTranslator({ locale: "en" }),
+    });
+    expect(form.getState()).toMatchObject({ resendIn: 12, issued: false });
+    // Nothing was sent to this number yet: "send", not "resend".
+    expect(parts.text.sendButton).toBe("Send code in 0:12");
+    expect((await form.send()).skipped).toBe("cooldown");
+  });
+
+  test("a cooldown skip and a wait-and-retry error are shown only while the wait runs", async () => {
+    const { form, next, tick } = setup();
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    expect((await form.send()).skipped).toBe("cooldown");
+    expect(form.getState().message?.key).toBe("skip.cooldown");
+    tick(30_000);
+    expect(form.getState().message?.key).toBe("status.sent");
+    next.verify.push(apiError("TOO_MANY_REQUESTS", 429, 5_000));
+    form.setCode("123456");
+    await microtasks();
+    expect(form.getState().message?.key).toBe("error.TOO_MANY_REQUESTS");
+    tick(5_000);
+    expect(form.getState().message?.key).toBe("status.sent");
+  });
+
+  test("abort() during a send drops its outcome: no onError(ABORTED), no onSent", async () => {
+    const onError = mock();
+    const onSent = mock();
+    const { form, next } = setup({ onError, onSent });
+    next.issue.push(hang);
+    form.setPhoneNumber("01012345678");
+    const sending = form.send();
+    expect(form.getState().phase).toBe("sending");
+    form.abort();
+    const result = await sending;
+    expect(result.error?.code).toBe("ABORTED");
+    expect(onError).not.toHaveBeenCalled();
+    expect(onSent).not.toHaveBeenCalled();
+    expect(form.getState()).toMatchObject({ phase: "phone", error: undefined });
+  });
+
+  test("change number during a verify drops it: no onError, no onVerified", async () => {
+    const onError = mock();
+    const onVerified = mock();
+    const { form, next } = setup({ onError, onVerified });
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    next.verify.push(hang);
+    form.setCode("123456");
+    expect(form.getState().phase).toBe("verifying");
+    form.editPhoneNumber();
+    await microtasks();
+    expect(onError).not.toHaveBeenCalled();
+    expect(onVerified).not.toHaveBeenCalled();
+    expect(form.getState().phase).toBe("phone");
+  });
+
+  test("a response that lands after reset() has no side effects", async () => {
+    const onSent = mock();
+    const get = mock(() => new Promise(() => {}));
+    await withWebOtp(get, async () => {
+      const { form, next } = setup({ onSent, webOtp: true });
+      const late = deferred(() => issued(9));
+      next.issue.push(late.step);
+      form.setPhoneNumber("01012345678");
+      const sending = form.send();
+      form.reset();
+      late.release();
+      await sending;
+      expect(onSent).not.toHaveBeenCalled();
+      expect(get).not.toHaveBeenCalled();
+      expect(form.getState()).toMatchObject({
+        phase: "phone",
+        issued: false,
+        expiresIn: undefined,
+        resendIn: 0,
+      });
+    });
+  });
+
+  test("getState() is referentially stable while unobserved, also during cooldowns", async () => {
+    const { form, next, tick } = setup();
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    expect(form.getState()).toBe(form.getState());
+    next.issue.push(apiError("TOO_MANY_REQUESTS", 429, 40_000));
+    tick(30_000);
+    await form.send();
+    // The flow's server cooldown is running and nobody is subscribed.
+    expect(form.getState().resendIn).toBe(40);
+    expect(form.getState()).toBe(form.getState());
+    tick(1_000);
+    const later = form.getState();
+    expect(later.resendIn).toBe(39);
+    expect(form.getState()).toBe(later);
   });
 
   test("submit dispatches by phase", async () => {
@@ -423,16 +595,34 @@ describe("createOtpForm", () => {
     expect((await form.submit()).skipped).toBe("busy");
   });
 
-  test("subscribers are notified; the expiry countdown ticks while observed", async () => {
-    const { form } = setup({ now: Date.now, resendCooldownMs: 0 });
-    const seen: (number | undefined)[] = [];
-    const stop = form.subscribe(() => seen.push(form.getState().expiresIn));
-    form.setPhoneNumber("01012345678");
-    await form.send();
-    await Bun.sleep(1_100);
-    stop();
-    expect(seen.at(-1)).toBeLessThanOrEqual(179);
-    expect(seen).toContain(180);
+  test("the expiry countdown and the local cooldown tick while observed", async () => {
+    const realSetTimeout = globalThis.setTimeout;
+    const realClearTimeout = globalThis.clearTimeout;
+    const timers: { fn: () => void; ms: number }[] = [];
+    globalThis.setTimeout = ((fn: () => void, ms: number) => {
+      timers.push({ fn, ms });
+      return timers.length;
+    }) as unknown as typeof setTimeout;
+    globalThis.clearTimeout = (() => {}) as typeof clearTimeout;
+    try {
+      const { form, tick } = setup();
+      const seen: [number | undefined, number][] = [];
+      const stop = form.subscribe(() =>
+        seen.push([form.getState().expiresIn, form.getState().resendIn]),
+      );
+      form.setPhoneNumber("01012345678");
+      await form.send();
+      expect(seen.at(-1)).toEqual([180, 30]);
+      const timer = timers.at(-1);
+      expect(timer?.ms).toBe(1_000);
+      tick(1_000);
+      timer?.fn();
+      expect(seen.at(-1)).toEqual([179, 29]);
+      stop();
+    } finally {
+      globalThis.setTimeout = realSetTimeout;
+      globalThis.clearTimeout = realClearTimeout;
+    }
   });
 
   test("configure updates callbacks and purpose without notifying", async () => {
@@ -446,44 +636,34 @@ describe("createOtpForm", () => {
     await form.send();
     expect(issues[0]?.purpose).toBe("login");
     expect(onSent).toHaveBeenCalledTimes(1);
+    // allowInternational changes the validation: subscribers are notified.
+    listener.mockClear();
     form.configure({ allowInternational: true });
+    expect(listener).toHaveBeenCalledTimes(1);
+    form.configure({ allowInternational: true, purpose: "login" });
+    expect(listener).toHaveBeenCalledTimes(1);
     stop();
   });
 
   test("WebOTP fills and verifies the code when supported", async () => {
-    const globals = globalThis as Record<string, unknown>;
-    const saved = {
-      window: globals.window,
-      navigator: Object.getOwnPropertyDescriptor(globalThis, "navigator"),
-    };
     let release!: (value: { code: string }) => void;
-    globals.window = { OTPCredential: class {} };
-    Object.defineProperty(globalThis, "navigator", {
-      value: {
-        credentials: {
-          get: () =>
-            new Promise((resolve) => {
-              release = resolve;
-            }),
-        },
-      },
-      configurable: true,
-    });
-    try {
-      const { form, verifies } = setup({ webOtp: true });
+    const get = () =>
+      new Promise((resolve) => {
+        release = resolve;
+      });
+    await withWebOtp(get, async () => {
+      const onVerified = mock();
+      const { form, verifies } = setup({ webOtp: true, onVerified });
+      const verifiedOnce = new Promise<void>((resolve) =>
+        onVerified.mockImplementation(() => resolve()),
+      );
       form.setPhoneNumber("01012345678");
       await form.send();
       release({ code: "123456" });
-      await Bun.sleep(0);
-      await Bun.sleep(0);
+      await verifiedOnce;
       expect(verifies[0]?.code).toBe("123456");
       expect(form.getState().phase).toBe("verified");
-    } finally {
-      globals.window = saved.window;
-      if (saved.navigator) {
-        Object.defineProperty(globalThis, "navigator", saved.navigator);
-      }
-    }
+    });
   });
 });
 

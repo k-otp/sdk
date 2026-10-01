@@ -65,6 +65,8 @@
       on:keydown={(event) => handlers.keydown(index, event)}
       on:paste={(event) => handlers.paste(index, event)}
       on:focus={(event) => handlers.focus(index, event)}
+      on:compositionstart={handlers.compositionstart}
+      on:compositionend={(event) => handlers.compositionend(index, event)}
     />
   {/each}
   {#if name}

@@ -2,6 +2,7 @@ import {
   type ButtonHTMLAttributes,
   type ChangeEvent,
   type ClipboardEvent,
+  type CompositionEvent,
   type Context,
   createContext,
   type FocusEvent,
@@ -19,6 +20,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -79,6 +81,13 @@ const useStableId = (id: string | undefined, prefix: string): string => {
   const generated = useId();
   return id ?? `${prefix}${generated.replace(/[^\w-]/g, "")}`;
 };
+
+/**
+ * `useLayoutEffect` in the browser, `useEffect` on the server (where React
+ * 18 warns about layout effects). Chosen once per environment.
+ */
+const useClientLayoutEffect: typeof useLayoutEffect = (effect, deps) =>
+  (typeof document === "undefined" ? useEffect : useLayoutEffect)(effect, deps);
 
 /** Settings of the form (see `createOtpForm`). */
 export type OtpFormSettings = OtpFormConfig &
@@ -195,8 +204,9 @@ export const OtpFormRoot = (rootProps: OtpFormRootProps): ReactElement => {
       createIdempotencyKey,
     }),
   );
-  // Latest callbacks and settings; never notifies, so safe during render.
-  form.configure(config);
+  // Latest callbacks and settings, applied after render (configure may
+  // notify, when allowInternational changes).
+  useClientLayoutEffect(() => form.configure(config));
   const state = useSyncExternalStore(
     form.subscribe,
     form.getState,
@@ -469,7 +479,12 @@ type SegmentsProps = {
   hidden?: ReactNode;
 };
 
-const renderSegments = ({
+/**
+ * The segments are uncontrolled for React (the shared handlers write the
+ * DOM value, a layout effect syncs it after renders): a controlled input
+ * would be reset by React in the middle of an IME composition.
+ */
+const Segments = ({
   group,
   segments,
   value,
@@ -480,6 +495,16 @@ const renderSegments = ({
   hidden,
 }: SegmentsProps): ReactElement => {
   const digits = otpCodeSegments(value, length);
+  useClientLayoutEffect(() => {
+    if (handlers.isComposing()) return;
+    const inputs = groupRef.current?.querySelectorAll<HTMLInputElement>(
+      '[data-k-otp="code-segment"]',
+    );
+    inputs?.forEach((input, index) => {
+      const digit = digits[index] ?? "";
+      if (input.value !== digit) input.value = digit;
+    });
+  });
   return h(
     "div",
     {
@@ -493,7 +518,7 @@ const renderSegments = ({
       h("input", {
         ...props(attrs),
         key: index,
-        value: digits[index] ?? "",
+        defaultValue: digits[index] ?? "",
         onChange: (event: ChangeEvent<HTMLInputElement>) =>
           handlers.input(index, event),
         onKeyDown: (event: KeyboardEvent<HTMLInputElement>) =>
@@ -502,11 +527,17 @@ const renderSegments = ({
           handlers.paste(index, event),
         onFocus: (event: FocusEvent<HTMLInputElement>) =>
           handlers.focus(index, event),
+        onCompositionStart: handlers.compositionstart,
+        onCompositionEnd: (event: CompositionEvent<HTMLInputElement>) =>
+          handlers.compositionend(index, event),
       }),
     ),
     hidden,
   );
 };
+
+const renderSegments = (segmentsProps: SegmentsProps): ReactElement =>
+  h(Segments, segmentsProps);
 
 export type OtpFormCodeFieldRenderProps = OtpFormContextValue & {
   labelProps: LabelHTMLAttributes<HTMLLabelElement>;

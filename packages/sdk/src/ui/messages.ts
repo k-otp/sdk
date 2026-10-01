@@ -11,8 +11,25 @@ import type { OtpPhoneErrorCode } from "./phone";
 
 export type OtpLocale = "ko" | "en";
 
-/** The built-in locale when none is given. */
+/** The built-in locale when none is given and the page has no usable `lang`. */
 export const DEFAULT_OTP_LOCALE: OtpLocale = "ko";
+
+/**
+ * The locale to use: `locale` when given; otherwise, in a browser, the
+ * page's `<html lang>` when it is Korean or English; otherwise `"ko"`.
+ * Server rendering has no document, so pass `locale` explicitly when you
+ * server-render a page whose `lang` is not Korean, or the hydrated text
+ * differs from the server's.
+ */
+export const resolveOtpLocale = (locale?: OtpLocale): OtpLocale => {
+  if (locale) return locale;
+  const lang =
+    typeof document === "undefined"
+      ? ""
+      : (document.documentElement?.lang ?? "").toLowerCase();
+  if (lang.startsWith("en")) return "en";
+  return DEFAULT_OTP_LOCALE;
+};
 
 const en = {
   "phone.label": "Phone number",
@@ -30,6 +47,7 @@ const en = {
   "send.sending": "Sending...",
   "send.resend": "Resend code",
   "send.resendIn": "Resend in {time}",
+  "send.sendIn": "Send code in {time}",
   "send.retry": "Try again",
   "verify.idle": "Verify",
   "verify.verifying": "Verifying...",
@@ -93,6 +111,7 @@ const ko: OtpMessageCatalog = {
   "send.sending": "보내는 중...",
   "send.resend": "인증번호 다시 받기",
   "send.resendIn": "{time} 후 다시 받기",
+  "send.sendIn": "{time} 후 받기",
   "send.retry": "다시 시도",
   "verify.idle": "확인",
   "verify.verifying": "확인 중...",
@@ -175,7 +194,7 @@ export const formatOtpMessage = (
   });
 
 export type OtpTranslatorOptions = {
-  /** `ko` (default) or `en`. */
+  /** `ko` or `en`; default: see {@link resolveOtpLocale}. */
   locale?: OtpLocale | undefined;
   /** Per-key overrides (templates or functions). */
   messages?: OtpMessageOverrides | undefined;
@@ -193,7 +212,7 @@ export const createOtpTranslator = (
   options: OtpTranslatorOptions = {},
 ): OtpTranslator => {
   const catalog =
-    OTP_MESSAGES[options.locale ?? DEFAULT_OTP_LOCALE] ??
+    OTP_MESSAGES[resolveOtpLocale(options.locale)] ??
     OTP_MESSAGES[DEFAULT_OTP_LOCALE];
   const overrides = options.messages ?? {};
   return (key, params = {}) => {

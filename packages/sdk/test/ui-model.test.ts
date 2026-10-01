@@ -8,6 +8,7 @@ import {
   formatOtpCountdown,
   formatOtpMessage,
   formatOtpPhoneInput,
+  getOtpCodeInputParts,
   isOtpCodeComplete,
   isWebOtpSupported,
   maskOtpPhoneNumber,
@@ -20,6 +21,7 @@ import {
   otpSkipMessageKey,
   parseOtpPhoneNumber,
   receiveWebOtp,
+  resolveOtpLocale,
   sanitizeOtpCode,
 } from "../src/ui";
 
@@ -102,8 +104,7 @@ describe("parseOtpPhoneNumber", () => {
     ).toBe(true);
   });
 
-  test("matches the API's per-phone canonicalization for every KR spelling", () => {
-    // The API folds these into one rate-limit subject; the UI sends one value.
+  test("folds every spelling of a Korean mobile into one national value", () => {
     const values = new Set(
       [
         "010-1234-5678",
@@ -159,6 +160,46 @@ describe("code input model", () => {
     ["abc", ""],
   ])("sanitizeOtpCode(%j) = %j", (input, expected) => {
     expect(sanitizeOtpCode(input)).toBe(expected);
+  });
+
+  test("sanitizeOtpCode finds a code next to letters, without lookbehind", () => {
+    expect(sanitizeOtpCode("code:123456.")).toBe("123456");
+    expect(sanitizeOtpCode("a123 456b")).toBe("123456");
+    expect(sanitizeOtpCode("1234567 and 654321")).toBe("654321");
+    expect(sanitizeOtpCode(undefined as unknown as string)).toBe("");
+  });
+
+  test("segment parts: one tab stop, a named group, described once", () => {
+    const t = createOtpTranslator({ locale: "en" });
+    const parts = getOtpCodeInputParts({
+      id: "c",
+      value: "12",
+      length: 6,
+      describedBy: "help",
+      t,
+    });
+    expect(parts.segments.map((s) => s.tabindex)).toEqual([
+      -1, -1, 0, -1, -1, -1,
+    ]);
+    expect(parts.group).toMatchObject({
+      role: "group",
+      "aria-label": "Verification code",
+      "aria-describedby": "help",
+      dir: "ltr",
+    });
+    expect(parts.segments.some((s) => "aria-describedby" in s)).toBe(false);
+    const full = getOtpCodeInputParts({
+      id: "c",
+      value: "123456",
+      length: 6,
+      labelledBy: "label",
+      t,
+    });
+    expect(full.segments.map((s) => s.tabindex)).toEqual([
+      -1, -1, -1, -1, -1, 0,
+    ]);
+    expect(full.group["aria-label"]).toBeUndefined();
+    expect(full.group["aria-labelledby"]).toBe("label");
   });
 
   test("sanitizeOtpCode honors the length", () => {
@@ -391,6 +432,34 @@ describe("messages", () => {
     expect(en("reason.MISMATCH", { attempts: 2 })).toBe("Nope (2)");
     expect(en("verify.idle")).toBe("Verify");
     expect(formatOtpMessage("{a} and {b}", { a: 1 })).toBe("1 and {b}");
+  });
+});
+
+describe("resolveOtpLocale", () => {
+  test("explicit locale, then <html lang> (ko/en), then ko", () => {
+    expect(resolveOtpLocale("en")).toBe("en");
+    expect(resolveOtpLocale()).toBe("ko"); // no document (server)
+    const globals = globalThis as Record<string, unknown>;
+    const saved = globals.document;
+    try {
+      for (const [lang, expected] of [
+        ["en-US", "en"],
+        ["EN", "en"],
+        ["ko-KR", "ko"],
+        ["ja", "ko"],
+        ["", "ko"],
+      ] as const) {
+        globals.document = { documentElement: { lang } };
+        expect(resolveOtpLocale()).toBe(expected);
+        expect(createOtpTranslator()("send.idle")).toBe(
+          expected === "en" ? "Send code" : "인증번호 받기",
+        );
+      }
+      globals.document = { documentElement: { lang: "en" } };
+      expect(resolveOtpLocale("ko")).toBe("ko");
+    } finally {
+      globals.document = saved;
+    }
   });
 });
 

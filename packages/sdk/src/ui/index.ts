@@ -47,6 +47,7 @@ export {
   otpPhoneErrorMessageKey,
   otpReasonMessageKey,
   otpSkipMessageKey,
+  resolveOtpLocale,
 } from "./messages";
 export {
   createOtpCodeInputHandlers,
@@ -63,6 +64,7 @@ export {
   type OtpFormParts,
   type OtpPartName,
   otpCodeSegmentId,
+  otpCodeTabIndex,
   otpFormIds,
 } from "./parts";
 export {
