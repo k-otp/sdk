@@ -330,8 +330,8 @@ export type OtpBalanceOutput = {
 
 /**
  * `organization`: the organization credit wallet (`org:<organizationId>`) shared
- * by every app of the organization. `app`: the legacy per-app wallet, kept only
- * until the contract step (ADR adr-org-credit-wallet).
+ * by every app of the organization. `app`: the legacy per-app wallet, which is
+ * being retired.
  */
 export type WalletScope = "app" | "organization";
 

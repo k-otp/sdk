@@ -909,7 +909,7 @@
             "const": "organization"
           }
         ],
-        "description": "`organization`: the organization credit wallet (`org:<organizationId>`) shared\nby every app of the organization. `app`: the legacy per-app wallet, kept only\nuntil the contract step (ADR adr-org-credit-wallet)."
+        "description": "`organization`: the organization credit wallet (`org:<organizationId>`) shared\nby every app of the organization. `app`: the legacy per-app wallet, which is\nbeing retired."
       },
       "ListTemplatesInput": {
         "type": "object",
