@@ -9,7 +9,7 @@ KakaoTalk AlimTalk.
 | Package | Use it for |
 | --- | --- |
 | [`@k-otp/sdk-core`](./packages/sdk-core) | `issue` / `verify` from browsers (`pk_` key), SSR and edge. Framework-agnostic, also available as a `<script>` bundle (`window.KOtp`). |
-| [`@k-otp/sdk-server`](./packages/sdk-server) | Every public `/v1` operation (status, history, ledger, balance, templates) from Node.js, Bun, Deno or Workers with an `sk_` key. |
+| [`@k-otp/sdk-server`](./packages/sdk-server) | Every public `/v1` operation (status, history, ledger, balance, templates) from Node.js, Bun, Deno or Workers with an `sk_` key. Credit is one wallet per organization (API 1.4.0). |
 | [`@k-otp/sdk-react`](./packages/sdk-react) | React 18/19 hooks: `OtpProvider`, `useOtpIssue`, `useOtpVerify`, `useOtpFlow` (resend cooldown + idempotency keys). |
 | [`@k-otp/sdk-vue`](./packages/sdk-vue) | Vue 3 plugin and composables: `createOtpPlugin`, `useOtp`, `useOtpFlow`. |
 | [`@k-otp/sdk-svelte`](./packages/sdk-svelte) | Svelte 4/5 stores: `createOtpStores`, flow store, `use:otpForm`. |

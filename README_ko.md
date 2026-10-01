@@ -8,7 +8,7 @@ SMS 또는 카카오 알림톡으로 일회용 인증번호를 발급(issue)하�
 | 패키지 | 용도 |
 | --- | --- |
 | [`@k-otp/sdk-core`](./packages/sdk-core) | 브라우저(`pk_` 키)·SSR·엣지에서 `issue` / `verify`. 프레임워크 무관, `<script>` 번들(`window.KOtp`) 제공. |
-| [`@k-otp/sdk-server`](./packages/sdk-server) | Node.js, Bun, Deno, Workers에서 `sk_` 키로 모든 공개 `/v1` 기능(상태, 발급 이력, 원장, 잔액, 템플릿) 호출. |
+| [`@k-otp/sdk-server`](./packages/sdk-server) | Node.js, Bun, Deno, Workers에서 `sk_` 키로 모든 공개 `/v1` 기능(상태, 발급 이력, 원장, 잔액, 템플릿) 호출. 크레딧은 조직 단위 지갑 하나입니다(API 1.4.0). |
 | [`@k-otp/sdk-react`](./packages/sdk-react) | React 18/19 훅: `OtpProvider`, `useOtpIssue`, `useOtpVerify`, `useOtpFlow`(재발송 쿨다운 + 멱등키 관리). |
 | [`@k-otp/sdk-vue`](./packages/sdk-vue) | Vue 3 플러그인·컴포저블: `createOtpPlugin`, `useOtp`, `useOtpFlow`. |
 | [`@k-otp/sdk-svelte`](./packages/sdk-svelte) | Svelte 4/5 스토어: `createOtpStores`, 플로우 스토어, `use:otpForm`. |
@@ -64,6 +64,11 @@ const { verified, reasonCode } = await otp.verify({ issueId, code: "123456" });
   (`verifyCooldownRemainingMs`, 그동안 `canVerify: false`)을 적용합니다.
 - 그 밖의 실패는 모두 `OtpApiError`(`code`, `status`, `requestId`, `data`, `retryAfterMs`,
   `retryable`)로 정규화됩니다. 잔액 부족은 `PAYMENT_REQUIRED`(402, `data.code`)입니다.
+- 크레딧은 조직 단위 지갑 하나를 조직의 모든 앱이 함께 씁니다(API 1.4.0). `getBalance()`는 조직 전체 잔액을
+  돌려주며 `walletId`, `walletScope`(`organization`), `organizationId`가 함께 옵니다. `appId`는 호출한 앱입니다.
+  `listCreditLedger`는 지갑의 `credit`/`clawback`과 **호출한 앱의** `debit`/`refund`만 돌려주므로, 다른 앱의
+  차감은 보이지 않아 `balanceAfter`(지갑 잔액) 차이가 `amountDelta`와 다를 수 있습니다. 1.4.0 이전 API는
+  `walletId`/`walletScope`를 보내지 않으므로 타입에서 선택값이며, 없으면 `app`(앱 지갑)으로 보세요.
 - `issue`/`verify`는 API 키별 레이트 리밋이 적용됩니다(API 1.3.1). 초과하면 재시도 가능한
   `TOO_MANY_REQUESTS`(429)로 거절되며, `retryAfterMs`(본문 `data.retryAfterMs`, 없으면
   `Retry-After` 헤더)만큼 기다린 뒤 같은 멱등키로 재시도하세요. `data.limit`(`perKey`, `perIp`,

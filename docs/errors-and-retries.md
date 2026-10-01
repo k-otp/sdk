@@ -19,7 +19,7 @@ All SDK methods reject with `OtpApiError`:
 | --- | --- | --- | --- |
 | `BAD_REQUEST` | 400 | no | Invalid input, missing/invalid idempotency key (also raised client-side before any request), header/body key mismatch. |
 | `UNAUTHORIZED` | 401 | no | Missing, malformed, revoked or unknown key. |
-| `PAYMENT_REQUIRED` | 402 | no | Not enough credit (`data.code`). Top up, then issue again. |
+| `PAYMENT_REQUIRED` | 402 | no | Not enough credit in your wallet (`data.code`; from API 1.4.0 the wallet is shared by every app of your organization). Top up, then issue again. |
 | `FORBIDDEN` | 403 | no | Missing scope, `pk_` key on a server-only operation, or `Origin` not in the key's allowlist. |
 | `NOT_FOUND` | 404 | no | Unknown issue/template for this app. |
 | `CONFLICT` | 409 | no | Idempotency key reused with a different payload, or the replayed issue was since replaced. |

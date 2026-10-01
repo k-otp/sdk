@@ -83,9 +83,9 @@ export default {
 | `listIssues(query?)` | `GET /v1/issues` | One page (`items`, `nextCursor?`). Filters: `limit` (1-100), `cursor`, `verificationStatus`, `createdFrom`, `createdTo`. |
 | `iterateIssues(query?, options?)` | `GET /v1/issues` | `AsyncGenerator` over all items, following `nextCursor`. |
 | `getIssue({ issueId })` | `GET /v1/issues/{issueId}` | Billing status and attempt counters. |
-| `listCreditLedger(query?)` | `GET /v1/credit-ledger` | One page. Filters: `limit`, `cursor`, `entryType`, `createdFrom`, `createdTo`. |
+| `listCreditLedger(query?)` | `GET /v1/credit-ledger` | One page of the wallet ledger. Filters: `limit`, `cursor`, `entryType`, `createdFrom`, `createdTo`. See [Credit wallet](#credit-wallet-organization-wide). |
 | `iterateCreditLedger(query?, options?)` | `GET /v1/credit-ledger` | `AsyncGenerator` over all entries. |
-| `getBalance()` | `GET /v1/balance` | Credit balance (`currency: "CREDIT"`). |
+| `getBalance()` | `GET /v1/balance` | Credit balance (`currency: "CREDIT"`) plus `walletId`, `walletScope`, `organizationId?`. See [Credit wallet](#credit-wallet-organization-wide). |
 | `listTemplates()` | `GET /v1/templates` | Whitelisted templates + `defaultTemplateId`. |
 | `getTemplate({ templateId })` | `GET /v1/templates/{templateId}` | Includes the `variables` schema for `templateVariables`. |
 
@@ -109,6 +109,37 @@ for await (const page of paginatePages((q) => otp.listCreditLedger(q), { entryTy
 Cursors are opaque and bound to the endpoint that issued them; keep the same
 filters while paging (the helpers do this for you). Breaking out of a
 `for await` loop stops fetching.
+
+### Credit wallet (organization-wide)
+
+From API 1.4.0 credit is held per **organization**, not per app: every app of
+an organization spends from, and is topped up into, one shared wallet.
+
+```ts
+const wallet = await otp.getBalance();
+wallet.balance;        // credits left in the wallet shared by all apps
+wallet.currency;       // "CREDIT"
+wallet.appId;          // the app of the key you called with (not the wallet owner)
+wallet.walletScope;    // "organization" (shared) | "app" (legacy per-app wallet)
+wallet.walletId;       // "org:<organizationId>" | "app:<appId>"
+wallet.organizationId; // set when walletScope is "organization"
+```
+
+- `balance` is the **whole organization's** balance, so it can drop between two
+  calls because of another app's issues.
+- `listCreditLedger` / `iterateCreditLedger` return the wallet's `credit` and
+  `clawback` entries plus only **the calling app's** `debit` and `refund`
+  entries. Other apps' debits are not listed, so `balanceAfter` (always the
+  wallet balance) can change by more than `amountDelta` between two entries.
+- A ledger entry's optional `appId` is its attribution: always the calling app
+  for `debit` / `refund`, and on a `credit` / `clawback` only when the purchase
+  was attributed to an app.
+- `walletId` and `walletScope` are typed optional (`GetBalanceResult`). An API
+  deployment older than 1.4.0 does not send them (its balance is the app's own
+  wallet), and `appId` on ledger entries is absent there too. Treat a missing
+  `walletScope` as `"app"`.
+- `PAYMENT_REQUIRED` (402) on `issue` now means the organization wallet is out
+  of credit. No new error codes were added.
 
 ### Errors
 

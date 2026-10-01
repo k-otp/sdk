@@ -76,6 +76,8 @@ code: `verify` on the old `issueId` then returns `reasonCode: "REPLACED"`.
 
 `PAYMENT_REQUIRED` means **your** K-OTP credit is exhausted
 (`error.data.code`: `INSUFFICIENT_CREDIT` or `OVERDRAFT_LIMIT_EXCEEDED`).
+From API 1.4.0 that credit is the organization wallet shared by all of its
+apps, so another app's traffic can exhaust it too.
 It is not the end user's fault:
 
 - show a generic "sending is temporarily unavailable" message,
