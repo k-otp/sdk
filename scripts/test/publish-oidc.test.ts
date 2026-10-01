@@ -17,7 +17,7 @@ import path from "node:path";
 
 const VERSION = "1.2.3";
 const PACKAGE = "@k-otp/sdk";
-const ALL_TAGS = [`v${VERSION}`, `${PACKAGE}-v${VERSION}`];
+const ALL_TAGS = [`v${VERSION}`];
 
 const root = mkdtempSync(path.join(tmpdir(), "publish-oidc-"));
 const bin = path.join(root, "bin");
@@ -73,6 +73,7 @@ case "$1" in
     has "$STUB_LOCAL_TAGS" "$tag" && exit 0
     exit 1 ;;
   push|tag) exit 0 ;;
+  log) echo "deadbeef" ;;
   *) exit 1 ;;
 esac`,
 );
@@ -136,11 +137,11 @@ describe("publish-oidc.sh --check", () => {
     expect(r.calls.some((c) => c.includes("ls-remote"))).toBe(false);
   });
 
-  test("a missing package tag needs finalizing", () => {
-    const r = run(["--check"], { STUB_REMOTE_TAGS: `v${VERSION}` });
+  test("a missing release tag needs finalizing", () => {
+    const r = run(["--check"], { STUB_REMOTE_TAGS: "" });
     expect(r.exitCode).toBe(0);
     expect(r.output("needs_finalize")).toBe("true");
-    expect(r.stdout).toContain(`${PACKAGE}-v${VERSION} is published`);
+    expect(r.stdout).toContain(`v${VERSION} is published`);
   });
 
   test("a second publishable package must be listed in PACKAGE_DIRS", () => {
@@ -198,6 +199,16 @@ describe("publish-oidc.sh recovery", () => {
     expect(r.calls.some((c) => / (log|cat-file) /.test(c))).toBe(false);
     expect(r.calls.some((c) => c.startsWith("git tag"))).toBe(false);
     expect(r.calls).toContain(`gh release create v${VERSION} --generate-notes`);
+  });
+
+  test("recovery creates and pushes only the vX.Y.Z tag", () => {
+    const r = run([], { STUB_LOCAL_TAGS: "" });
+    expect(r.exitCode).toBe(0);
+    const tags = r.calls.filter((c) => / tag /.test(c));
+    expect(tags).toEqual([`git -C ${root} tag v${VERSION} deadbeef`]);
+    expect(r.calls).toContain(
+      `git -C ${root} push origin refs/tags/v${VERSION}`,
+    );
   });
 
   test("an existing Release is not recreated", () => {

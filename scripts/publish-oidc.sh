@@ -15,8 +15,8 @@ set -euo pipefail
 #                                       # (re)creates missing tags + Release
 #
 # should_publish: some package version is not on npm yet (a new release).
-# needs_finalize: everything is on npm but a release tag (vX.Y.Z or the
-#   package tag @k-otp/sdk-vX.Y.Z) or the GitHub Release is missing (an
+# needs_finalize: the version is on npm but the release tag vX.Y.Z or the
+#   GitHub Release is missing (an
 #   earlier run failed after publishing). Kept separate so a recovery never
 #   blocks the Sampo release-PR step: when the tag / Release lookups keep
 #   failing, --check warns and reports needs_finalize=false instead of failing.
@@ -44,8 +44,8 @@ if [[ $# -ne 0 ]]; then
   exit 2
 fi
 
-# The single published package. The script still loops over a list (and
-# checks that versions agree) so a future package can be added here.
+# The single published package (@k-otp/sdk). Kept as a list for the loops
+# below; any other publishable package under packages/ is an error.
 PACKAGE_DIRS=(
   "packages/sdk"
 )
@@ -189,23 +189,10 @@ detect_finalize() {
   esac
 }
 
-# Validate lockstep versions up front.
-RELEASE_VERSION=""
-for dir in "${PACKAGE_DIRS[@]}"; do
-  VERSION="$(pkg_field "$dir" version)"
-  if [[ -z "$RELEASE_VERSION" ]]; then
-    RELEASE_VERSION="$VERSION"
-  elif [[ "$RELEASE_VERSION" != "$VERSION" ]]; then
-    echo "Expected lockstep versions, found ${RELEASE_VERSION} and ${VERSION} (${dir})" >&2
-    exit 1
-  fi
-done
+RELEASE_VERSION="$(pkg_field "${PACKAGE_DIRS[0]}" version)"
 
-# The main tag plus one tag per package (Sampo's `<package>-v<version>`).
+# One release tag: vX.Y.Z.
 RELEASE_TAGS=("v${RELEASE_VERSION}")
-for dir in "${PACKAGE_DIRS[@]}"; do
-  RELEASE_TAGS+=("$(pkg_field "$dir" name)-v${RELEASE_VERSION}")
-done
 
 emit() {
   echo "$1"

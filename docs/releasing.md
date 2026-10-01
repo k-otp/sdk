@@ -53,7 +53,7 @@ SAMPO_RELEASE_BRANCH=main sampo release --dry-run   # e.g. "@k-otp/sdk: 1.0.0 ->
 3. Merging the release PR pushes the new version to `main`; the workflow sees
    an unpublished version and runs `scripts/publish-oidc.sh`, which builds,
    runs `check:pack` and `smoke:dist`, publishes the `bun pm pack` tarball
-   with `npm publish <tarball>`, tags `vX.Y.Z` plus `@k-otp/sdk-vX.Y.Z`, and
+   with `npm publish <tarball>`, tags `vX.Y.Z`, and
    creates a GitHub Release.
 
 ## The first release: 1.0.0
@@ -73,8 +73,8 @@ hand; let the release PR set it.
 - `should_publish=true`: the package version is not on npm yet. The workflow
   publishes, and skips the Sampo step in that run (the release PR is updated
   again on the next push).
-- `needs_finalize=true`: the version is on npm, but one of the release tags
-  (`vX.Y.Z` or `@k-otp/sdk-vX.Y.Z`) or the GitHub Release is missing (an
+- `needs_finalize=true`: the version is on npm, but the release tag
+  (`vX.Y.Z`) or the GitHub Release is missing (an
   earlier run failed after `npm publish`). The workflow re-runs the publish
   step, which skips the published package and only creates what is missing.
   This output does not gate the Sampo step, so a stuck recovery can never
@@ -111,8 +111,8 @@ PR up to date and logs a warning instead of publishing.
    ```
    Always publish the `bun pm pack` tarball (it rewrites `catalog:` ranges to
    real versions), never `npm publish` inside the package directory. Then tag
-   the release commit (`git tag v1.0.0 && git tag @k-otp/sdk-v1.0.0 && git
-   push origin v1.0.0 @k-otp/sdk-v1.0.0`) and create the GitHub Release, or
+   the release commit (`git tag v1.0.0 && git push origin v1.0.0`) and
+   create the GitHub Release, or
    let the next workflow run finalize it (`needs_finalize`).
 4. **Configure Trusted Publishing** for `@k-otp/sdk` on npmjs.com -> package
    -> *Settings -> Trusted publishing*:
