@@ -3,6 +3,8 @@
  * correct code is always 123456. Not part of the SDK.
  */
 const MOCK_CODE = "123456";
+/** Wallet balance after the mocked debit; the ledger entries add up to it. */
+const MOCK_BALANCE = 999;
 const issues = new Map<
   string,
   { attempts: number; expiresAt: string; verifiedAt?: string }
@@ -21,27 +23,38 @@ export const mockFetch: typeof fetch = async (input, init) => {
       walletId: "org:org_mock",
       walletScope: "organization",
       organizationId: "org_mock",
-      balance: 1000,
+      balance: MOCK_BALANCE,
       currency: "CREDIT",
       updatedAt: new Date().toISOString(),
     });
   }
   if (request.method === "GET" && path.endsWith("/credit-ledger")) {
-    // The wallet's credits plus only THIS app's debits (other apps' are hidden).
-    return reply({
-      items: [
-        {
-          ledgerId: "00000000-0000-4000-8000-000000000001",
-          issueId: "mock-signup-1",
-          entryType: "debit",
-          appId: "app_mock",
-          amountDelta: -1,
-          balanceAfter: 999,
-          currency: "CREDIT",
-          createdAt: new Date().toISOString(),
-        },
-      ],
-    });
+    // Newest first: this app's debit, then the wallet's credit (no appId: not
+    // attributed to an app). Honors the entryType and limit query params.
+    const query = new URL(request.url).searchParams;
+    const entryType = query.get("entryType");
+    const limit = Number(query.get("limit") ?? 20);
+    const entries = [
+      {
+        ledgerId: "00000000-0000-4000-8000-000000000002",
+        issueId: "5f2b1c3e-8d4a-4f6b-9a7c-1e2d3c4b5a69",
+        entryType: "debit",
+        appId: "app_mock",
+        amountDelta: -1,
+        balanceAfter: MOCK_BALANCE,
+        currency: "CREDIT",
+        createdAt: new Date().toISOString(),
+      },
+      {
+        ledgerId: "00000000-0000-4000-8000-000000000001",
+        entryType: "credit",
+        amountDelta: MOCK_BALANCE + 1,
+        balanceAfter: MOCK_BALANCE + 1,
+        currency: "CREDIT",
+        createdAt: new Date(Date.now() - 86_400_000).toISOString(),
+      },
+    ].filter((entry) => !entryType || entry.entryType === entryType);
+    return reply({ items: entries.slice(0, limit) });
   }
   const body = (await request.json().catch(() => ({}))) as Record<
     string,

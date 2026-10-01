@@ -94,7 +94,7 @@ try {
     createOtpServerClient({ apiKey: "sk_mock", fetch: apiFetch }),
   );
   assert.deepEqual(wallet, {
-    balance: 1000,
+    balance: 999,
     scope: "organization",
     walletId: "org:org_mock",
     recentAppDebits: 1,
