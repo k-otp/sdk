@@ -51,15 +51,25 @@ import {
 } from "..";
 
 /**
+ * Attributes Svelte must not receive through a spread: Svelte 5 aliases them
+ * to DOM properties (`readonly` -> `readOnly`) and caches spread attributes
+ * under the alias, so toggling one through a spread can leave it stale. The
+ * components bind them explicitly (`readonly={...}`, `novalidate`).
+ */
+const EXPLICIT = new Set(["readonly", "novalidate"]);
+
+/**
  * Part attributes for a Svelte spread: booleans become `""` / `undefined`,
  * since Svelte 4 would render `readonly={false}` in a spread as
- * `readonly="false"` (still read-only).
+ * `readonly="false"` (still read-only), and the attributes in `EXPLICIT`
+ * are left out.
  */
 export const attrs = (
   attributes: OtpAttrs,
 ): Record<string, string | number | undefined> => {
   const out: Record<string, string | number | undefined> = {};
   for (const [key, value] of Object.entries(attributes)) {
+    if (EXPLICIT.has(key)) continue;
     out[key] = value === true ? "" : value === false ? undefined : value;
   }
   return out;

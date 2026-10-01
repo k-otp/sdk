@@ -88,6 +88,6 @@
   });
 </script>
 
-<form {...attrs($parts.root)} {...$$restProps} use:root on:submit={submit}>
+<form {...attrs($parts.root)} novalidate {...$$restProps} use:root on:submit={submit}>
   <slot {...slotProps(context, $state, $parts, $t)} />
 </form>

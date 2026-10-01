@@ -59,6 +59,7 @@
   {#each parts.segments as segment, index (index)}
     <input
       {...attrs(segment)}
+      readonly={segment.readonly === true}
       value={parts.digits[index]}
       on:input={(event) => handlers.input(index, event)}
       on:keydown={(event) => handlers.keydown(index, event)}

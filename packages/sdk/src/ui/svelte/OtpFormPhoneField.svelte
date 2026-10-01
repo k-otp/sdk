@@ -39,7 +39,12 @@
     />
   {:else}
     <label {...attrs($parts.phoneLabel)}>{label ?? $parts.text.phoneLabel}</label>
-    <input {...inputProps} on:input={handlers.input} on:blur={handlers.blur} />
+    <input
+      {...inputProps}
+      readonly={$state.phoneLocked}
+      on:input={handlers.input}
+      on:blur={handlers.blur}
+    />
     {#if descriptionText}
       <p {...attrs($parts.phoneDescription)}>{descriptionText}</p>
     {/if}
