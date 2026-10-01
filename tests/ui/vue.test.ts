@@ -117,6 +117,49 @@ describe("<OtpForm /> preset (Vue)", () => {
     expect(document.querySelector('[data-k-otp="code-field"]')).toBeNull();
   });
 
+  test("hydrates server markup (explicit id) without mismatches", async () => {
+    const api = createMockApi();
+    const root = () =>
+      h(OtpForm, {
+        client: api.client,
+        purpose: "signup",
+        id: "otp",
+        locale: "en",
+      });
+    const html = await renderToString(createSSRApp({ render: root }));
+    const el = document.createElement("div");
+    el.innerHTML = html;
+    document.body.append(el);
+    const warnings: unknown[] = [];
+    const warn = console.warn;
+    const error = console.error;
+    console.warn = (...args: unknown[]) => warnings.push(args);
+    console.error = (...args: unknown[]) => warnings.push(args);
+    try {
+      const app = createSSRApp({ render: root });
+      app.mount(el);
+      mounted.push({ app, el });
+      await flush();
+      expect(warnings).toEqual([]);
+      expect(part("phone-input").id).toBe("otp-phone");
+      await typePhone("01012345678");
+      fireEvent.click(screen.getByRole("button", { name: "Send code" }));
+      await flush();
+      expect(part("root").getAttribute("data-state")).toBe("code");
+      expect(segments().map((s) => s.getAttribute("tabindex"))).toEqual([
+        "0",
+        "-1",
+        "-1",
+        "-1",
+        "-1",
+        "-1",
+      ]);
+    } finally {
+      console.warn = warn;
+      console.error = error;
+    }
+  });
+
   test("server rendering performs no request", async () => {
     const api = createMockApi();
     const app = createSSRApp({

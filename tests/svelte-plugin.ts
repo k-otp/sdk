@@ -15,6 +15,8 @@ plugin({
       const options = {
         filename: path,
         generate: svelte4 ? "dom" : "client",
+        // Svelte 4 only hydrates components compiled as hydratable.
+        ...(svelte4 ? { hydratable: true } : {}),
       } as unknown as Parameters<typeof compile>[1];
       const { js } = compile(await Bun.file(path).text(), options);
       return { contents: js.code, loader: "js" };

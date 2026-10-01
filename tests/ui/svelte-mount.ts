@@ -6,15 +6,20 @@ type Instance = { destroy: () => void };
 export const mountSvelte = (
   Component: unknown,
   props: Record<string, unknown> = {},
+  options: { target?: HTMLElement; hydrate?: boolean } = {},
 ): Instance => {
-  const target = document.createElement("div");
-  document.body.append(target);
+  const target = options.target ?? document.createElement("div");
+  if (!target.isConnected) document.body.append(target);
   const api = svelte as unknown as {
     mount?: (component: unknown, options: unknown) => unknown;
+    hydrate?: (component: unknown, options: unknown) => unknown;
     unmount?: (instance: unknown) => void;
   };
-  if (typeof api.mount === "function" && api.unmount) {
-    const instance = api.mount(Component, { target, props });
+  if (typeof api.mount === "function" && api.hydrate && api.unmount) {
+    const instance = (options.hydrate ? api.hydrate : api.mount)(Component, {
+      target,
+      props,
+    });
     return {
       destroy: () => {
         api.unmount?.(instance);
@@ -23,7 +28,7 @@ export const mountSvelte = (
     };
   }
   const Ctor = Component as new (options: unknown) => { $destroy: () => void };
-  const instance = new Ctor({ target, props });
+  const instance = new Ctor({ target, props, hydrate: options.hydrate });
   return {
     destroy: () => {
       instance.$destroy();

@@ -170,12 +170,12 @@ const scenarios: Record<
     ],
   },
   "429 on send, then change number after a send": {
-    setup: (api) => api.next.issue.push(rateLimited(1_000)),
+    setup: (api) => api.next.issue.push(rateLimited(500)),
     steps: [
       typePhone("+82 10-1234-5678"),
       click("send-button"),
       async () => {
-        await new Promise((resolve) => setTimeout(resolve, 1_100));
+        await new Promise((resolve) => setTimeout(resolve, 600));
       },
       click("send-button"),
       click("edit-phone"),
@@ -183,14 +183,14 @@ const scenarios: Record<
   },
   "429 on verify, then max attempts": {
     setup: (api) => {
-      api.next.verify.push(rateLimited(1_000));
+      api.next.verify.push(rateLimited(500));
     },
     steps: [
       typePhone("01012345678"),
       click("send-button"),
       paste("111111"),
       async () => {
-        await new Promise((resolve) => setTimeout(resolve, 1_100));
+        await new Promise((resolve) => setTimeout(resolve, 600));
       },
       click("verify-button"),
       paste("222222"),

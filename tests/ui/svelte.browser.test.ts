@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, afterEach, describe, expect, mock, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { OtpCodeInput, OtpForm } from "@k-otp/sdk/ui/svelte";
 import { fireEvent, screen } from "@testing-library/dom";
 import { part, segment, segments, sentPhone } from "./dom";
@@ -95,6 +97,93 @@ describe("<OtpForm /> preset (Svelte)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Change number" }));
     await flush();
     expect(input.readOnly).toBe(false);
+  });
+});
+
+describe("Svelte hydration", () => {
+  let dir: string | undefined;
+  afterAll(async () => {
+    if (dir) await rm(dir, { recursive: true, force: true });
+  });
+
+  /**
+   * Server-renders the preset like an SSR build: a separate bundle of the
+   * `.svelte` sources compiled for the server, with Svelte's server runtime
+   * (this test process resolves `svelte` to the client runtime).
+   */
+  const serverRender = async (props: Record<string, unknown>) => {
+    const { compile, VERSION } = await import("svelte/compiler");
+    const svelte4 = VERSION.startsWith("4.");
+    dir ??= await mkdtemp(path.join(import.meta.dir, "..", ".svelte-tmp-"));
+    const entry = path.join(dir, "entry.js");
+    const index = path.resolve(
+      import.meta.dir,
+      "../../packages/sdk/src/ui/svelte/index.js",
+    );
+    await writeFile(
+      entry,
+      svelte4
+        ? `export { OtpForm } from ${JSON.stringify(index)};\n`
+        : `export { OtpForm } from ${JSON.stringify(index)};\nexport { render } from "svelte/server";\n`,
+    );
+    const result = await Bun.build({
+      entrypoints: [entry],
+      outdir: dir,
+      naming: "server-[hash].js",
+      target: "bun",
+      plugins: [
+        {
+          name: "svelte-server",
+          setup(build) {
+            build.onLoad({ filter: /\.svelte$/ }, async ({ path: file }) => {
+              const options = {
+                filename: file,
+                generate: svelte4 ? "ssr" : "server",
+              } as unknown as Parameters<typeof compile>[1];
+              const { js } = compile(await Bun.file(file).text(), options);
+              return { contents: js.code, loader: "js" };
+            });
+          },
+        },
+      ],
+    });
+    if (!result.success) throw new Error(result.logs.join("\n"));
+    const output = result.outputs[0]?.path ?? "";
+    const server = (await import(output)) as {
+      OtpForm: { render?: (p: unknown) => { html: string } };
+      render?: (c: unknown, o: unknown) => { body: string };
+    };
+    return svelte4
+      ? (server.OtpForm.render?.(props).html ?? "")
+      : (server.render?.(server.OtpForm, { props }).body ?? "");
+  };
+
+  test("hydrates server markup (explicit id), reusing the server nodes", async () => {
+    const api = createMockApi();
+    const props = {
+      client: api.client,
+      purpose: "signup",
+      id: "otp",
+      locale: "en",
+    };
+    const html = await serverRender(props);
+    expect(html).toContain('id="otp-phone"');
+    const target = document.createElement("div");
+    target.innerHTML = html;
+    document.body.append(target);
+    const serverInput = target.querySelector('[data-k-otp="phone-input"]');
+    mounted.push(mountSvelte(OtpForm, props, { target, hydrate: true }));
+    await flush();
+    expect(part("phone-input")).toBe(serverInput as HTMLElement);
+    expect(part("phone-input").id).toBe("otp-phone");
+    fireEvent.input(part("phone-input"), {
+      target: { value: "01012345678" },
+    });
+    await flush();
+    fireEvent.click(screen.getByRole("button", { name: "Send code" }));
+    await flush();
+    expect(part("root").getAttribute("data-state")).toBe("code");
+    expect(api.calls).toHaveLength(1);
   });
 });
 
