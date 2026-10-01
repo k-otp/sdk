@@ -34,7 +34,9 @@ function Headless({ onVerified }: { onVerified: (r: VerifyResult) => void }) {
           <OtpForm.PhoneField>
             {({ labelProps, inputProps, errorProps, parts }) => (
               <>
-                <label {...labelProps}>{copy[locale].mobile}</label>
+                <label {...labelProps} htmlFor={labelProps.htmlFor}>
+                  {copy[locale].mobile}
+                </label>
                 <input {...inputProps} />
                 {parts.text.phoneError && (
                   <p {...errorProps}>{parts.text.phoneError}</p>

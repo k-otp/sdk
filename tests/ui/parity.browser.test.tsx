@@ -32,7 +32,9 @@ const frameworks: Framework[] = [
     mount: (props) => {
       const el = document.createElement("div");
       document.body.append(el);
-      const app = createApp({ render: () => h(VueOtpForm, props as { purpose: string }) });
+      const app = createApp({
+        render: () => h(VueOtpForm, props as { purpose: string }),
+      });
       app.mount(el);
       return {
         destroy: () => {
