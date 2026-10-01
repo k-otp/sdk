@@ -16,11 +16,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 const VERSION = "1.2.3";
-const PACKAGES = ["core", "server", "react", "vue", "svelte"];
-const ALL_TAGS = [
-  `v${VERSION}`,
-  ...PACKAGES.map((name) => `@k-otp/sdk-${name}-v${VERSION}`),
-];
+const PACKAGE = "@k-otp/sdk";
+const ALL_TAGS = [`v${VERSION}`, `${PACKAGE}-v${VERSION}`];
 
 const root = mkdtempSync(path.join(tmpdir(), "publish-oidc-"));
 const bin = path.join(root, "bin");
@@ -31,14 +28,12 @@ writeFileSync(
   path.join(root, "scripts", "publish-oidc.sh"),
   await Bun.file(path.join(import.meta.dir, "..", "publish-oidc.sh")).text(),
 );
-for (const name of PACKAGES) {
-  const dir = path.join(root, "packages", `sdk-${name}`);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(
-    path.join(dir, "package.json"),
-    JSON.stringify({ name: `@k-otp/sdk-${name}`, version: VERSION }),
-  );
-}
+const packageDir = path.join(root, "packages", "sdk");
+mkdirSync(packageDir, { recursive: true });
+writeFileSync(
+  path.join(packageDir, "package.json"),
+  JSON.stringify({ name: PACKAGE, version: VERSION }),
+);
 
 const stub = (name: string, body: string) => {
   mkdirSync(bin, { recursive: true });
@@ -141,15 +136,26 @@ describe("publish-oidc.sh --check", () => {
     expect(r.calls.some((c) => c.includes("ls-remote"))).toBe(false);
   });
 
-  test("a missing per-package tag needs finalizing", () => {
-    const r = run(["--check"], {
-      STUB_REMOTE_TAGS: ALL_TAGS.filter((t) => !t.includes("sdk-vue")).join(
-        " ",
-      ),
-    });
+  test("a missing package tag needs finalizing", () => {
+    const r = run(["--check"], { STUB_REMOTE_TAGS: `v${VERSION}` });
     expect(r.exitCode).toBe(0);
     expect(r.output("needs_finalize")).toBe("true");
-    expect(r.stdout).toContain(`@k-otp/sdk-vue-v${VERSION} is published`);
+    expect(r.stdout).toContain(`${PACKAGE}-v${VERSION} is published`);
+  });
+
+  test("a second publishable package must be listed in PACKAGE_DIRS", () => {
+    const extra = path.join(root, "packages", "extra");
+    mkdirSync(extra, { recursive: true });
+    writeFileSync(
+      path.join(extra, "package.json"),
+      JSON.stringify({ name: "@k-otp/extra", version: VERSION }),
+    );
+    try {
+      const r = run(["--check"]);
+      expect(r.exitCode).toBe(1);
+    } finally {
+      rmSync(extra, { recursive: true, force: true });
+    }
   });
 
   test("a missing GitHub Release (HTTP 404) needs finalizing", () => {

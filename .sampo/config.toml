@@ -12,18 +12,10 @@ repository = "k-otp/sdk"
 ignore_unpublished = true
 
 # Keep the workspace root, tests and examples out of versioning/release flows
-# (they are private as well).
+# (they are private as well). The only released package is npm/@k-otp/sdk
+# (packages/sdk); its subpaths (/core, /server, /react, ...) share its version.
 ignore = [
   "npm/k-otp-sdk-workspace",
   "npm/k-otp-sdk-tests",
   "npm/k-otp-example-*",
 ]
-
-# Lockstep versioning for every published @k-otp/sdk-* package.
-fixed = [[
-  "npm/@k-otp/sdk-core",
-  "npm/@k-otp/sdk-server",
-  "npm/@k-otp/sdk-react",
-  "npm/@k-otp/sdk-vue",
-  "npm/@k-otp/sdk-svelte",
-]]

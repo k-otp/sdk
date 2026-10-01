@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Publish the lockstep @k-otp/sdk-* packages to npm with GitHub OIDC
-# Trusted Publishing (no long-lived npm token).
+# Publish @k-otp/sdk to npm with GitHub OIDC Trusted Publishing (no
+# long-lived npm token).
 #
 # Why pack with Bun? The workspace uses `workspace:*` and `catalog:` ranges;
 # `bun pm pack` rewrites them to real versions inside the tarball, which is
@@ -15,8 +15,8 @@ set -euo pipefail
 #                                       # (re)creates missing tags + Release
 #
 # should_publish: some package version is not on npm yet (a new release).
-# needs_finalize: everything is on npm but a release tag (vX.Y.Z or a
-#   per-package @k-otp/sdk-*-vX.Y.Z) or the GitHub Release is missing (an
+# needs_finalize: everything is on npm but a release tag (vX.Y.Z or the
+#   package tag @k-otp/sdk-vX.Y.Z) or the GitHub Release is missing (an
 #   earlier run failed after publishing). Kept separate so a recovery never
 #   blocks the Sampo release-PR step: when the tag / Release lookups keep
 #   failing, --check warns and reports needs_finalize=false instead of failing.
@@ -25,7 +25,7 @@ set -euo pipefail
 # the 3 attempts of a git / gh lookup (tests set it to 0).
 #
 # Requirements (publish mode): GitHub Actions job with `id-token: write`,
-# every package configured for Trusted Publishing from this repo + workflow
+# @k-otp/sdk configured for Trusted Publishing from this repo + workflow
 # (see docs/releasing.md), Node >= 22.14 and npm >= 11.5.1.
 #
 # Version 0.0.0 is the "never released" placeholder and is never published.
@@ -44,13 +44,10 @@ if [[ $# -ne 0 ]]; then
   exit 2
 fi
 
-# Publish order matters: dependencies first.
+# The single published package. The script still loops over a list (and
+# checks that versions agree) so a future package can be added here.
 PACKAGE_DIRS=(
-  "packages/sdk-core"
-  "packages/sdk-server"
-  "packages/sdk-react"
-  "packages/sdk-vue"
-  "packages/sdk-svelte"
+  "packages/sdk"
 )
 
 pkg_field() {
@@ -204,7 +201,7 @@ for dir in "${PACKAGE_DIRS[@]}"; do
   fi
 done
 
-# The main tag plus one tag per package.
+# The main tag plus one tag per package (Sampo's `<package>-v<version>`).
 RELEASE_TAGS=("v${RELEASE_VERSION}")
 for dir in "${PACKAGE_DIRS[@]}"; do
   RELEASE_TAGS+=("$(pkg_field "$dir" name)-v${RELEASE_VERSION}")
