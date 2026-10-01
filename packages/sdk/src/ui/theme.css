@@ -8,7 +8,8 @@
  * ancestor (e.g. :root):
  *   --k-otp-accent, --k-otp-accent-contrast, --k-otp-radius, --k-otp-font,
  *   --k-otp-font-mono, --k-otp-space, --k-otp-surface, --k-otp-text,
- *   --k-otp-muted, --k-otp-border, --k-otp-field, --k-otp-danger,
+ *   --k-otp-muted, --k-otp-border, --k-otp-field-border,
+ *   --k-otp-border-strong, --k-otp-field, --k-otp-danger,
  *   --k-otp-success, --k-otp-focus-ring, --k-otp-focus-width,
  *   --k-otp-shadow, --k-otp-max-width, --k-otp-segment-size.
  *
@@ -24,7 +25,9 @@
   --_k-otp-text: var(--k-otp-text, #0d0d18);
   --_k-otp-muted: var(--k-otp-muted, #6c6c84);
   --_k-otp-border: var(--k-otp-border, #e2e2eb);
-  --_k-otp-border-strong: var(--k-otp-border-strong, #cbcbd8);
+  /* Field borders: >= 3:1 against the field and the surface. */
+  --_k-otp-field-border: var(--k-otp-field-border, #86869e);
+  --_k-otp-border-strong: var(--k-otp-border-strong, #6c6c84);
   --_k-otp-field: var(--k-otp-field, #fbfbfd);
   --_k-otp-field-locked: var(--k-otp-field-locked, #f3f3f8);
   --_k-otp-danger: var(--k-otp-danger, #c62828);
@@ -57,11 +60,9 @@
     Consolas,
     monospace
   );
-  --_k-otp-ring: var(
-    --k-otp-focus-ring,
-    color-mix(in oklab, var(--_k-otp-accent) 40%, transparent)
-  );
-  --_k-otp-ring-width: var(--k-otp-focus-width, 3px);
+  /* Focus: a solid accent outline (>= 3:1 against the surface). */
+  --_k-otp-ring: var(--k-otp-focus-ring, var(--_k-otp-accent));
+  --_k-otp-ring-width: var(--k-otp-focus-width, 2px);
   --_k-otp-segment-size: var(--k-otp-segment-size, 3.25rem);
   color-scheme: light;
 }
@@ -78,7 +79,8 @@
     --_k-otp-text: var(--k-otp-text, #f5f5f9);
     --_k-otp-muted: var(--k-otp-muted, #9d9db0);
     --_k-otp-border: var(--k-otp-border, #2e2e44);
-    --_k-otp-border-strong: var(--k-otp-border-strong, #45455e);
+    --_k-otp-field-border: var(--k-otp-field-border, #6e6e8c);
+    --_k-otp-border-strong: var(--k-otp-border-strong, #9d9db0);
     --_k-otp-field: var(--k-otp-field, #12121f);
     --_k-otp-field-locked: var(--k-otp-field-locked, #1f1f32);
     --_k-otp-danger: var(--k-otp-danger, #f87171);
@@ -100,7 +102,8 @@
   --_k-otp-text: var(--k-otp-text, #f5f5f9);
   --_k-otp-muted: var(--k-otp-muted, #9d9db0);
   --_k-otp-border: var(--k-otp-border, #2e2e44);
-  --_k-otp-border-strong: var(--k-otp-border-strong, #45455e);
+  --_k-otp-field-border: var(--k-otp-field-border, #6e6e8c);
+  --_k-otp-border-strong: var(--k-otp-border-strong, #9d9db0);
   --_k-otp-field: var(--k-otp-field, #12121f);
   --_k-otp-field-locked: var(--k-otp-field-locked, #1f1f32);
   --_k-otp-danger: var(--k-otp-danger, #f87171);
@@ -167,7 +170,7 @@
   height: 3rem;
   margin: 0;
   padding: 0 calc(var(--_k-otp-space) * 4);
-  border: 1px solid var(--_k-otp-border);
+  border: 1px solid var(--_k-otp-field-border);
   border-radius: var(--_k-otp-radius);
   background: var(--_k-otp-field);
   color: inherit;
@@ -176,6 +179,9 @@
   font-size: 1rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
+  /* Phone numbers read left to right, whatever the page direction. */
+  direction: ltr;
+  text-align: start;
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease,
@@ -184,7 +190,7 @@
 
 :where([data-k-otp="phone-input"])::placeholder {
   color: var(--_k-otp-muted);
-  opacity: 0.6;
+  opacity: 1;
 }
 
 :where([data-k-otp="phone-input"]):hover:not([readonly]) {
@@ -193,9 +199,9 @@
 
 :where([data-k-otp="phone-input"], [data-k-otp="code-segment"]):focus-visible,
 :where([data-k-otp="phone-input"], [data-k-otp="code-segment"]):focus {
-  outline: none;
   border-color: var(--_k-otp-accent);
-  box-shadow: 0 0 0 var(--_k-otp-ring-width) var(--_k-otp-ring);
+  outline: var(--_k-otp-ring-width) solid var(--_k-otp-ring);
+  outline-offset: 1px;
 }
 
 :where([data-k-otp="phone-input"])[readonly] {
@@ -208,12 +214,13 @@
 }
 
 :where([data-k-otp="phone-input"])[data-invalid]:focus {
-  box-shadow: 0 0 0 var(--_k-otp-ring-width)
-    color-mix(in oklab, var(--_k-otp-danger) 30%, transparent);
+  outline-color: var(--_k-otp-danger);
 }
 
 /* Segmented code input. */
 :where([data-k-otp="code-input"]) {
+  /* Segment 1 is on the left in RTL pages too (arrow keys match). */
+  direction: ltr;
   display: flex;
   gap: calc(var(--_k-otp-space) * 2);
   min-width: 0;
@@ -228,7 +235,7 @@
   height: calc(var(--_k-otp-segment-size) * 1.1);
   margin: 0;
   padding: 0;
-  border: 1px solid var(--_k-otp-border);
+  border: 1px solid var(--_k-otp-field-border);
   border-radius: var(--_k-otp-radius);
   background: var(--_k-otp-field);
   color: inherit;
@@ -347,10 +354,8 @@
   [data-k-otp="verify-button"],
   [data-k-otp="edit-phone"]
 ):focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px var(--_k-otp-surface),
-    0 0 0 calc(2px + var(--_k-otp-ring-width)) var(--_k-otp-ring);
+  outline: var(--_k-otp-ring-width) solid var(--_k-otp-ring);
+  outline-offset: 2px;
 }
 
 :where(
@@ -538,5 +543,51 @@
     animation: none;
     border-right-color: currentColor;
     opacity: 0.6;
+  }
+}
+
+/*
+ * Windows High Contrast and other forced-colors modes drop box shadows and
+ * custom colors: keep borders, outlines and states in system colors.
+ */
+@media (forced-colors: active) {
+  :where([data-k-otp="root"]) {
+    border-color: CanvasText;
+  }
+
+  :where([data-k-otp="phone-input"], [data-k-otp="code-segment"]) {
+    border: 1px solid CanvasText;
+  }
+
+  :where([data-k-otp="phone-input"])[data-invalid],
+  :where([data-k-otp="code-segment"])[data-invalid] {
+    border-width: 2px;
+  }
+
+  :where([data-k-otp="phone-input"], [data-k-otp="code-segment"]):focus,
+  :where(
+    [data-k-otp="send-button"],
+    [data-k-otp="verify-button"],
+    [data-k-otp="edit-phone"]
+  ):focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  :where([data-k-otp="send-button"], [data-k-otp="verify-button"]) {
+    border: 1px solid ButtonText;
+  }
+
+  :where(
+    [data-k-otp="send-button"],
+    [data-k-otp="verify-button"]
+  )[aria-disabled="true"] {
+    border-color: GrayText;
+    color: GrayText;
+    opacity: 1;
+  }
+
+  :where([data-k-otp="message"])[data-state="success"]::before {
+    background: CanvasText;
   }
 }
