@@ -19,7 +19,8 @@
  *   chunk they share (`dist/react-<hash>.js`), never from the core or a
  *   chunk of another subpath
  * - `sideEffects` lists only the CSS files (the optional theme)
- * - `"use client"` opens the react entries and nothing else (see below)
+ * - `"use client"` opens exactly the files with React code: the react and
+ *   ui-react entries and their shared hooks chunk (via source maps)
  *
  * Run `bun run build` first.
  */
@@ -90,6 +91,26 @@ const FRAMEWORKS: Record<string, string[]> = {
   react: ["react", "ui-react"],
   vue: ["vue", "ui-vue"],
   svelte: ["svelte", "ui-svelte"],
+};
+
+/** Entries that must start with `"use client"`. */
+const REACT_ENTRY = /^dist[/\\](?:ui-)?react\.c?js$/;
+/** Source directories of React code (hooks and components). */
+const REACT_SOURCES = /(?:^|[/\\])src[/\\](?:ui[/\\])?react[/\\]/;
+
+/** Whether a built file's source map lists React sources. */
+const hasReactSources = async (
+  unpacked: string,
+  file: string,
+): Promise<boolean> => {
+  try {
+    const map = JSON.parse(
+      await readFile(path.join(unpacked, `${file}.map`), "utf8"),
+    ) as { sources?: string[] };
+    return (map.sources ?? []).some((source) => REACT_SOURCES.test(source));
+  } catch {
+    return false; // no source map: the IIFE bundles and the server stub
+  }
 };
 
 /** Only the theme has side effects (importing it applies styles). */
@@ -320,15 +341,21 @@ const checkPackage = async (dir: string): Promise<void> => {
   // Imports in the built output must be declared dependencies.
   for (const file of files.filter((f) => /\.(c?js|mjs|svelte)$/.test(f))) {
     const code = await readFile(path.join(unpacked, file), "utf8");
-    // `"use client"` opens the react entry (Next.js App Router) and nothing
-    // else: on a shared chunk it would turn the core into client code.
+    // `"use client"` opens every file with React code (Next.js App Router):
+    // the react and ui-react entries and the hooks chunk they share, found
+    // through the source maps. On any other file (a core chunk) it would
+    // turn framework-free code into client code.
     const useClient = /^\s*["']use client["'];?/.test(code);
-    const isReactEntry = /^dist[/\\]react\.c?js$/.test(file);
-    if (isReactEntry && !useClient) {
-      fail(name, `${file} must start with "use client"`);
+    const needsUseClient =
+      REACT_ENTRY.test(file) || (await hasReactSources(unpacked, file));
+    if (needsUseClient && !useClient) {
+      fail(
+        name,
+        `${file} contains React code and must start with "use client"`,
+      );
     }
-    if (!isReactEntry && /["']use client["']/.test(code)) {
-      fail(name, `${file} must not contain "use client"`);
+    if (!needsUseClient && /["']use client["']/.test(code)) {
+      fail(name, `${file} has no React code and must not contain "use client"`);
     }
     if (file.includes(".iife.")) continue; // self-contained CDN bundle
     for (const specifier of bareImports(code)) {

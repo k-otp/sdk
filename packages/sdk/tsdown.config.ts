@@ -42,10 +42,22 @@ const {
 
 /**
  * Hooks, context and components only work in client components (Next.js
- * App Router): `@k-otp/sdk/react` and `@k-otp/sdk/ui/react`.
+ * App Router). `"use client"` opens every JS file that contains React code
+ * (`src/react`, `src/ui/react`): the `react` and `ui-react` entries and the
+ * chunk with the hooks they share. Never a core chunk or a declaration file.
  */
-const reactClientBanner = ({ fileName }: { fileName: string }) =>
-  /^(ui-)?react\.c?js$/.test(fileName) ? { js: '"use client";' } : undefined;
+const REACT_SOURCES = /[\\/]src[\\/](?:ui[\\/])?react[\\/]/;
+const reactClientBanner = (chunk: {
+  name: string;
+  fileName: string;
+  isEntry: boolean;
+  moduleIds: string[];
+}): string =>
+  !/\.d\.c?ts$/.test(chunk.fileName) &&
+  ((chunk.isEntry && /^(?:ui-)?react$/.test(chunk.name)) ||
+    chunk.moduleIds.some((id) => REACT_SOURCES.test(id)))
+    ? '"use client";'
+    : "";
 
 export default defineConfig([
   // npm entry points: ESM with .d.ts. `server.browser` is what
@@ -58,7 +70,7 @@ export default defineConfig([
     entry: { ...entries, "server.browser": "src/server/browser.ts" },
     format: "esm",
     dts: { generator: "oxc" },
-    banner: reactClientBanner,
+    outputOptions: { banner: reactClientBanner },
     // Shipped as-is: the Svelte component sources (+ their declarations and
     // the subpath index) and the optional default theme.
     copy: [
@@ -80,7 +92,7 @@ export default defineConfig([
     entry: cjsEntries,
     format: "cjs",
     dts: { generator: "oxc" },
-    banner: reactClientBanner,
+    outputOptions: { banner: reactClientBanner },
   },
   // CDN bundle for <script> tags: exposes `window.KOtp`, bundles oRPC.
   {

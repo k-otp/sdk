@@ -77,8 +77,10 @@ Public, MIT-licensed SDK for the K-OTP Korean OTP API (`https://api.k-otp.dev/v1
   request and send it as header + body.
 - Adapters: no top-level `window` access, no module-level state, no mutation
   of protocol semantics. `run`/flow actions resolve `{ data } | { error }`
-  (never reject for API errors). Keep `"use client"` on the react and
-  ui-react entries only (`banner` in `packages/sdk/tsdown.config.ts`).
+  (never reject for API errors). `"use client"` opens exactly the built
+  files with React code: the react and ui-react entries and the hooks chunk
+  they share (`outputOptions.banner` in `packages/sdk/tsdown.config.ts`,
+  verified through the source maps by `check:pack`), never a core chunk.
 - UI: the three frameworks must render the same `data-*`/ARIA state
   (`tests/ui/parity.browser.test.tsx`). The hooks subpaths, core, headless
   and server must never load `src/ui` (`bun run size` checks it). The
