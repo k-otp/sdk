@@ -54,11 +54,15 @@ const SDK_ENTRIES = [
   "ui-vue",
   "ui-svelte",
 ];
-/** Subpaths a framework example may (and must) bundle. */
+/**
+ * Subpaths a framework example may bundle (the core client uses the oRPC
+ * contract chunk).
+ */
+const SHARED = ["core", "headless", "contract", "ui"];
 const ALLOWED: Record<string, string[]> = {
-  react: ["core", "headless", "ui", "react", "ui-react"],
-  vue: ["core", "headless", "ui", "vue", "ui-vue"],
-  svelte: ["core", "headless", "ui", "svelte", "ui-svelte"],
+  react: [...SHARED, "react", "ui-react"],
+  vue: [...SHARED, "vue", "ui-vue"],
+  svelte: [...SHARED, "svelte", "ui-svelte"],
 };
 
 /**
@@ -265,7 +269,7 @@ for (const entry of await readdir(examplesDir, { withFileTypes: true })) {
         problems = [error instanceof Error ? error.message : String(error)];
       }
       console.log(
-        `[examples] ${entry.name} bundle (only @k-otp/sdk/${framework}): ${problems.length ? "FAILED" : "ok"}`,
+        `[examples] ${entry.name} bundle (only @k-otp/sdk/${framework} + /ui/${framework}): ${problems.length ? "FAILED" : "ok"}`,
       );
       if (problems.length) {
         failed = true;

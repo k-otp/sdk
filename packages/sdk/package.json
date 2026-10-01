@@ -30,7 +30,7 @@
   },
   "type": "module",
   "sideEffects": [
-    "*.css"
+    "**/*.css"
   ],
   "main": "./dist/core.cjs",
   "module": "./dist/core.js",

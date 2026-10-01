@@ -93,7 +93,7 @@ const FRAMEWORKS: Record<string, string[]> = {
 };
 
 /** Only the theme has side effects (importing it applies styles). */
-const SIDE_EFFECTS = ["*.css"];
+const SIDE_EFFECTS = ["**/*.css"];
 
 /**
  * The subpath a built file belongs to: `dist/react.js` and its shared
