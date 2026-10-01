@@ -702,17 +702,17 @@ export type OtpFormProps = Omit<OtpFormRootProps, "children"> & {
 
 const PresetBody = ({ children }: { children?: ReactNode }): ReactElement => {
   const { state } = useOtpFormContext();
+  // Once verified, only the fields and the result stay.
+  const active = state.phase !== "verified";
   return h(
     Fragment,
     null,
     h(OtpFormPhoneField),
     state.issued ? h(OtpFormCodeField) : null,
-    state.issued ? h(OtpFormCountdown) : null,
-    state.issued ? h(OtpFormVerifyButton) : null,
-    h(OtpFormSendButton),
-    state.issued && state.phase !== "verified"
-      ? h(OtpFormEditPhoneButton)
-      : null,
+    active && state.issued ? h(OtpFormCountdown) : null,
+    active && state.issued ? h(OtpFormVerifyButton) : null,
+    active ? h(OtpFormSendButton) : null,
+    active && state.issued ? h(OtpFormEditPhoneButton) : null,
     children,
     h(OtpFormMessage),
   );
