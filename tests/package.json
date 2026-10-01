@@ -2,10 +2,10 @@
   "name": "k-otp-sdk-tests",
   "version": "0.0.0",
   "private": true,
-  "description": "Adapter tests (React, Vue, Svelte) and the cross-adapter parity suite. Runs under happy-dom.",
+  "description": "Adapter and UI component tests (React, Vue, Svelte) and the cross-framework parity suites. Runs under happy-dom; *.browser.test.* files run with the browser export condition (Svelte client runtime).",
   "type": "module",
   "scripts": {
-    "test": "bun test --timeout 10000 ."
+    "test": "bun test --timeout 10000 --path-ignore-patterns='**/*.browser.test.*' . && bun test --timeout 30000 --conditions=browser --preload ./svelte-plugin.ts ./ui/svelte.browser.test.ts ./ui/parity.browser.test.tsx"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "catalog:",
