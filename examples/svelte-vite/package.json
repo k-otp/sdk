@@ -2,7 +2,7 @@
   "name": "k-otp-example-svelte-vite",
   "version": "0.0.0",
   "private": true,
-  "description": "K-OTP issue -> verify with @k-otp/sdk-svelte and Vite",
+  "description": "K-OTP issue -> verify with @k-otp/sdk/svelte and Vite",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,7 @@
     "typecheck": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings"
   },
   "dependencies": {
-    "@k-otp/sdk-svelte": "workspace:*",
+    "@k-otp/sdk": "workspace:*",
     "svelte": "^5.57.1"
   },
   "devDependencies": {

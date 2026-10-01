@@ -9,10 +9,7 @@
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "catalog:",
-    "@k-otp/sdk-core": "workspace:*",
-    "@k-otp/sdk-react": "workspace:*",
-    "@k-otp/sdk-svelte": "workspace:*",
-    "@k-otp/sdk-vue": "workspace:*",
+    "@k-otp/sdk": "workspace:*",
     "@testing-library/dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/bun": "catalog:",

@@ -2,7 +2,7 @@
   "name": "k-otp-example-node-server",
   "version": "0.0.0",
   "private": true,
-  "description": "Backend issue/verify endpoints with @k-otp/sdk-server (sk_ key stays on the server)",
+  "description": "Backend issue/verify endpoints with @k-otp/sdk/server (sk_ key stays on the server)",
   "type": "module",
   "engines": {
     "node": ">=22.18"
@@ -15,7 +15,7 @@
     "smoke": "node src/smoke.ts"
   },
   "dependencies": {
-    "@k-otp/sdk-server": "workspace:*"
+    "@k-otp/sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

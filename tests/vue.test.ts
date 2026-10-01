@@ -6,7 +6,7 @@ import {
   useOtp,
   useOtpClient,
   useOtpFlow,
-} from "@k-otp/sdk-vue";
+} from "@k-otp/sdk/vue";
 import {
   createApp,
   createSSRApp,
@@ -21,7 +21,7 @@ import {
   issueOutput,
   json,
   mockFetch,
-} from "../packages/sdk-core/test/helpers";
+} from "../packages/sdk/test/helpers";
 
 const issueInput = {
   phoneNumber: "01012345678",

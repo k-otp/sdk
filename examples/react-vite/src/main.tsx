@@ -1,4 +1,4 @@
-import { OtpProvider } from "@k-otp/sdk-react";
+import { OtpProvider } from "@k-otp/sdk/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";

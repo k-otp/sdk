@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
-    "@k-otp/sdk-core": "workspace:*",
+    "@k-otp/sdk": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "~5.9.3"
   }

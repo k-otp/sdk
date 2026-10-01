@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { createOtpServerClient } from "@k-otp/sdk-server";
+import { createOtpServerClient } from "@k-otp/sdk/server";
 import { createHandler } from "./app.ts";
 import { mockFetch } from "./mock-fetch.ts";
 

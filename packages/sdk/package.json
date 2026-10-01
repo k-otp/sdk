@@ -1,0 +1,197 @@
+{
+  "name": "@k-otp/sdk",
+  "version": "0.0.0",
+  "description": "Official K-OTP (Korean OTP API) SDK: issue and verify one-time passwords from browsers, SSR, edge and servers, with React, Vue and Svelte bindings and a CDN bundle.",
+  "keywords": [
+    "k-otp",
+    "otp",
+    "one-time-password",
+    "sms",
+    "alimtalk",
+    "korea",
+    "verification",
+    "orpc",
+    "react",
+    "vue",
+    "svelte"
+  ],
+  "license": "MIT",
+  "author": "1990Company",
+  "homepage": "https://github.com/k-otp/sdk/tree/main/packages/sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/k-otp/sdk.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/k-otp/sdk/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/core.cjs",
+  "module": "./dist/core.js",
+  "types": "./dist/core.d.ts",
+  "unpkg": "./dist/k-otp.iife.min.js",
+  "jsdelivr": "./dist/k-otp.iife.min.js",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/core.d.ts",
+        "default": "./dist/core.js"
+      },
+      "require": {
+        "types": "./dist/core.d.cts",
+        "default": "./dist/core.cjs"
+      }
+    },
+    "./core": {
+      "import": {
+        "types": "./dist/core.d.ts",
+        "default": "./dist/core.js"
+      },
+      "require": {
+        "types": "./dist/core.d.cts",
+        "default": "./dist/core.cjs"
+      }
+    },
+    "./headless": {
+      "import": {
+        "types": "./dist/headless.d.ts",
+        "default": "./dist/headless.js"
+      },
+      "require": {
+        "types": "./dist/headless.d.cts",
+        "default": "./dist/headless.cjs"
+      }
+    },
+    "./contract": {
+      "import": {
+        "types": "./dist/contract.d.ts",
+        "default": "./dist/contract.js"
+      },
+      "require": {
+        "types": "./dist/contract.d.cts",
+        "default": "./dist/contract.cjs"
+      }
+    },
+    "./server": {
+      "browser": {
+        "workerd": {
+          "import": {
+            "types": "./dist/server.d.ts",
+            "default": "./dist/server.js"
+          },
+          "require": {
+            "types": "./dist/server.d.cts",
+            "default": "./dist/server.cjs"
+          }
+        },
+        "worker": {
+          "import": {
+            "types": "./dist/server.d.ts",
+            "default": "./dist/server.js"
+          },
+          "require": {
+            "types": "./dist/server.d.cts",
+            "default": "./dist/server.cjs"
+          }
+        },
+        "edge-light": {
+          "import": {
+            "types": "./dist/server.d.ts",
+            "default": "./dist/server.js"
+          },
+          "require": {
+            "types": "./dist/server.d.cts",
+            "default": "./dist/server.cjs"
+          }
+        },
+        "deno": {
+          "import": {
+            "types": "./dist/server.d.ts",
+            "default": "./dist/server.js"
+          },
+          "require": {
+            "types": "./dist/server.d.cts",
+            "default": "./dist/server.cjs"
+          }
+        },
+        "default": "./dist/server.browser.js"
+      },
+      "import": {
+        "types": "./dist/server.d.ts",
+        "default": "./dist/server.js"
+      },
+      "require": {
+        "types": "./dist/server.d.cts",
+        "default": "./dist/server.cjs"
+      }
+    },
+    "./react": {
+      "import": {
+        "types": "./dist/react.d.ts",
+        "default": "./dist/react.js"
+      },
+      "require": {
+        "types": "./dist/react.d.cts",
+        "default": "./dist/react.cjs"
+      }
+    },
+    "./vue": {
+      "import": {
+        "types": "./dist/vue.d.ts",
+        "default": "./dist/vue.js"
+      },
+      "require": {
+        "types": "./dist/vue.d.cts",
+        "default": "./dist/vue.cjs"
+      }
+    },
+    "./svelte": {
+      "types": "./dist/svelte.d.ts",
+      "default": "./dist/svelte.js"
+    },
+    "./k-otp.iife.js": "./dist/k-otp.iife.js",
+    "./k-otp.iife.min.js": "./dist/k-otp.iife.min.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsdown",
+    "typecheck": "ttsc --noEmit -p tsconfig.json && ttsc --noEmit -p tsconfig.test.json",
+    "test": "bun test",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@orpc/client": "catalog:",
+    "@orpc/contract": "catalog:",
+    "@orpc/openapi-client": "catalog:"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "svelte": ">=4",
+    "vue": ">=3.3"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
+  }
+}

@@ -1,0 +1,43 @@
+export {
+  createIdempotencyKey,
+  createOtpClient,
+  type IssueInput,
+  type IssueResult,
+  isOtpApiError,
+  OtpApiError,
+  type OtpApiErrorCode,
+  type OtpClient,
+  type OtpClientOptions,
+  type OtpRequestOptions,
+  type VerifyInput,
+  type VerifyReasonCode,
+  type VerifyResult,
+} from "../core";
+export {
+  DEFAULT_RESEND_COOLDOWN_MS,
+  type OtpFlowOptions,
+  type OtpFlowResult,
+  type OtpFlowSendInput,
+  type OtpFlowSkipReason,
+  type OtpFlowState,
+  type OtpOperationState,
+  type OtpOperationStatus,
+  type OtpRunResult,
+} from "../headless";
+export {
+  type UseOtpFlowOptions,
+  type UseOtpFlowReturn,
+  type UseOtpOperation,
+  type UseOtpOptions,
+  type UseOtpReturn,
+  useOtp,
+  useOtpFlow,
+} from "./composables";
+export {
+  createOtpPlugin,
+  OTP_CLIENT_KEY,
+  type OtpClientLike,
+  type OtpClientSource,
+  provideOtpClient,
+  useOtpClient,
+} from "./plugin";

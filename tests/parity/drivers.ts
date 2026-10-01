@@ -11,7 +11,7 @@ import type {
   OtpClient,
   VerifyInput,
   VerifyResult,
-} from "@k-otp/sdk-core";
+} from "@k-otp/sdk";
 import type {
   OtpFlowOptions,
   OtpFlowResult,
@@ -19,19 +19,19 @@ import type {
   OtpFlowState,
   OtpOperationState,
   OtpRunResult,
-} from "@k-otp/sdk-core/headless";
+} from "@k-otp/sdk/headless";
 import {
   OtpProvider,
   useOtpFlow,
   useOtpIssue,
   useOtpVerify,
-} from "@k-otp/sdk-react";
-import { createOtpStores } from "@k-otp/sdk-svelte";
+} from "@k-otp/sdk/react";
+import { createOtpStores } from "@k-otp/sdk/svelte";
 import {
   createOtpPlugin,
   useOtp,
   useOtpFlow as useVueOtpFlow,
-} from "@k-otp/sdk-vue";
+} from "@k-otp/sdk/vue";
 import { act, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { get } from "svelte/store";

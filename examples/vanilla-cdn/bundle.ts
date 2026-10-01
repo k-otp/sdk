@@ -1,9 +1,8 @@
 import { createRequire } from "node:module";
-import path from "node:path";
 
-/** Local path of the built CDN bundle (`bun run build` at the repo root). */
-export const bundlePath = (): string => {
-  const require = createRequire(import.meta.url);
-  const pkg = require.resolve("@k-otp/sdk-core/package.json");
-  return path.join(path.dirname(pkg), "dist", "k-otp.iife.min.js");
-};
+/**
+ * Local path of the built CDN bundle (`bun run build` at the repo root),
+ * resolved through the `@k-otp/sdk/k-otp.iife.min.js` package export.
+ */
+export const bundlePath = (): string =>
+  createRequire(import.meta.url).resolve("@k-otp/sdk/k-otp.iife.min.js");

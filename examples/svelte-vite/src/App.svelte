@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createOtpStores, type OtpApiError, otpForm } from "@k-otp/sdk-svelte";
+  import { createOtpStores, type OtpApiError, otpForm } from "@k-otp/sdk/svelte";
   import { onDestroy } from "svelte";
   import { mockFetch } from "./mock-fetch";
 

@@ -17,7 +17,7 @@ import {
   isOtpApiError,
   type OtpApiError,
   type OtpServerClient,
-} from "@k-otp/sdk-server";
+} from "@k-otp/sdk/server";
 
 type PendingOtp = {
   phoneNumber: string;

@@ -6,7 +6,7 @@ import {
   createOtpFlowStore,
   createOtpStores,
   otpForm,
-} from "@k-otp/sdk-svelte";
+} from "@k-otp/sdk/svelte";
 import { compile, VERSION } from "svelte/compiler";
 import { get } from "svelte/store";
 import {
@@ -15,7 +15,7 @@ import {
   json,
   mockFetch,
   verifyOutput,
-} from "../packages/sdk-core/test/helpers";
+} from "../packages/sdk/test/helpers";
 
 const issueInput = {
   phoneNumber: "01012345678",
@@ -150,7 +150,7 @@ describe("Svelte components (SSR)", () => {
     const child = await load(
       "Child",
       `<script>
-        import { getOtpContext } from "@k-otp/sdk-svelte";
+        import { getOtpContext } from "@k-otp/sdk/svelte";
         const { issue, loading } = getOtpContext();
       </script>
       <p>{$issue.status}/{$loading}</p>`,
@@ -158,7 +158,7 @@ describe("Svelte components (SSR)", () => {
     const parent = await load(
       "Parent",
       `<script>
-        import { setOtpContext } from "@k-otp/sdk-svelte";
+        import { setOtpContext } from "@k-otp/sdk/svelte";
         import Child from ${JSON.stringify(child)};
         setOtpContext({ apiKey: "pk_ssr", fetch: globalThis.__otpFetch });
       </script>
@@ -182,7 +182,7 @@ describe("Svelte components (SSR)", () => {
     const withShared = await load(
       "WithShared",
       `<script>
-        import { setOtpContext } from "@k-otp/sdk-svelte";
+        import { setOtpContext } from "@k-otp/sdk/svelte";
         setOtpContext(globalThis.__otpStores);
       </script>
       <p>shared</p>`,

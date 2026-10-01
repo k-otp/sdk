@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { createOtpServerClient } from "@k-otp/sdk-server";
+import { createOtpServerClient } from "@k-otp/sdk/server";
 import { createHandler } from "./app.ts";
 import { mockFetch } from "./mock-fetch.ts";
 import { readWallet } from "./wallet.ts";

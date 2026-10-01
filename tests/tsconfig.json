@@ -5,5 +5,5 @@
     "jsx": "react-jsx",
     "isolatedDeclarations": false
   },
-  "include": ["./**/*.ts", "./**/*.tsx", "../packages/sdk-core/test/helpers.ts"]
+  "include": ["./**/*.ts", "./**/*.tsx", "../packages/sdk/test/helpers.ts"]
 }

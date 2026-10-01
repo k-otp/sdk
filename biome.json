@@ -32,7 +32,7 @@
       "!**/coverage",
       "!**/.pack",
       "!spec/openapi.json",
-      "!**/src/generated"
+      "!**/src/**/generated"
     ]
   },
   "overrides": [

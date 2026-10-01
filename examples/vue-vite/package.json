@@ -2,7 +2,7 @@
   "name": "k-otp-example-vue-vite",
   "version": "0.0.0",
   "private": true,
-  "description": "K-OTP issue -> verify with @k-otp/sdk-vue and Vite",
+  "description": "K-OTP issue -> verify with @k-otp/sdk/vue and Vite",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,7 @@
     "typecheck": "vue-tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@k-otp/sdk-vue": "workspace:*",
+    "@k-otp/sdk": "workspace:*",
     "vue": "^3.5.43"
   },
   "devDependencies": {

@@ -9,7 +9,7 @@
  *   bun run sync:openapi --check                       # exit 1 if it would change
  *
  * After syncing, run `bun run gen:types` and `bun run check:openapi`; update
- * `packages/sdk-core/src/contract.ts` if operations were added or removed.
+ * `packages/sdk/src/core/contract.ts` if operations were added or removed.
  */
 import { stat } from "node:fs/promises";
 import path from "node:path";

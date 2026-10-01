@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { type OtpApiError, useOtpFlow } from "@k-otp/sdk-vue";
+import { type OtpApiError, useOtpFlow } from "@k-otp/sdk/vue";
 import { computed, ref } from "vue";
 
 defineProps<{ mock: boolean }>();

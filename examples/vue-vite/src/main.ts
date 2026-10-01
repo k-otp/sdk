@@ -1,4 +1,4 @@
-import { createOtpPlugin } from "@k-otp/sdk-vue";
+import { createOtpPlugin } from "@k-otp/sdk/vue";
 import { createApp } from "vue";
 import App from "./App.vue";
 import { mockFetch } from "./mock-fetch";

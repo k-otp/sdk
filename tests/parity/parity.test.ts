@@ -1,7 +1,7 @@
 /**
  * Adapter parity: identical mocked API responses must produce equivalent
  * outputs (results, state snapshots, normalized errors, requests sent) in the
- * React, Vue and Svelte adapters, and errors must equal what sdk-core itself
+ * React, Vue and Svelte adapters, and errors must equal what the core client itself
  * rejects with.
  */
 import { afterEach, describe, expect, test } from "bun:test";
@@ -10,7 +10,7 @@ import {
   isOtpApiError,
   OtpApiError,
   type OtpClientOptions,
-} from "@k-otp/sdk-core";
+} from "@k-otp/sdk";
 import {
   errorEnvelope,
   hangUntilAborted,
@@ -19,7 +19,7 @@ import {
   mockFetch,
   type RecordedRequest,
   verifyOutput,
-} from "../../packages/sdk-core/test/helpers";
+} from "../../packages/sdk/test/helpers";
 import { type Driver, drivers, type Harness } from "./drivers";
 
 type Handler = (request: RecordedRequest) => Response | Promise<Response>;
@@ -291,7 +291,7 @@ describe("parity: operations", () => {
         };
       })) as { result: { error: unknown }; issue: { error: unknown } };
 
-      // The adapters surface exactly what sdk-core rejects with.
+      // The adapters surface exactly what the core client rejects with.
       const { fetch } = mockApi(setup.handlers);
       const coreError = await createOtpClient({
         apiKey: "pk_test_parity",

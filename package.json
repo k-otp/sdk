@@ -2,7 +2,7 @@
   "name": "k-otp-sdk-workspace",
   "version": "0.0.0",
   "private": true,
-  "description": "Official JavaScript/TypeScript SDKs for the K-OTP Korean OTP API",
+  "description": "Official JavaScript/TypeScript SDK (@k-otp/sdk) for the K-OTP Korean OTP API",
   "license": "MIT",
   "type": "module",
   "packageManager": "bun@1.4.2",
@@ -39,14 +39,14 @@
     }
   },
   "scripts": {
-    "build": "bun run --filter @k-otp/sdk-core build && bun run --filter @k-otp/sdk-server --filter @k-otp/sdk-react --filter @k-otp/sdk-vue --filter @k-otp/sdk-svelte build",
+    "build": "bun run --filter @k-otp/sdk build",
     "typecheck": "bun run scripts/typecheck.ts",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "test": "bun test --timeout 10000 packages scripts/test && bun run --cwd tests test",
     "gen:types": "bun run scripts/generate-types.ts",
-    "check:openapi": "bun run scripts/generate-types.ts --check && bun test --timeout 10000 packages/sdk-core/test/contract-drift.test.ts packages/sdk-core/test/openapi-generator.test.ts",
+    "check:openapi": "bun run scripts/generate-types.ts --check && bun test --timeout 10000 packages/sdk/test/contract-drift.test.ts packages/sdk/test/openapi-generator.test.ts",
     "sync:openapi": "bun run scripts/sync-openapi.ts",
     "check:pack": "bun run scripts/check-pack.ts",
     "size": "bun run scripts/size-report.ts",
@@ -56,6 +56,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
+    "@k-otp/sdk": "workspace:*",
     "@ttsc/lint": "catalog:",
     "@types/bun": "catalog:",
     "@types/react": "catalog:",

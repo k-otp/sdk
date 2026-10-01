@@ -6,7 +6,7 @@ import {
   useOtpFlow,
   useOtpIssue,
   useOtpVerify,
-} from "@k-otp/sdk-react";
+} from "@k-otp/sdk/react";
 import { act, render, renderHook, waitFor } from "@testing-library/react";
 import { type ReactNode, StrictMode } from "react";
 import { renderToString } from "react-dom/server";
@@ -15,7 +15,7 @@ import {
   json,
   mockFetch,
   verifyOutput,
-} from "../packages/sdk-core/test/helpers";
+} from "../packages/sdk/test/helpers";
 
 const issueInput = {
   phoneNumber: "01012345678",

@@ -1,4 +1,4 @@
-import { createOtpServerClient } from "@k-otp/sdk-server";
+import { createOtpServerClient } from "@k-otp/sdk/server";
 import { mockFetch } from "./mock-fetch.ts";
 import { readWallet } from "./wallet.ts";
 

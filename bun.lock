@@ -6,6 +6,7 @@
       "name": "k-otp-sdk-workspace",
       "devDependencies": {
         "@biomejs/biome": "catalog:",
+        "@k-otp/sdk": "workspace:*",
         "@ttsc/lint": "catalog:",
         "@types/bun": "catalog:",
         "@types/react": "catalog:",
@@ -22,7 +23,7 @@
       "name": "k-otp-example-node-server",
       "version": "0.0.0",
       "dependencies": {
-        "@k-otp/sdk-server": "workspace:*",
+        "@k-otp/sdk": "workspace:*",
       },
       "devDependencies": {
         "@types/node": "catalog:",
@@ -33,7 +34,7 @@
       "name": "k-otp-example-react-vite",
       "version": "0.0.0",
       "dependencies": {
-        "@k-otp/sdk-react": "workspace:*",
+        "@k-otp/sdk": "workspace:*",
         "react": "^19.3.0",
         "react-dom": "^19.3.0",
       },
@@ -49,7 +50,7 @@
       "name": "k-otp-example-svelte-vite",
       "version": "0.0.0",
       "dependencies": {
-        "@k-otp/sdk-svelte": "workspace:*",
+        "@k-otp/sdk": "workspace:*",
         "svelte": "^5.57.1",
       },
       "devDependencies": {
@@ -63,7 +64,7 @@
       "name": "k-otp-example-vanilla-cdn",
       "version": "0.0.0",
       "devDependencies": {
-        "@k-otp/sdk-core": "workspace:*",
+        "@k-otp/sdk": "workspace:*",
         "@types/node": "catalog:",
         "typescript": "~5.9.3",
       },
@@ -72,7 +73,7 @@
       "name": "k-otp-example-vue-vite",
       "version": "0.0.0",
       "dependencies": {
-        "@k-otp/sdk-vue": "workspace:*",
+        "@k-otp/sdk": "workspace:*",
         "vue": "^3.5.43",
       },
       "devDependencies": {
@@ -82,61 +83,31 @@
         "vue-tsc": "^3.3.11",
       },
     },
-    "packages/sdk-core": {
-      "name": "@k-otp/sdk-core",
+    "packages/sdk": {
+      "name": "@k-otp/sdk",
       "version": "0.0.0",
       "dependencies": {
         "@orpc/client": "catalog:",
         "@orpc/contract": "catalog:",
         "@orpc/openapi-client": "catalog:",
       },
-    },
-    "packages/sdk-react": {
-      "name": "@k-otp/sdk-react",
-      "version": "0.0.0",
-      "dependencies": {
-        "@k-otp/sdk-core": "workspace:*",
-      },
       "peerDependencies": {
         "react": ">=18",
-      },
-    },
-    "packages/sdk-server": {
-      "name": "@k-otp/sdk-server",
-      "version": "0.0.0",
-      "dependencies": {
-        "@k-otp/sdk-core": "workspace:*",
-      },
-    },
-    "packages/sdk-svelte": {
-      "name": "@k-otp/sdk-svelte",
-      "version": "0.0.0",
-      "dependencies": {
-        "@k-otp/sdk-core": "workspace:*",
-      },
-      "peerDependencies": {
         "svelte": ">=4",
-      },
-    },
-    "packages/sdk-vue": {
-      "name": "@k-otp/sdk-vue",
-      "version": "0.0.0",
-      "dependencies": {
-        "@k-otp/sdk-core": "workspace:*",
-      },
-      "peerDependencies": {
         "vue": ">=3.3",
       },
+      "optionalPeers": [
+        "react",
+        "svelte",
+        "vue",
+      ],
     },
     "tests": {
       "name": "k-otp-sdk-tests",
       "version": "0.0.0",
       "devDependencies": {
         "@happy-dom/global-registrator": "catalog:",
-        "@k-otp/sdk-core": "workspace:*",
-        "@k-otp/sdk-react": "workspace:*",
-        "@k-otp/sdk-svelte": "workspace:*",
-        "@k-otp/sdk-vue": "workspace:*",
+        "@k-otp/sdk": "workspace:*",
         "@testing-library/dom": "catalog:",
         "@testing-library/react": "catalog:",
         "@types/bun": "catalog:",
@@ -213,15 +184,7 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@k-otp/sdk-core": ["@k-otp/sdk-core@workspace:packages/sdk-core"],
-
-    "@k-otp/sdk-react": ["@k-otp/sdk-react@workspace:packages/sdk-react"],
-
-    "@k-otp/sdk-server": ["@k-otp/sdk-server@workspace:packages/sdk-server"],
-
-    "@k-otp/sdk-svelte": ["@k-otp/sdk-svelte@workspace:packages/sdk-svelte"],
-
-    "@k-otp/sdk-vue": ["@k-otp/sdk-vue@workspace:packages/sdk-vue"],
+    "@k-otp/sdk": ["@k-otp/sdk@workspace:packages/sdk"],
 
     "@orpc/client": ["@orpc/client@1.15.4", "", { "dependencies": { "@orpc/shared": "1.15.4", "@orpc/standard-server": "1.15.4", "@orpc/standard-server-fetch": "1.15.4", "@orpc/standard-server-peer": "1.15.4" } }, "sha512-8Iv2K8Rj8hf6xHCTxmQ+gxgiY6EATDossQk4gdt3oSbGVV0x2RSeLtRK9Zry+KVsmOqPJfnLahfRp7H2rQ/Vgg=="],
 

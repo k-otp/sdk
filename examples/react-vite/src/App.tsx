@@ -1,4 +1,4 @@
-import { useOtpFlow } from "@k-otp/sdk-react";
+import { useOtpFlow } from "@k-otp/sdk/react";
 import { type FormEvent, useState } from "react";
 
 const describeError = (code: string, retryAfterMs?: number): string => {

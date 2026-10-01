@@ -6,7 +6,7 @@
  * balance is shared by every app of the organization, and the ledger shows the
  * wallet's credits plus only this app's debits.
  */
-import type { OtpServerClient, OtpWalletScope } from "@k-otp/sdk-server";
+import type { OtpServerClient, OtpWalletScope } from "@k-otp/sdk/server";
 
 export type WalletSummary = {
   /** Credits left in the wallet (the whole organization's when shared). */

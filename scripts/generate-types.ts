@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Regenerates `packages/sdk-core/src/generated/openapi.ts` from
+ * Regenerates `packages/sdk/src/core/generated/openapi.ts` from
  * `spec/openapi.json`.
  *
  *   bun run gen:types          # write
@@ -12,7 +12,7 @@ import { type OpenApiDocument, renderOpenApiTypes } from "./lib/openapi-types";
 
 const root = path.resolve(import.meta.dir, "..");
 const specPath = path.join(root, "spec/openapi.json");
-const outPath = path.join(root, "packages/sdk-core/src/generated/openapi.ts");
+const outPath = path.join(root, "packages/sdk/src/core/generated/openapi.ts");
 
 const spec = JSON.parse(await readFile(specPath, "utf8")) as OpenApiDocument;
 const rendered = renderOpenApiTypes(spec);
