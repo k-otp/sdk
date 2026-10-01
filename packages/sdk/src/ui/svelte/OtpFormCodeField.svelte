@@ -5,7 +5,6 @@
     codeDigits,
     codeFieldHandlers,
     getOtpFormContext,
-    slotProps,
   } from "./runtime.js";
 
   /** @type {string | undefined} */
@@ -14,21 +13,17 @@
   export let description = undefined;
 
   const context = getOtpFormContext();
-  const { state, parts, t } = context;
+  const { state: formState, parts } = context;
   /** @type {HTMLElement | undefined} */
   let group;
   const handlers = codeFieldHandlers(context, () => group);
 
-  $: digits = codeDigits($state.code, $state.codeLength);
+  $: digits = codeDigits($formState.code, $formState.codeLength);
   $: descriptionText = description ?? $parts.text.codeDescription;
 </script>
 
 <div {...attrs($parts.codeField)} {...$$restProps}>
-  {#if $$slots.label}
-    <slot name="label" {...slotProps(context, $state, $parts, $t)} labelProps={attrs($parts.codeLabel)} />
-  {:else}
-    <label {...attrs($parts.codeLabel)}>{label ?? $parts.text.codeLabel}</label>
-  {/if}
+  <label {...attrs($parts.codeLabel)}>{label ?? $parts.text.codeLabel}</label>
   <div {...attrs($parts.codeInput)} bind:this={group}>
     {#each $parts.codeSegments as segment, index (index)}
       <input

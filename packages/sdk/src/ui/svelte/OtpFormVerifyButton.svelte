@@ -8,8 +8,8 @@
   } from "./runtime.js";
 
   const context = getOtpFormContext();
-  const { state, parts, t } = context;
+  const { state: formState, parts, t } = context;
   const handlers = buttonHandlers(context);
 </script>
 
-<button {...attrs($parts.verifyButton)} {...$$restProps} on:click={handlers.verify}><slot {...slotProps(context, $state, $parts, $t)}>{$parts.text.verifyButton}</slot></button>
+<button {...attrs($parts.verifyButton)} {...$$restProps} on:click={handlers.verify}><slot {...slotProps(context, $formState, $parts, $t)}>{$parts.text.verifyButton}</slot></button>

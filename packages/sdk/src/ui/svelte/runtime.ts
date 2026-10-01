@@ -114,6 +114,19 @@ export type OtpFormSlotProps = {
   t: OtpTranslator;
 };
 
+/** Slot values of `OtpFormPhoneField` (for a custom label/input). */
+export type OtpFormPhoneFieldSlotProps = OtpFormSlotProps & {
+  labelProps: Record<string, string | number | undefined>;
+  /** Spread on the input; also bind `readonly={state.phoneLocked}`. */
+  inputProps: Record<string, string | number | undefined>;
+  descriptionProps: Record<string, string | number | undefined>;
+  errorProps: Record<string, string | number | undefined>;
+  /** `on:input` / `oninput` handler of the input. */
+  onInput: (event: Event) => void;
+  /** `on:blur` / `onblur` handler of the input. */
+  onBlur: () => void;
+};
+
 /** What `OtpFormRoot` shares with its parts (Svelte context). */
 export type OtpFormSvelteContext = {
   form: OtpFormController;

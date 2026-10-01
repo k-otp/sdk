@@ -25,12 +25,17 @@
   <OtpFormPhoneField />
   {#if state.issued}
     <OtpFormCodeField />
-    <OtpFormCountdown />
-    <OtpFormVerifyButton />
   {/if}
-  <OtpFormSendButton />
-  {#if state.issued && state.phase !== "verified"}
-    <OtpFormEditPhoneButton />
+  <!-- Once verified, only the fields and the result stay. -->
+  {#if state.phase !== "verified"}
+    {#if state.issued}
+      <OtpFormCountdown />
+      <OtpFormVerifyButton />
+    {/if}
+    <OtpFormSendButton />
+    {#if state.issued}
+      <OtpFormEditPhoneButton />
+    {/if}
   {/if}
   <slot />
   <OtpFormMessage />

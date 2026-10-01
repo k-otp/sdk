@@ -12,6 +12,7 @@ export type {
   OtpCodeInputEvents,
   OtpCodeInputProps,
   OtpFormPhase,
+  OtpFormPhoneFieldSlotProps,
   OtpFormRootEvents,
   OtpFormRootProps,
   OtpFormSlotProps,

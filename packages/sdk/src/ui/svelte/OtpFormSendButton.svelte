@@ -8,8 +8,8 @@
   } from "./runtime.js";
 
   const context = getOtpFormContext();
-  const { state, parts, t } = context;
+  const { state: formState, parts, t } = context;
   const handlers = buttonHandlers(context);
 </script>
 
-<button {...attrs($parts.sendButton)} {...$$restProps} on:click={handlers.send}><slot {...slotProps(context, $state, $parts, $t)}>{$parts.text.sendButton}</slot></button>
+<button {...attrs($parts.sendButton)} {...$$restProps} on:click={handlers.send}><slot {...slotProps(context, $formState, $parts, $t)}>{$parts.text.sendButton}</slot></button>

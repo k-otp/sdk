@@ -3,7 +3,7 @@
   import { attrs, getOtpFormContext, slotProps } from "./runtime.js";
 
   const context = getOtpFormContext();
-  const { state, parts, t } = context;
+  const { state: formState, parts, t } = context;
 </script>
 
-<p {...attrs($parts.message)} {...$$restProps}><slot {...slotProps(context, $state, $parts, $t)}>{$parts.text.message ?? ""}</slot></p>
+<p {...attrs($parts.message)} {...$$restProps}><slot {...slotProps(context, $formState, $parts, $t)}>{$parts.text.message ?? ""}</slot></p>

@@ -15,12 +15,12 @@
   export let placeholder = undefined;
 
   const context = getOtpFormContext();
-  const { state, parts, t } = context;
+  const { state: formState, parts, t } = context;
   const handlers = phoneInputHandlers(context);
 
   $: inputProps = {
     ...attrs($parts.phoneInput),
-    value: $state.phoneNumber,
+    value: $formState.phoneNumber,
     placeholder: placeholder ?? $parts.text.phonePlaceholder,
   };
   $: descriptionText = description ?? $parts.text.phoneDescription;
@@ -29,7 +29,7 @@
 <div {...attrs($parts.phoneField)} {...$$restProps}>
   {#if $$slots.default}
     <slot
-      {...slotProps(context, $state, $parts, $t)}
+      {...slotProps(context, $formState, $parts, $t)}
       labelProps={attrs($parts.phoneLabel)}
       {inputProps}
       descriptionProps={attrs($parts.phoneDescription)}
@@ -41,7 +41,7 @@
     <label {...attrs($parts.phoneLabel)}>{label ?? $parts.text.phoneLabel}</label>
     <input
       {...inputProps}
-      readonly={$state.phoneLocked}
+      readonly={$formState.phoneLocked}
       on:input={handlers.input}
       on:blur={handlers.blur}
     />

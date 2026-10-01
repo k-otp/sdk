@@ -69,7 +69,7 @@
     onError,
     onPhaseChange,
   });
-  const { state, parts, t, root, submit } = context;
+  const { state: formState, parts, t, root, submit } = context;
 
   $: context.update({
     id,
@@ -89,5 +89,5 @@
 </script>
 
 <form {...attrs($parts.root)} novalidate {...$$restProps} use:root on:submit={submit}>
-  <slot {...slotProps(context, $state, $parts, $t)} />
+  <slot {...slotProps(context, $formState, $parts, $t)} />
 </form>
