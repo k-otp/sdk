@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 /**
  * CI compatibility matrix helper: pins the workspace catalog to another
- * React and/or Svelte major before `bun install`, so the adapter tests in
- * `tests/` run against it. Never commit the result.
+ * React and/or Svelte major (and/or Vue minor) before `bun install`, so the
+ * adapter tests in `tests/` run against it. Never commit the result.
  *
- *   bun run scripts/set-framework-versions.ts --react 18 --svelte 4
+ *   bun run scripts/set-framework-versions.ts --react 18 --svelte 4 --vue 3.3
  */
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -28,13 +28,23 @@ const VERSIONS: Record<string, Record<string, Record<string, string>>> = {
     "4": { svelte: "^4.2.20" },
     "5": {},
   },
+  vue: {
+    "3.3": { vue: "~3.3.13" },
+    "3.5": {},
+  },
 };
 
 const { values } = parseArgs({
-  options: { react: { type: "string" }, svelte: { type: "string" } },
+  options: {
+    react: { type: "string" },
+    svelte: { type: "string" },
+    vue: { type: "string" },
+  },
 });
-if (!values.react && !values.svelte) {
-  throw new Error("pass --react <major> and/or --svelte <major>");
+if (!values.react && !values.svelte && !values.vue) {
+  throw new Error(
+    "pass --react <major>, --svelte <major> and/or --vue <minor>",
+  );
 }
 const file = path.resolve(import.meta.dir, "..", "package.json");
 const manifest = (await Bun.file(file).json()) as {
@@ -44,7 +54,7 @@ const catalog = manifest.workspaces?.catalog;
 if (!catalog || typeof catalog !== "object") {
   throw new Error(`${file} has no workspaces.catalog to pin`);
 }
-for (const framework of ["react", "svelte"] as const) {
+for (const framework of ["react", "svelte", "vue"] as const) {
   const major = values[framework];
   if (!major) continue;
   const pins = VERSIONS[framework]?.[major];

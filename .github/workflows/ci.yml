@@ -161,7 +161,7 @@ jobs:
         run: bun run e2e:examples
 
   adapter-compat:
-    name: Adapters on React ${{ matrix.react }} / Svelte ${{ matrix.svelte }}
+    name: Adapters on React ${{ matrix.react }} / Svelte ${{ matrix.svelte }} / Vue ${{ matrix.vue }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -169,6 +169,12 @@ jobs:
       matrix:
         react: ["18", "19"]
         svelte: ["4", "5"]
+        vue: ["3.5"]
+        include:
+          # The oldest supported Vue (peer dependency >= 3.3), once.
+          - react: "19"
+            svelte: "5"
+            vue: "3.3"
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -179,7 +185,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Pin framework versions
-        run: bun run scripts/set-framework-versions.ts --react "${{ matrix.react }}" --svelte "${{ matrix.svelte }}"
+        run: bun run scripts/set-framework-versions.ts --react "${{ matrix.react }}" --svelte "${{ matrix.svelte }}" --vue "${{ matrix.vue }}"
 
       - name: Install dependencies
         # The catalog was changed on purpose, so the lockfile cannot be frozen.
@@ -189,4 +195,5 @@ jobs:
         env:
           EXPECT_REACT_MAJOR: ${{ matrix.react }}
           EXPECT_SVELTE_MAJOR: ${{ matrix.svelte }}
+          EXPECT_VUE_MINOR: ${{ matrix.vue }}
         run: bun run --cwd tests test

@@ -24,7 +24,7 @@ bun run check
 | `bun run check:pack` | Packs `@k-otp/sdk` like the release and validates the tarball (exports map, files, optional peers, framework imports per subpath). |
 | `bun run smoke:dist` | Loads every built subpath through the `exports` map with Node.js (ESM, CJS, IIFE, the server `browser` condition). |
 | `bun run size` | Size report with budgets per subpath (core, headless, IIFE, each framework and UI subpath alone and with everything it loads, the Svelte sources, the theme, server) and a tree-shaking check (no subpath loads another framework, adapter or the server; core, headless, server and the hooks load no UI code). |
-| `bun run scripts/set-framework-versions.ts --react 18 --svelte 4 && bun install && bun run --cwd tests test` | Runs the adapter tests on React 18 / Svelte 4 like the CI `adapter-compat` matrix (revert `package.json` and `bun.lock` afterwards). |
+| `bun run scripts/set-framework-versions.ts --react 18 --svelte 4 [--vue 3.3] && bun install && bun run --cwd tests test` | Runs the adapter and UI tests on React 18 / Svelte 4 (/ Vue 3.3) like the CI `adapter-compat` matrix (revert `package.json` and `bun.lock` afterwards). |
 | `bun run check:examples` | Typecheck, build and smoke-test every example against the built package, and check that each framework example's bundle contains only its own subpaths. |
 | `bun run e2e:examples [--only react] [--screenshots dir]` | Drives the UI flows of the React, Vue and Svelte examples in Chromium (Playwright) against their mock API; optionally takes light/dark desktop/mobile screenshots. Needs `bunx playwright install chromium` once. |
 | `bun run gen:types` | Regenerates `packages/sdk/src/core/generated/openapi.ts` from `spec/openapi.json`. |
