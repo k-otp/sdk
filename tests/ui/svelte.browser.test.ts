@@ -252,6 +252,15 @@ describe("<OtpCodeInput /> (Svelte)", () => {
     expect(document.querySelector("output")?.textContent).toBe("12345");
   });
 
+  test("a raw bound value is sanitized before it reaches the segments", async () => {
+    mount(OtpCodeInput, { value: "123 456", name: "code", locale: "en" });
+    await flush();
+    expect(segments().map((s) => s.value)).toEqual([..."123456"]);
+    expect(
+      (document.querySelector('input[name="code"]') as HTMLInputElement).value,
+    ).toBe("123456");
+  });
+
   test("is exported for direct use", () => {
     expect(OtpCodeInput).toBeDefined();
   });

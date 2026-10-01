@@ -489,7 +489,9 @@ export const createOtpCodeInputModel = (options: {
   const dispatch = createEventDispatcher();
   let container: HTMLElement | undefined;
   const length = (): number => options.getLength() || DEFAULT_OTP_CODE_LENGTH;
-  const current = (): string => options.getValue() ?? "";
+  /** The bound value as digits (spaces, hyphens, full-width removed). */
+  const current = (): string =>
+    sanitizeOtpCode(options.getValue() ?? "", length());
   const change = (value: string): void => {
     options.setValue(value);
     options.getProps().onValueChange?.(value);

@@ -72,6 +72,6 @@
     />
   {/each}
   {#if name}
-    <input type="hidden" {name} {value} />
+    <input type="hidden" {name} value={parts.digits.join("")} />
   {/if}
 </div>
