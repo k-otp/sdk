@@ -298,6 +298,45 @@ describe("<OtpForm /> preset (React)", () => {
     expect(document.activeElement).toBe(segment(1));
   });
 
+  test("a composition without compositionend is ended by blur or a non-composing key", async () => {
+    const api = createMockApi();
+    let form!: OtpFormController;
+    render(
+      <OtpForm.Root
+        client={api.client}
+        purpose="ime"
+        locale="en"
+        autoSubmit={false}
+      >
+        {(context) => {
+          form = context.form;
+          return context.state.issued ? <OtpForm.CodeField /> : null;
+        }}
+      </OtpForm.Root>,
+    );
+    form.setPhoneNumber("01012345678");
+    await act(async () => {
+      await form.send();
+    });
+    fireEvent.change(segment(0), { target: { value: "1" } });
+    fireEvent.change(segment(1), { target: { value: "2" } });
+    // A composition that never ends (cancelled IME), then the field blurs.
+    fireEvent.compositionStart(segment(2));
+    fireEvent.blur(segment(2));
+    segment(2).focus();
+    fireEvent.keyDown(segment(2), { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(segment(1));
+    // A programmatic change reaches the DOM again.
+    act(() => form.setCode("98"));
+    expect(segments().map((s) => s.value)).toEqual(["9", "8", "", "", "", ""]);
+    // Again, recovered by a key the browser marks as not composing.
+    fireEvent.compositionStart(segment(2));
+    fireEvent.keyDown(segment(2), { key: "Backspace", isComposing: false });
+    await settle();
+    expect(form.getState().code).toBe("9");
+    expect(segments().map((s) => s.value)).toEqual(["9", "", "", "", "", ""]);
+  });
+
   test('locale="auto" follows <html lang> after mount; the default never does', async () => {
     const api = createMockApi();
     document.documentElement.lang = "en";

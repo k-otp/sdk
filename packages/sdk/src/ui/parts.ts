@@ -449,7 +449,9 @@ type InputLike = {
 };
 type KeyLike = {
   key: string;
+  /** `KeyboardEvent.isComposing` (React: `event.nativeEvent.isComposing`). */
   isComposing?: boolean;
+  nativeEvent?: object;
   altKey?: boolean;
   ctrlKey?: boolean;
   metaKey?: boolean;
@@ -623,9 +625,11 @@ export const createOtpCodeInputHandlers = (
         leaveGroup();
         return;
       }
-      if (event.isComposing === true || event.key === "Process") return;
+      const native = event.nativeEvent as { isComposing?: boolean } | undefined;
+      const keyComposing = event.isComposing ?? native?.isComposing;
+      if (keyComposing === true || event.key === "Process") return;
       // A key outside any composition ends a composition left open.
-      if (event.isComposing === false) composing = false;
+      if (keyComposing === false) composing = false;
       if (composing) return;
       const value = options.getValue();
       const change = applyOtpCodeKey(

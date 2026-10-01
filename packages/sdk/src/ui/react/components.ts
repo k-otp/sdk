@@ -541,6 +541,8 @@ const Segments = ({
           handlers.paste(index, event),
         onFocus: (event: FocusEvent<HTMLInputElement>) =>
           handlers.focus(index, event),
+        // Ends a composition that never got compositionend.
+        onBlur: handlers.blur,
         onCompositionStart: handlers.compositionstart,
         onCompositionEnd: (event: CompositionEvent<HTMLInputElement>) =>
           handlers.compositionend(index, event),
