@@ -12,6 +12,7 @@
  * subscribed; WebOTP is feature-detected when a code was sent.
  */
 import type { OtpApiError } from "../core/errors";
+import { createIdempotencyKey } from "../core/idempotency";
 import type {
   IssueResult,
   VerifyReasonCode,
@@ -115,7 +116,12 @@ export type OtpFormOptions = OtpFlowOptions &
     codeLength?: number | undefined;
     /** Initial phone input. */
     defaultPhoneNumber?: string | undefined;
-    /** Use this flow instead of creating one from the client. */
+    /**
+     * Use this flow instead of creating one from the client. The form then
+     * adds no cooldown of its own: the flow's `resendCooldownMs` applies (and
+     * survives "change number"), and dropped sends do not keep their
+     * idempotency key for the next send.
+     */
     flow?: OtpFlowController | undefined;
   };
 
@@ -206,13 +212,15 @@ export type OtpFormController = {
   >;
   /**
    * Back to the phone step (keeps the number, unlocks it). Drops in-flight
-   * requests without callbacks, clears the local resend cooldown and keeps
-   * a server-imposed wait.
+   * requests without callbacks. The local resend cooldown belongs to the
+   * number it was started for: a different number can be sent to at once,
+   * the same number waits for the rest of it. A server-imposed wait is kept.
    */
   editPhoneNumber: () => void;
   /**
-   * Clears everything. Like "change number", it clears the local resend
-   * cooldown but keeps a server-imposed wait (429/503 `Retry-After`).
+   * Clears everything. Like "change number", it keeps a server-imposed wait
+   * (429/503 `Retry-After`) and the local cooldown of the number it was
+   * started for.
    */
   reset: () => void;
   /**
@@ -226,7 +234,12 @@ export type OtpFormController = {
    * phone validation); everything else is read when it is used.
    */
   configure: (config: Partial<OtpFormConfig>) => void;
-  /** The headless flow behind the form. */
+  /**
+   * The headless flow behind the form, for reading its state. Send and
+   * verify through the form (`send()`, `verify()`): a flow the form created
+   * has no local cooldown (`resendCooldownMs: 0`; the form keeps it, see
+   * `state.resendIn`), so `flow.send()` would bypass it.
+   */
   readonly flow: OtpFlowController;
 };
 
@@ -281,14 +294,28 @@ export const createOtpForm = (
   options: OtpFormOptions,
 ): OtpFormController => {
   const now = options.now ?? Date.now;
-  // The form keeps the local resend cooldown itself (so "change number" can
-  // clear it); the flow only applies the server's retry hints. A `flow`
-  // passed in keeps its own cooldown.
+  // The form keeps the local resend cooldown itself, per phone number (see
+  // `localCooldown`); the flow only applies the server's retry hints. A
+  // `flow` passed in keeps its own cooldown.
   const localCooldownMs = options.flow
     ? 0
     : Math.max(0, options.resendCooldownMs ?? DEFAULT_RESEND_COOLDOWN_MS);
+  /** A key to reuse for the next send (see `retained`), read by the flow. */
+  let reuseKey: string | undefined;
+  const newKey = (): string =>
+    options.createIdempotencyKey?.() ??
+    createIdempotencyKey(options.idempotencyKeyPrefix);
   const flow =
-    options.flow ?? createOtpFlow(client, { ...options, resendCooldownMs: 0 });
+    options.flow ??
+    createOtpFlow(client, {
+      ...options,
+      resendCooldownMs: 0,
+      createIdempotencyKey: () => {
+        const key = reuseKey ?? newKey();
+        reuseKey = undefined;
+        return key;
+      },
+    });
   const codeLength =
     Number.isInteger(options.codeLength) && (options.codeLength ?? 0) > 0
       ? (options.codeLength as number)
@@ -303,7 +330,20 @@ export const createOtpForm = (
   let lastSkip:
     | { reason: OtpFlowSkipReason; operation: OtpFormOperation }
     | undefined;
-  let localCooldownUntil: number | undefined;
+  /**
+   * The local resend cooldown (UX only: the server's limits are the
+   * enforcement). It belongs to the number it was started for: changing to
+   * a different number does not wait for it, coming back to the same number
+   * does.
+   */
+  let localCooldown: { until: number; phone: string } | undefined;
+  /**
+   * The idempotency key of a send dropped by "change number"/`reset()`
+   * while in flight or after an ambiguous failure: the next send of the same
+   * input reuses it, so a request that did reach the server is not sent
+   * twice (no second SMS).
+   */
+  let retained: { key: string; input: string } | undefined;
   /**
    * Bumped by `abort()`, `reset()` and `editPhoneNumber()`: a response of a
    * request started before is dropped without callbacks or side effects.
@@ -329,10 +369,15 @@ export const createOtpForm = (
       allowInternational: config.allowInternational === true,
     });
 
-  const localLeft = (): number =>
-    localCooldownUntil === undefined
+  /** Remaining local cooldown for `phone` (default: the current input). */
+  const localLeft = (phone: string | undefined = parsePhone().value): number =>
+    localCooldown === undefined || localCooldown.phone !== phone
       ? 0
-      : Math.max(0, localCooldownUntil - now());
+      : Math.max(0, localCooldown.until - now());
+
+  /** What identifies a send for idempotency (as the flow compares it). */
+  const sendInput = (phone: string): string =>
+    JSON.stringify([phone, config.purpose, config.issue ?? null]);
 
   const expiresInSeconds = (f: OtpFlowState): number | undefined =>
     f.issueId === undefined || expiresAt === undefined
@@ -583,7 +628,7 @@ export const createOtpForm = (
       touch();
       return invalid();
     }
-    if (localLeft() > 0 && !flow.getState().issueState.isLoading) {
+    if (localLeft(phone.value) > 0 && !flow.getState().issueState.isLoading) {
       lastSkip = { reason: "cooldown", operation: "send" };
       touch();
       return skipped("cooldown");
@@ -591,16 +636,22 @@ export const createOtpForm = (
     lastSkip = undefined;
     attemptPhone = phone;
     const started = epoch;
+    if (retained && retained.input === sendInput(phone.value)) {
+      reuseKey = retained.key;
+    }
+    retained = undefined;
     const promise = flow.send({
       ...config.issue,
       purpose: config.purpose,
       phoneNumber: phone.value,
     });
+    reuseKey = undefined;
     // The flow is already "loading" synchronously.
     touch();
     const result = await promise;
-    // Aborted, reset or "change number" meanwhile: drop it silently.
-    if (started !== epoch) return result;
+    // Aborted, reset or "change number" meanwhile, or superseded: drop it
+    // silently (no callbacks).
+    if (started !== epoch || result.error?.code === "ABORTED") return result;
     if (result.skipped) {
       lastSkip = { reason: result.skipped, operation: "send" };
     } else if (result.error) {
@@ -610,7 +661,9 @@ export const createOtpForm = (
       showCodeError = false;
       code = "";
       expiresAt = localExpiry(result.data, now());
-      if (localCooldownMs > 0) localCooldownUntil = now() + localCooldownMs;
+      if (localCooldownMs > 0 && phone.value) {
+        localCooldown = { until: now() + localCooldownMs, phone: phone.value };
+      }
       requestFocus("code");
       startWebOtp(result.data.issueId);
       config.onSent?.(result.data);
@@ -631,7 +684,8 @@ export const createOtpForm = (
     const promise = flow.verify(code);
     touch();
     const result = await promise;
-    if (started !== epoch) return result;
+    // Dropped, or superseded by a newer send (which aborts this verify).
+    if (started !== epoch || result.error?.code === "ABORTED") return result;
     if (result.skipped) {
       lastSkip = { reason: result.skipped, operation: "verify" };
     } else if (result.error) {
@@ -669,12 +723,19 @@ export const createOtpForm = (
     }
   }
 
-  /** Back to the phone step; the server's waits are kept, the local one not. */
+  /**
+   * Back to the phone step. The server's waits are kept, and so is the
+   * local cooldown of the number it belongs to.
+   */
   const clearIssue = (): void => {
     epoch++;
     stopWebOtp();
+    const pendingKey = flow.getState().idempotencyKey;
+    retained =
+      pendingKey && attemptPhone?.value && !options.flow
+        ? { key: pendingKey, input: sendInput(attemptPhone.value) }
+        : undefined;
     flow.reset();
-    localCooldownUntil = undefined;
     attemptPhone = undefined;
     expiresAt = undefined;
     code = "";

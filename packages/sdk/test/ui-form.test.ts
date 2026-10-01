@@ -453,7 +453,7 @@ describe("createOtpForm", () => {
     });
   });
 
-  test("change number goes back to the phone step and clears the local cooldown", async () => {
+  test("change number: the local cooldown belongs to the number it was started for", async () => {
     const { form, phases, issues } = setup();
     form.setPhoneNumber("01012345678");
     await form.send();
@@ -466,17 +466,66 @@ describe("createOtpForm", () => {
       phoneLocked: false,
       phoneNumber: "010-1234-5678",
       code: "",
-      resendIn: 0,
-      sendDisabled: false,
+      // Still the same number: its cooldown keeps running.
+      resendIn: 30,
+      sendDisabled: true,
       message: undefined,
       focus: { target: "phone" },
     });
+    expect((await form.send()).skipped).toBe("cooldown");
+    // A different number can be sent to at once.
+    form.setPhoneNumber("010-9999-8888");
+    expect(form.getState()).toMatchObject({ resendIn: 0, sendDisabled: false });
+    form.setPhoneNumber("010-1234-5678");
+    expect(form.getState().resendIn).toBe(30);
     form.setPhoneNumber("010-9999-8888");
     expect((await form.send()).data?.issueId).toBe("issue-2");
     expect(issues[1]?.phoneNumber).toBe("01099998888");
     expect(phases).toEqual(["sending", "code", "phone", "sending", "code"]);
     form.reset();
     expect(form.getState()).toMatchObject({ phoneNumber: "", resendIn: 0 });
+  });
+
+  test("a send dropped by change number keeps its idempotency key for the same input", async () => {
+    const { form, next, issues } = setup();
+    next.issue.push(hang);
+    form.setPhoneNumber("01012345678");
+    const dropped = form.send();
+    form.editPhoneNumber();
+    await dropped;
+    await form.send();
+    // The dropped request may have reached the server: same key, no 2nd SMS.
+    expect(issues[1]?.idempotencyKey).toBe(issues[0]?.idempotencyKey);
+    expect(form.getState().phase).toBe("code");
+    // A different number gets a new key.
+    form.editPhoneNumber();
+    form.setPhoneNumber("01099998888");
+    await form.send();
+    expect(issues[2]?.idempotencyKey).not.toBe(issues[0]?.idempotencyKey);
+  });
+
+  test("an ambiguous send keeps its key across change number", async () => {
+    const { form, next, issues } = setup();
+    next.issue.push(apiError("TIMEOUT", 0));
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    form.editPhoneNumber();
+    await form.send();
+    expect(issues[1]?.idempotencyKey).toBe(issues[0]?.idempotencyKey);
+  });
+
+  test("a send that supersedes an in-flight verify emits no onError(ABORTED)", async () => {
+    const onError = mock();
+    const { form, next } = setup({ onError, resendCooldownMs: 0 });
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    next.verify.push(hang);
+    form.setCode("123456");
+    expect(form.getState().phase).toBe("verifying");
+    await form.send();
+    await microtasks();
+    expect(onError).not.toHaveBeenCalled();
+    expect(form.getState()).toMatchObject({ phase: "code", error: undefined });
   });
 
   test("change number keeps a server-imposed wait (Retry-After)", async () => {
