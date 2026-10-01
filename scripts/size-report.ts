@@ -61,8 +61,10 @@ const BUDGETS = {
   // A UI components subpath's own code.
   uiAdapter: 4 * 1024,
   // Everything an app ships for the UI components of one framework (core,
-  // headless, hooks, UI model, components; framework external).
-  uiAdapterWithAll: 23 * 1024,
+  // headless, hooks, UI model, components; framework external). Raised
+  // from 23 kB for the single-tab-stop/IME handling, the local cooldown and
+  // the request epoch of the form.
+  uiAdapterWithAll: 24 * 1024,
   // The `.svelte` sources (uncompiled; the app compiles them).
   uiSvelteSources: 4 * 1024,
   theme: 4 * 1024,
