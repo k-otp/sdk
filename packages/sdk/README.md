@@ -52,6 +52,12 @@ and Svelte are **optional peer dependencies**: install the one your app uses
 Requires a runtime with `fetch`, `AbortController` and Web Streams (all modern
 browsers, Node.js >= 20.19, Bun, Deno, Cloudflare Workers).
 
+TypeScript resolves the subpaths through the `exports` map, which needs
+`"moduleResolution": "bundler"`, `"node16"` or `"nodenext"`. The legacy
+`"node"` (`node10`) setting only sees the root `@k-otp/sdk`. `@k-otp/sdk/svelte`
+ships plain JavaScript stores (no `.svelte` files), so it has no `svelte`
+export condition on purpose.
+
 ## Quick start
 
 ```ts

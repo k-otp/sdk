@@ -3,7 +3,7 @@
  * Refreshes the vendored `spec/openapi.json`.
  *
  *   bun run sync:openapi                               # from the live API
- *   bun run sync:openapi --from ../api.k-otp.dev       # from a local API checkout
+ *   bun run sync:openapi --from <path>                 # from a local API checkout
  *   bun run sync:openapi --from ./openapi.api.json     # from a file
  *   bun run sync:openapi --from https://.../v1.json    # from a URL
  *   bun run sync:openapi --check                       # exit 1 if it would change

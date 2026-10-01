@@ -91,7 +91,7 @@ bun run size
 bun run check:examples # typecheck/build/smoke examples (after build)
 bun run check          # all of the above
 bun run gen:types      # after changing spec/openapi.json
-bun run sync:openapi --from ../api.k-otp.dev   # refresh the spec
+bun run sync:openapi --from <local API checkout>   # refresh the spec
 sampo add              # changeset (npm/@k-otp/sdk) for user-facing changes
 ```
 
