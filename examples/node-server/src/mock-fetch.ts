@@ -13,11 +13,40 @@ const reply = (body: unknown, status = 200): Response =>
 
 export const mockFetch: typeof fetch = async (input, init) => {
   const request = new Request(input, init);
+  const path = new URL(request.url).pathname;
+  // API 1.4.0: one credit wallet per organization, shared by all of its apps.
+  if (request.method === "GET" && path.endsWith("/balance")) {
+    return reply({
+      appId: "app_mock",
+      walletId: "org:org_mock",
+      walletScope: "organization",
+      organizationId: "org_mock",
+      balance: 1000,
+      currency: "CREDIT",
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  if (request.method === "GET" && path.endsWith("/credit-ledger")) {
+    // The wallet's credits plus only THIS app's debits (other apps' are hidden).
+    return reply({
+      items: [
+        {
+          ledgerId: "00000000-0000-4000-8000-000000000001",
+          issueId: "mock-signup-1",
+          entryType: "debit",
+          appId: "app_mock",
+          amountDelta: -1,
+          balanceAfter: 999,
+          currency: "CREDIT",
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    });
+  }
   const body = (await request.json().catch(() => ({}))) as Record<
     string,
     string
   >;
-  const path = new URL(request.url).pathname;
   if (path.endsWith("/issue")) {
     const issueId = `mock-${body.idempotencyKey}`;
     if (!issues.has(issueId)) {

@@ -5,6 +5,7 @@ import type { AddressInfo } from "node:net";
 import { createOtpServerClient } from "@k-otp/sdk-server";
 import { createHandler } from "./app.ts";
 import { mockFetch } from "./mock-fetch.ts";
+import { readWallet } from "./wallet.ts";
 
 // Records the idempotency key of every issue request; `failNextIssue` makes
 // the next one fail like a dropped connection (an ambiguous outcome).
@@ -87,6 +88,18 @@ try {
   );
   assert.notEqual(issueKeys.at(-1), issueKeys[0]);
   console.log("ok - node-server send/verify (mock, ambiguous retry)");
+
+  // The organization wallet (API 1.4.0): shared balance + this app's debits.
+  const wallet = await readWallet(
+    createOtpServerClient({ apiKey: "sk_mock", fetch: apiFetch }),
+  );
+  assert.deepEqual(wallet, {
+    balance: 1000,
+    scope: "organization",
+    walletId: "org:org_mock",
+    recentAppDebits: 1,
+  });
+  console.log("ok - node-server organization wallet (mock)");
 } finally {
   server.close();
   // Keep-alive sockets of fetch would otherwise hold the process open.

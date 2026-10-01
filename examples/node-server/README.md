@@ -9,7 +9,12 @@ this server; the **`sk_` secret key never leaves it**.
 | `POST /api/otp/send` | `{ phoneNumber }` | `200 { expiresAt, attemptsRemaining }`, `400`, `429` (+ `Retry-After`), `503` |
 | `POST /api/otp/verify` | `{ code }` | `200 { verified, reasonCode?, attemptsRemaining }`, `409` when nothing was sent |
 
-`GET /` serves a tiny test page.
+`GET /` serves a tiny test page. Besides the HTTP endpoints, `bun run wallet`
+(`src/wallet.ts`) reads the credit wallet with the same `sk_` key: since API
+1.4.0 `getBalance()` returns the **organization** wallet shared by all of its
+apps (`walletScope: "organization"`), and `listCreditLedger()` shows the
+wallet's credits plus only this app's debits. `walletScope` is typed optional
+because an API older than 1.4.0 omits it.
 
 ## Run
 
