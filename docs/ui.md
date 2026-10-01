@@ -70,16 +70,18 @@ server-side with `getStatus` and an `sk_` key.
 
 Every form takes the same settings: `purpose` (required), `issue` (other
 `issue` fields: `channel`, `templateId`, `templateVariables`, `metadata`, ...),
-`codeLength` (6), `resendCooldownMs` (30 s; "change number" clears it,
-while a server-imposed `Retry-After` wait is kept), `idempotencyKeyPrefix`,
+`codeLength` (6), `resendCooldownMs` (30 s, see [cooldowns](#cooldowns)),
+`idempotencyKeyPrefix`,
 `autoSubmit` (verify once all digits are in, `true`), `webOtp` (`true`, see
 [WebOTP](#webotp-sms-autofill-on-android-chrome)), `clearCodeOnMismatch`
 (`true`), `allowInternational` (`false`), `defaultPhoneNumber`, `locale`
-(`"ko"` or `"en"`; default: the page's `<html lang>` when it is Korean or
-English, else `"ko"`), `messages` (overrides) and `id` (root id; part ids
-derive from it). Requests in flight when the form is unmounted, reset or
-sent back to the phone step are dropped silently: no `error` (`ABORTED`),
-`sent` or `verified` for them. Events:
+(`"ko"` (default), `"en"` or `"auto"`, see [locale](#messages-and-locale)),
+`messages` (overrides) and `id` (root id; part ids derive from it).
+Requests in flight when the form is unmounted, reset or sent back to the
+phone step, or superseded by a newer send, are dropped silently: no `error`
+(`ABORTED`), `sent` or `verified` for them, and the next send of the same
+number reuses the dropped request's idempotency key (no second SMS if it had
+reached the server). Events:
 `sent`, `verified`, `error` and `phaseChange` (React and Svelte: `onSent`,
 `onVerified`, `onError`, `onPhaseChange` props; Vue: `@sent`, `@verified`,
 `@error`, `@phase-change`; Svelte also dispatches `on:sent` etc.).
@@ -249,8 +251,13 @@ Without the theme the parts are unstyled; the
 
 ## Messages and locale
 
-`locale` is `"ko"` (default) or `"en"`. `messages` overrides any key, with a
-template (`{name}` placeholders) or a function:
+`locale` is `"ko"` (the default, on the server and in the browser) or
+`"en"`. `"auto"` follows the page's `<html lang>`: Korean for `ko*` (or no
+`lang`), English for any other language. It renders Korean on the server and
+on the first client render, so hydration always matches, then switches
+right after mount and follows later `lang` changes (an SPA language switch).
+`messages` overrides any key, with a template (`{name}` placeholders) or a
+function:
 
 ```tsx
 <OtpForm
@@ -311,9 +318,25 @@ Importing any UI subpath and rendering the components on the server performs
 no request, starts no timer and never touches `window`. When you
 server-render, pass `id` (React uses `useId` and Vue 3.5 `useId`, but
 Svelte and older Vue generate a random id, which would differ on the client)
-and `locale` (the server has no `<html lang>` to read, so a page whose `lang`
-is English would otherwise hydrate Korean server text). The hydration of the
-three presets with an explicit `id` is covered by the tests.
+and keep `locale` the same on both sides (the default `"ko"`, an explicit
+locale, or `"auto"`, which switches only after hydration). The hydration of
+the three presets with an explicit `id` is covered by the tests.
+
+## Cooldowns
+
+After a send, the button waits `resendCooldownMs` (30 s) before the same
+number can get another code. This local cooldown is a UX guard against
+double taps and impatient resends, not a limit: a reload resets it, and the
+API's rate limits are the enforcement. It belongs to the number it was
+started for: after "change number", a **different** number can be sent to
+at once, and coming back to the **same** number waits for the rest of it. A
+wait imposed by the server (429/503 `Retry-After`) applies to every send
+until it ends.
+
+The form keeps this cooldown itself (`state.resendIn`); send through the
+form (`form.send()`), not through `form.flow`, whose own
+`resendCooldownMs` is 0. A form created with your own `flow` uses that
+flow's cooldown instead.
 
 ## Svelte 4 and 5
 
@@ -361,8 +384,8 @@ import "@k-otp/sdk/ui/theme.css"; // 선택
 
 Vue는 `<OtpForm purpose="signup" @verified="..." />`, Svelte는
 `<OtpForm {client} purpose="signup" onVerified={...} />` 입니다. 기본
-언어는 `locale="ko"` 이고 `locale="en"` 으로 영어, `messages` 로 문구를
-바꿀 수 있습니다. `pk_` 키는 `allowedOrigins` 에 정확히 등록된 출처에서만
+언어는 `locale="ko"` 이고 `locale="en"` 으로 영어, `locale="auto"` 로 페이지의
+`<html lang>`(마운트 후), `messages` 로 문구를 바꿀 수 있습니다. `pk_` 키는 `allowedOrigins` 에 정확히 등록된 출처에서만
 동작합니다. 브라우저 인증 결과로 서버 권한을 주려면 서버에서 `sk_` 키로
 `getStatus` 를 확인하세요.
 
@@ -422,8 +445,15 @@ Vue는 `<OtpForm purpose="signup" @verified="..." />`, Svelte는
 ## SSR, Svelte 4/5
 
 모든 UI 서브패스는 서버에서 불러오고 렌더링해도 요청, 타이머, `window`
-접근이 없습니다. SSR 에서는 `id` 와 `locale` 을 넘겨 서버와 클라이언트의
-id 와 문구를 맞추세요(기본 언어는 브라우저에서 `<html lang>` 을 따르고
-서버에서는 `"ko"` 입니다).
+접근이 없습니다. SSR 에서는 `id` 를 넘겨 서버와 클라이언트 id 를 맞추세요.
+기본 언어는 서버와 브라우저 모두 `"ko"` 이고, `locale="auto"` 는 서버와 첫
+렌더링에서는 `"ko"` 로 그린 뒤 마운트 후 `<html lang>` 을 따릅니다(`ko*` 또는
+`lang` 없음은 한국어, 그 밖의 언어는 영어). 따라서 하이드레이션 불일치가
+생기지 않습니다.
+
+재전송 쿨다운(`resendCooldownMs`, 30초)은 중복 탭을 막는 UX 장치일 뿐 제한이
+아니며, 실제 제한은 API 레이트 리밋입니다. 쿨다운은 시작한 번호에 묶여 있어
+번호 변경 후 **다른** 번호는 바로 받을 수 있고, **같은** 번호로 돌아오면 남은
+시간을 기다립니다.
 Svelte 컴포넌트는 Svelte 4/5 가 모두 컴파일할 수 있는 `.svelte` 소스로
 배포되어 앱의 Svelte 가 직접 컴파일합니다.

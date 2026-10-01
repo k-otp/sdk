@@ -32,9 +32,9 @@ keys, the resend cooldown and the 429/503 retry hints).
 | `clearCodeOnMismatch` | `true` | clear the code after `MISMATCH` |
 | `allowInternational` | `false` | accept non-Korean E.164 numbers |
 | `defaultPhoneNumber` | | initial phone input |
-| `resendCooldownMs` | `30000` | local cooldown after a send; `editPhoneNumber()` and `reset()` clear it (a server `Retry-After` wait is kept) |
+| `resendCooldownMs` | `30000` | local cooldown after a send, for the number it was sent to (UX only; server limits are the enforcement): a different number is not held by it, the same number is, also after `editPhoneNumber()`/`reset()`; a server `Retry-After` wait applies to every send |
 | `idempotencyKeyPrefix`, `createIdempotencyKey`, `now` | | as `createOtpFlow` |
-| `flow` | | use an existing `OtpFlowController` |
+| `flow` | | use an existing `OtpFlowController`; its own `resendCooldownMs` then applies, the form adds none, and dropped sends do not keep their idempotency key |
 | `onSent(result)`, `onVerified(result)`, `onError(error, "send" \| "verify")`, `onPhaseChange(phase, previous)` | | callbacks |
 
 Controller: `getState()`, `subscribe(listener)`, `setPhoneNumber(value,
@@ -44,10 +44,14 @@ Controller: `getState()`, `subscribe(listener)`, `setPhoneNumber(value,
 `editPhoneNumber()`, `reset()`, `abort()`, `configure(partialConfig)`
 (callbacks and settings; notifies subscribers only when
 `allowInternational` changes, the React root applies it in a layout effect)
-and `flow`. A request that is in flight when `abort()`, `reset()` or
-`editPhoneNumber()` is called is dropped: no `onError` (`ABORTED`),
-`onSent`, `onVerified` or WebOTP for it. `getState()` returns the same
-object until something visible changes, also while nobody is subscribed.
+and `flow` (read its state; send and verify through the form, since a flow
+the form created has `resendCooldownMs: 0` and the form keeps the
+cooldown). A request that is in flight when `abort()`, `reset()` or
+`editPhoneNumber()` is called, or that a newer send supersedes, is dropped:
+no `onError` (`ABORTED`), `onSent`, `onVerified` or WebOTP for it, and the
+next send of the same input reuses its idempotency key. `getState()`
+returns the same object until something visible changes, also while nobody
+is subscribed.
 Actions resolve the flow
 result, or `{ skipped: "invalid" }` when the phone number or code is not
 valid (the matching error is then shown); they never reject for API errors.
@@ -94,8 +98,10 @@ valid (the matching error is then shown); they never reject for API errors.
 
 - `OTP_MESSAGES` (`ko`, `en`), `DEFAULT_OTP_LOCALE` (`"ko"`),
   `createOtpTranslator({ locale, messages })` -> `t(key, params)`,
-  `resolveOtpLocale(locale?)` (explicit locale, else `<html lang>` when
-  Korean or English in a browser, else `"ko"`),
+  `resolveOtpLocale(locale?)` (`"ko"`/`"en"` as given, else `"ko"`; the same
+  on server and client), `detectOtpDocumentLocale()` (`<html lang>`: `ko*`
+  or none -> `"ko"`, other languages -> `"en"`) and
+  `watchOtpDocumentLocale(onChange)` (for `locale: "auto"`, after mount),
   `formatOtpMessage(template, params)`.
 - `otpErrorMessageKey(error, operation?)`, `otpReasonMessageKey(reason)`,
   `otpSkipMessageKey(skip)`, `otpPhoneErrorMessageKey(error)`.
