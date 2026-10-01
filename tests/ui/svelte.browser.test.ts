@@ -1,11 +1,13 @@
 import { afterAll, afterEach, describe, expect, mock, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { OtpFormController } from "@k-otp/sdk/ui";
 import { OtpCodeInput, OtpForm } from "@k-otp/sdk/ui/svelte";
 import { fireEvent, screen } from "@testing-library/dom";
 import { part, segment, segments, sentPhone } from "./dom";
 import BoundCode from "./fixtures/BoundCode.svelte";
 import Custom from "./fixtures/Custom.svelte";
+import ImeHarness from "./fixtures/ImeHarness.svelte";
 import { createMockApi, flush, MOCK_CODE } from "./mock-api";
 import { mountSvelte } from "./svelte-mount";
 
@@ -97,6 +99,50 @@ describe("<OtpForm /> preset (Svelte)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Change number" }));
     await flush();
     expect(input.readOnly).toBe(false);
+  });
+});
+
+describe("Svelte IME and locale", () => {
+  test("IME: a re-render in the middle of a composition keeps it", async () => {
+    const api = createMockApi();
+    let form!: OtpFormController;
+    mount(ImeHarness, {
+      client: api.client,
+      onForm: (captured: OtpFormController) => {
+        form = captured;
+      },
+    });
+    await flush();
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    await flush();
+    fireEvent.compositionStart(segment(0));
+    segment(0).value = "３";
+    fireEvent.input(segment(0), { isComposing: true });
+    // A state change re-renders the field (like the countdown tick).
+    form.configure({ allowInternational: true });
+    await flush();
+    expect(segment(0).value).toBe("３");
+    fireEvent.compositionEnd(segment(0));
+    await flush();
+    expect(form.getState().code).toBe("3");
+    expect(segment(0).value).toBe("3");
+    expect(document.activeElement).toBe(segment(1));
+  });
+
+  test('locale="auto" follows <html lang> after mount', async () => {
+    const api = createMockApi();
+    document.documentElement.lang = "en-GB";
+    try {
+      mount(OtpForm, { client: api.client, purpose: "x", locale: "auto" });
+      await flush();
+      expect(part("send-button").textContent).toBe("Send code");
+      document.documentElement.lang = "ko";
+      await flush();
+      expect(part("send-button").textContent).toBe("인증번호 받기");
+    } finally {
+      document.documentElement.lang = "";
+    }
   });
 });
 

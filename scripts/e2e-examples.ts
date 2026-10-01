@@ -351,11 +351,16 @@ try {
         "--host",
         "127.0.0.1",
       ],
-      { cwd: dir, stdout: "ignore", stderr: "ignore" },
+      { cwd: dir, stdout: "ignore", stderr: "pipe" },
     );
+    // Drained continuously (a full pipe would block the server) and printed
+    // when something fails.
+    const serverLog = new Response(server.stderr).text();
     const base = `http://127.0.0.1:${port}`;
+    let frameworkFailed = true;
     try {
       await waitForServer(base);
+      frameworkFailed = false;
       for (const [name, flow] of [
         ["preset", presetFlow],
         ["headless", headlessFlow],
@@ -372,6 +377,7 @@ try {
           console.log(`[e2e] ${framework} ${name}: ok`);
         } catch (error) {
           failed = true;
+          frameworkFailed = true;
           console.log(`[e2e] ${framework} ${name}: FAILED\n  ${String(error)}`);
           await screenshot(page, `failure-${framework}-${name}`);
         } finally {
@@ -382,6 +388,12 @@ try {
     } finally {
       server.kill();
       await server.exited;
+      if (frameworkFailed) {
+        const log = (await serverLog).trim();
+        if (log) {
+          console.log(`[e2e] ${framework} preview server stderr:\n${log}`);
+        }
+      }
     }
   }
 } finally {

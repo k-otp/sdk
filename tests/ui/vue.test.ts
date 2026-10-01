@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import type { OtpFormController } from "@k-otp/sdk/ui";
 import { OTP_FORM_KEY, OtpCodeInput, OtpForm } from "@k-otp/sdk/ui/vue";
 import { createOtpPlugin } from "@k-otp/sdk/vue";
 import { fireEvent, screen } from "@testing-library/dom";
@@ -115,6 +116,71 @@ describe("<OtpForm /> preset (Vue)", () => {
     );
     expect(document.activeElement).toBe(screen.getByLabelText("Phone number"));
     expect(document.querySelector('[data-k-otp="code-field"]')).toBeNull();
+  });
+
+  test("IME: a re-render in the middle of a composition keeps it", async () => {
+    const api = createMockApi();
+    let form!: OtpFormController;
+    const app = mountVue({
+      render: () =>
+        h(
+          OtpForm.Root,
+          { client: api.client, purpose: "ime", locale: "en" },
+          {
+            default: (context: {
+              form: OtpFormController;
+              state: { issued: boolean };
+            }) => {
+              form = context.form;
+              return context.state.issued ? [h(OtpForm.CodeField)] : [];
+            },
+          },
+        ),
+    });
+    app.mount(mounted[0]?.el as HTMLElement);
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    await flush();
+    fireEvent.compositionStart(segment(0));
+    segment(0).value = "３";
+    fireEvent.input(segment(0), { isComposing: true });
+    // A state change re-renders the field (like the countdown tick); Vue
+    // would re-patch a bound `value` and cancel the composition.
+    form.configure({ allowInternational: true });
+    await flush();
+    expect(segment(0).value).toBe("３");
+    fireEvent.compositionEnd(segment(0));
+    await flush();
+    expect(form.getState().code).toBe("3");
+    expect(segment(0).value).toBe("3");
+    expect(document.activeElement).toBe(segment(1));
+  });
+
+  test('locale="auto" follows <html lang> after mount', async () => {
+    const api = createMockApi();
+    document.documentElement.lang = "fr";
+    try {
+      const html = await renderToString(
+        createSSRApp({
+          render: () =>
+            h(OtpForm, { client: api.client, purpose: "x", locale: "auto" }),
+        }),
+      );
+      expect(html).toContain("인증번호 받기");
+      const app = mountVue({
+        render: () =>
+          h(OtpForm, { client: api.client, purpose: "x", locale: "auto" }),
+      });
+      app.mount(mounted[0]?.el as HTMLElement);
+      await flush();
+      // Any non-Korean language: English.
+      expect(part("send-button").textContent).toBe("Send code");
+      document.documentElement.lang = "ko-KR";
+      await flush();
+      expect(part("send-button").textContent).toBe("인증번호 받기");
+    } finally {
+      document.documentElement.lang = "";
+    }
   });
 
   test("hydrates server markup (explicit id) without mismatches", async () => {

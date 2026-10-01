@@ -117,6 +117,25 @@ const paste =
   () => {
     fireEvent.paste(segment(0), { clipboardData: { getData: () => text } });
   };
+/**
+ * Waits (polling) until a button's retry wait is over, instead of sleeping
+ * a fixed time: the wait starts when the mocked 429 lands, which a loaded
+ * runner can delay.
+ */
+const waitUntilIdle =
+  (part: string): Step =>
+  async () => {
+    const deadline = Date.now() + 10_000;
+    while (
+      document
+        .querySelector(`[data-k-otp="${part}"]`)
+        ?.getAttribute("data-state") === "cooldown"
+    ) {
+      if (Date.now() > deadline) throw new Error(`${part} stayed in cooldown`);
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  };
+
 const typeCode =
   (code: string): Step =>
   async () => {
@@ -174,9 +193,7 @@ const scenarios: Record<
     steps: [
       typePhone("+82 10-1234-5678"),
       click("send-button"),
-      async () => {
-        await new Promise((resolve) => setTimeout(resolve, 600));
-      },
+      waitUntilIdle("send-button"),
       click("send-button"),
       click("edit-phone"),
     ],
@@ -189,9 +206,7 @@ const scenarios: Record<
       typePhone("01012345678"),
       click("send-button"),
       paste("111111"),
-      async () => {
-        await new Promise((resolve) => setTimeout(resolve, 600));
-      },
+      waitUntilIdle("verify-button"),
       click("verify-button"),
       paste("222222"),
       paste("333333"),

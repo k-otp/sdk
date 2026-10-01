@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { OtpProvider } from "@k-otp/sdk/react";
+import type { OtpFormController } from "@k-otp/sdk/ui";
 import { OtpCodeInput, OtpForm, type OtpFormPhase } from "@k-otp/sdk/ui/react";
 import {
   act,
@@ -266,6 +267,90 @@ describe("<OtpForm /> preset (React)", () => {
     await settle();
     expect(segments().map((s) => s.value)).toEqual(["3", "", "", "", "", ""]);
     expect(document.activeElement).toBe(segment(1));
+  });
+
+  test("IME: a re-render in the middle of a composition keeps it", async () => {
+    const api = createMockApi();
+    let form!: OtpFormController;
+    render(
+      <OtpForm.Root client={api.client} purpose="ime" locale="en">
+        {(context) => {
+          form = context.form;
+          return context.state.issued ? <OtpForm.CodeField /> : null;
+        }}
+      </OtpForm.Root>,
+    );
+    form.setPhoneNumber("01012345678");
+    await act(async () => {
+      await form.send();
+    });
+    fireEvent.compositionStart(segment(0));
+    segment(0).value = "３";
+    fireEvent.input(segment(0), { isComposing: true });
+    // A state change re-renders the field (like the countdown tick).
+    act(() => form.configure({ allowInternational: true }));
+    expect(segment(0).value).toBe("３");
+    expect(form.getState().code).toBe("");
+    fireEvent.compositionEnd(segment(0));
+    await settle();
+    expect(form.getState().code).toBe("3");
+    expect(segment(0).value).toBe("3");
+    expect(document.activeElement).toBe(segment(1));
+  });
+
+  test('locale="auto" follows <html lang> after mount; the default never does', async () => {
+    const api = createMockApi();
+    document.documentElement.lang = "en";
+    try {
+      // Default: Korean on the server and the client (no mismatch).
+      const element = <OtpForm client={api.client} purpose="x" id="d" />;
+      const container = document.createElement("div");
+      container.innerHTML = renderToString(element);
+      document.body.append(container);
+      const errors: unknown[] = [];
+      let root!: ReturnType<typeof hydrateRoot>;
+      await act(async () => {
+        root = hydrateRoot(container, element, {
+          onRecoverableError: (cause) => errors.push(cause),
+        });
+      });
+      expect(errors).toEqual([]);
+      expect(part("send-button").textContent).toBe("인증번호 받기");
+      act(() => root.unmount());
+      container.remove();
+      // "auto": switches after mount, then follows lang changes.
+      render(<OtpForm client={api.client} purpose="x" locale="auto" />);
+      await settle();
+      expect(part("send-button").textContent).toBe("Send code");
+      document.documentElement.lang = "ko";
+      await settle();
+      expect(part("send-button").textContent).toBe("인증번호 받기");
+    } finally {
+      document.documentElement.lang = "";
+    }
+  });
+
+  test("a controlled OtpCodeInput shows the parent's value when it rejects a change", async () => {
+    const Rejecting = () => {
+      const [value, setValue] = useState("12");
+      // Only accepts digits up to 5.
+      return (
+        <OtpCodeInput
+          aria-label="Code"
+          value={value}
+          onValueChange={(next) => {
+            if (/^[0-5]*$/.test(next)) setValue(next);
+          }}
+        />
+      );
+    };
+    render(<Rejecting />);
+    fireEvent.change(segment(2), { target: { value: "9" } });
+    await settle();
+    expect(segments().map((s) => s.value)).toEqual(["1", "2", "", "", "", ""]);
+    fireEvent.change(segment(2), { target: { value: "3" } });
+    await settle();
+    expect(segments().map((s) => s.value)).toEqual(["1", "2", "3", "", "", ""]);
   });
 
   test("hydrates server markup (explicit id) without mismatches", async () => {
