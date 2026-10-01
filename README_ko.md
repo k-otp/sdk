@@ -18,7 +18,7 @@ npm 패키지는 [`@k-otp/sdk`](./packages/sdk) 하나이며, 용도별 서브�
 | [`@k-otp/sdk/k-otp.iife.min.js`](./packages/sdk/README.md#cdn--static-sites) | 정적 사이트용 `<script>` 번들(`window.KOtp`), jsDelivr 또는 unpkg. |
 
 프레임워크 서브패스는 코어 위의 얇은 계층(각각 gzip 약 1 kB)이며 동작과 정규화된 `OtpApiError`가 모두
-동일하고, 하나의 공유 코어를 사용합니다. React, Vue, Svelte는 선택적(optional) peer dependency이며,
+동일하고, 모듈 포맷(ESM/CJS)별로 하나의 공유 코어를 사용합니다(`instanceof OtpApiError`는 포맷 간에도 동작). React, Vue, Svelte는 선택적(optional) peer dependency이며,
 `@k-otp/sdk/react`를 임포트해도 Vue, Svelte, 서버 클라이언트는 로드되지 않습니다.
 
 ## 빠른 시작

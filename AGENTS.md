@@ -9,7 +9,9 @@ Public, MIT-licensed SDK for the K-OTP Korean OTP API (`https://api.k-otp.dev/v1
 
 - `packages/sdk` (`@k-otp/sdk`): the only published package, one subpath
   export per use (tsdown builds every entry in one graph per format, so the
-  core is shared, never duplicated):
+  core is shared within a format, never duplicated; ESM and CJS are separate
+  copies, so cross-copy identity relies on `Symbol.for` brands/keys, e.g.
+  `OtpApiError[Symbol.hasInstance]`):
   - `src/core` -> `@k-otp/sdk` and `@k-otp/sdk/core`: framework-agnostic
     `issue`/`verify` client (browser `pk_` keys, SSR, edge). oRPC
     `OpenAPILink` over REST `/v1`. `src/core/contract.ts` ->

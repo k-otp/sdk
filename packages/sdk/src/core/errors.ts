@@ -65,6 +65,14 @@ export type OtpApiErrorOptions = {
 
 const BRAND: symbol = Symbol.for("@k-otp/sdk/OtpApiError");
 
+const hasBrand = (value: unknown): boolean =>
+  typeof value === "object" &&
+  value !== null &&
+  (value as Record<symbol, unknown>)[BRAND] === true;
+
+const ordinaryHasInstance = (target: unknown, value: unknown): boolean =>
+  Function.prototype[Symbol.hasInstance].call(target, value);
+
 /** Codes for which retrying the same request later may succeed. */
 const RETRYABLE_CODES: ReadonlySet<OtpApiErrorCode> = new Set([
   "TOO_MANY_REQUESTS",
@@ -93,6 +101,21 @@ export class OtpApiError extends Error {
    * and, when the server sends one, on 503.
    */
   readonly retryAfterMs: number | undefined;
+
+  /**
+   * `error instanceof OtpApiError` is also true for errors created by another
+   * copy of the SDK (the ESM and CommonJS builds loaded side by side, the CDN
+   * bundle): every `OtpApiError` carries the same `Symbol.for` brand.
+   * Subclasses keep the ordinary prototype check.
+   */
+  static override [Symbol.hasInstance](value: unknown): boolean {
+    // biome-ignore lint/complexity/noThisInStatic lint/complexity/noUselessThisAlias: the subclass in `x instanceof Subclass`.
+    const target: unknown = this;
+    return (
+      ordinaryHasInstance(target, value) ||
+      (target === OtpApiError && hasBrand(value))
+    );
+  }
 
   constructor(options: OtpApiErrorOptions) {
     super(
@@ -144,10 +167,7 @@ export class OtpApiError extends Error {
  * e.g. the CDN bundle and an npm install).
  */
 export const isOtpApiError = (value: unknown): value is OtpApiError =>
-  value instanceof OtpApiError ||
-  (typeof value === "object" &&
-    value !== null &&
-    (value as Record<symbol, unknown>)[BRAND] === true);
+  ordinaryHasInstance(OtpApiError, value) || hasBrand(value);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;

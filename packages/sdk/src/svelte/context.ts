@@ -5,7 +5,8 @@ import {
   type OtpStores,
 } from "./stores";
 
-const CONTEXT_KEY: unique symbol = Symbol("k-otp");
+// A registered symbol: shared by every copy of `@k-otp/sdk/svelte`.
+const CONTEXT_KEY: unique symbol = Symbol.for("@k-otp/sdk/svelte/stores");
 
 const isStores = (value: unknown): value is OtpStores =>
   typeof value === "object" &&

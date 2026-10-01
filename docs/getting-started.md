@@ -13,7 +13,9 @@ verifies them. Everything ships in one package, `@k-otp/sdk`
 | [`@k-otp/sdk/svelte`](./reference/svelte.md) | Svelte 4/5 | `pk_` | `issue`, `verify`, flow |
 
 The framework subpaths re-export the common core helpers and types (the same
-objects as `@k-otp/sdk`, from one shared copy of the core). React, Vue and
+objects as `@k-otp/sdk` within one module format, from one shared copy of the
+core; `instanceof OtpApiError` also matches across the ESM and CommonJS
+builds). React, Vue and
 Svelte are optional peer dependencies of `@k-otp/sdk`: your app provides the
 one it uses, and importing `@k-otp/sdk/react` never loads Vue, Svelte or the
 server client. `@k-otp/sdk/server` is never bundled for browsers (it resolves

@@ -23,7 +23,8 @@ npm install @k-otp/sdk svelte
 yourself (your app already has it). `@k-otp/sdk/svelte` only loads Svelte, never
 the other frameworks or the server client. The common core exports
 (`createOtpClient`, `createIdempotencyKey`, `isOtpApiError`, `OtpApiError`,
-types) are re-exported here and are the same objects as in `@k-otp/sdk`.
+types) are re-exported here and are the same objects as in `@k-otp/sdk`
+(within one module format).
 This subpath is ESM-only (no `require` build), like Svelte.
 
 ## Quick start

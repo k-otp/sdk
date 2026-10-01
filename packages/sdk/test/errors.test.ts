@@ -270,6 +270,33 @@ describe("OtpApiError", () => {
     expect(isOtpApiError(null)).toBe(false);
   });
 
+  test("instanceof accepts errors from another copy (ESM/CJS, CDN)", () => {
+    // What another copy's OtpApiError looks like from here: a different
+    // prototype chain carrying the shared Symbol.for brand.
+    const foreign = Object.defineProperty(
+      new Error("x"),
+      Symbol.for("@k-otp/sdk/OtpApiError"),
+      { value: true },
+    );
+    expect(foreign instanceof OtpApiError).toBe(true);
+    expect(isOtpApiError(foreign)).toBe(true);
+    expect(new Error("x") instanceof OtpApiError).toBe(false);
+    expect((null as unknown as object) instanceof OtpApiError).toBe(false);
+
+    // Subclasses keep the ordinary prototype check.
+    class CustomError extends OtpApiError {}
+    const base = new OtpApiError({ code: "UNKNOWN", status: 0, message: "x" });
+    const custom = new CustomError({
+      code: "UNKNOWN",
+      status: 0,
+      message: "x",
+    });
+    expect(custom instanceof OtpApiError).toBe(true);
+    expect(custom instanceof CustomError).toBe(true);
+    expect(base instanceof CustomError).toBe(false);
+    expect(foreign instanceof CustomError).toBe(false);
+  });
+
   test("normalizeOtpApiError handles arbitrary values", () => {
     const same = new OtpApiError({
       code: "CONFLICT",

@@ -20,7 +20,8 @@ subpath per use:
 
 The framework subpaths are thin layers over the core (about 1 kB gzip each)
 with identical semantics and the same normalized `OtpApiError`, from one
-shared copy of the core. React, Vue and Svelte are optional peer
+shared copy of the core per module format (`instanceof OtpApiError` also
+matches across the ESM and CommonJS builds). React, Vue and Svelte are optional peer
 dependencies: importing `@k-otp/sdk/react` never loads Vue, Svelte or the
 server client.
 

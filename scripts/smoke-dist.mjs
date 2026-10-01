@@ -249,6 +249,22 @@ for (const [label, mod] of [
 assert.equal(require("@k-otp/sdk/react").OtpApiError, cjsCore.OtpApiError);
 console.log("ok - one OtpApiError per format across subpaths");
 
+// Across formats (ESM + CJS loaded side by side) the classes differ, but
+// `instanceof` and the adapters' context keys still match.
+assert.notEqual(cjsCore.OtpApiError, esmCore.OtpApiError);
+const errorOptions = { code: "UNKNOWN", status: 0, message: "x" };
+const cjsError = new cjsCore.OtpApiError(errorOptions);
+const esmError = new esmCore.OtpApiError(errorOptions);
+assert.ok(cjsError instanceof esmCore.OtpApiError, "cjs instanceof esm");
+assert.ok(esmError instanceof cjsCore.OtpApiError, "esm instanceof cjs");
+assert.ok(esmCore.isOtpApiError(cjsError) && cjsCore.isOtpApiError(esmError));
+assert.ok(!(new Error("x") instanceof esmCore.OtpApiError));
+assert.equal(
+  require("@k-otp/sdk/vue").OTP_CLIENT_KEY,
+  (await import("@k-otp/sdk/vue")).OTP_CLIENT_KEY,
+);
+console.log("ok - OtpApiError instanceof and the Vue key work across ESM/CJS");
+
 // `@k-otp/sdk/server` under the "browser" export condition is a stub that
 // throws, unless a server runtime condition (workerd, edge-light, ...) wins.
 const importServer = (...conditions) =>

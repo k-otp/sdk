@@ -22,7 +22,8 @@ npm install @k-otp/sdk vue
 yourself (your app already has it). `@k-otp/sdk/vue` only loads Vue, never
 the other frameworks or the server client. The common core exports
 (`createOtpClient`, `createIdempotencyKey`, `isOtpApiError`, `OtpApiError`,
-types) are re-exported here and are the same objects as in `@k-otp/sdk`.
+types) are re-exported here and are the same objects as in `@k-otp/sdk`
+(within one module format).
 
 ## Quick start
 

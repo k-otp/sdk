@@ -16,8 +16,13 @@ export type OtpClientLike = OtpIssueVerifyClient;
 /** A client instance, or options for `createOtpClient`. */
 export type OtpClientSource = OtpClientLike | OtpClientOptions;
 
-/** Injection key of the OTP client (`app.provide` / `provide`). */
-export const OTP_CLIENT_KEY: InjectionKey<OtpClientLike> = Symbol("k-otp");
+/**
+ * Injection key of the OTP client (`app.provide` / `provide`). A registered
+ * symbol, so the ESM and CommonJS builds of `@k-otp/sdk/vue` share it.
+ */
+export const OTP_CLIENT_KEY: InjectionKey<OtpClientLike> = Symbol.for(
+  "@k-otp/sdk/vue/client",
+);
 
 /**
  * Vue plugin: `app.use(createOtpPlugin({ apiKey: "pk_..." }))`. The client is

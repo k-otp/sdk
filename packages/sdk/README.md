@@ -20,8 +20,9 @@ package, with a subpath per use:
   SSR-safe (no `window` access at import)
 - Each subpath only loads what it needs: `@k-otp/sdk/react` never pulls Vue,
   Svelte or the server client, and the framework adapters share one copy of
-  the core (`OtpApiError` from `@k-otp/sdk` and `@k-otp/sdk/react` is the
-  same class)
+  the core per module format (`OtpApiError` from `@k-otp/sdk` and
+  `@k-otp/sdk/react` is the same class; across the ESM and CommonJS builds,
+  `instanceof OtpApiError` still matches)
 - Typed from the published OpenAPI spec; normalized `OtpApiError`
 - ESM and CommonJS per subpath (Svelte: ESM only) with type declarations,
   plus the `<script>` bundle
@@ -174,8 +175,10 @@ Codes: `BAD_REQUEST`, `UNAUTHORIZED`, `PAYMENT_REQUIRED`, `FORBIDDEN`,
 `NOT_FOUND`, `CONFLICT`, `TOO_MANY_REQUESTS`, `INTERNAL_SERVER_ERROR`,
 `SERVICE_UNAVAILABLE`, `TIMEOUT`, `NETWORK_ERROR`, `ABORTED`, `UNKNOWN`.
 
-Use `isOtpApiError(error)` rather than `instanceof` when several copies of the
-SDK may be loaded (for example the CDN bundle and an npm install).
+`error instanceof OtpApiError` also matches errors from another copy of the
+SDK (the ESM and CommonJS builds loaded side by side, the CDN bundle and an
+npm install): every `OtpApiError` carries a shared `Symbol.for` brand, which
+`instanceof` and `isOtpApiError(error)` check.
 
 ### Telemetry
 
