@@ -88,7 +88,7 @@ if (!result.verified) {
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js"
+  src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.1/dist/k-otp.iife.min.js"
   integrity="sha384-REPLACE_WITH_THE_FILE_HASH"
   crossorigin="anonymous"
 ></script>
@@ -103,14 +103,14 @@ Always pin an exact version and add Subresource Integrity. Get the hash from
 jsDelivr ("Copy HTML + SRI" on the package page) or compute it:
 
 ```bash
-curl -s https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js \
+curl -s https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.1/dist/k-otp.iife.min.js \
   | openssl dgst -sha384 -binary | openssl base64 -A
 ```
 
 unpkg works the same way:
-`https://unpkg.com/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js` (the package's
+`https://unpkg.com/@k-otp/sdk@1.0.1/dist/k-otp.iife.min.js` (the package's
 `unpkg` / `jsdelivr` fields also point there, so
-`https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0` serves it too). CDN URLs use
+`https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.1` serves it too). CDN URLs use
 the file path `dist/...`; bundlers and Node.js use the package export
 `@k-otp/sdk/k-otp.iife.min.js`. `dist/k-otp.iife.js` is the unminified
 variant.

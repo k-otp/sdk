@@ -45,7 +45,7 @@ const { verified, reasonCode } = await otp.verify({ issueId, code: "123456" });
 정적 사이트:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js"
+<script src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.1/dist/k-otp.iife.min.js"
         integrity="sha384-..." crossorigin="anonymous"></script>
 <script>
   const otp = KOtp.createOtpClient({ apiKey: "pk_live_..." }); // Origin 정확히 일치 필요

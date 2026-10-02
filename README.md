@@ -61,7 +61,7 @@ await otp.verify(code);                              // otp.verified, otp.reason
 Static site:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js"
+<script src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.1/dist/k-otp.iife.min.js"
         integrity="sha384-..." crossorigin="anonymous"></script>
 <script>
   const otp = KOtp.createOtpClient({ apiKey: "pk_live_..." }); // exact Origin allowlist

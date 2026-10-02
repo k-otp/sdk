@@ -76,7 +76,7 @@ that requested it.
 Pin exact versions and use Subresource Integrity:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js"
+<script src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.1/dist/k-otp.iife.min.js"
         integrity="sha384-..." crossorigin="anonymous"></script>
 ```
 

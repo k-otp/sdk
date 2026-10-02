@@ -21,11 +21,11 @@ bun run build                         # dist/: index.html + k-otp.iife.min.js
 ## Production: jsDelivr (or unpkg) + SRI
 
 Replace the local `<script>` with a pinned jsDelivr URL and an integrity
-hash (unpkg: `https://unpkg.com/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js`):
+hash (unpkg: `https://unpkg.com/@k-otp/sdk@1.0.1/dist/k-otp.iife.min.js`):
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.0/dist/k-otp.iife.min.js"
+  src="https://cdn.jsdelivr.net/npm/@k-otp/sdk@1.0.1/dist/k-otp.iife.min.js"
   integrity="sha384-..."
   crossorigin="anonymous"
 ></script>
