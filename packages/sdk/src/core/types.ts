@@ -75,12 +75,19 @@ export type OtpWalletScope = WalletScope;
  * "organization"`, `organizationId` set). `walletId` and `walletScope` are
  * always sent by 1.4.0+ but are typed optional here: an API deployment older
  * than 1.4.0 omits them and the balance is then that app's own wallet.
+ * Likewise `promoBalance` (free promotional credits included in `balance`) and
+ * `promoNextExpiry` are sent by 1.6.0+ and typed optional for older APIs.
  */
 export type GetBalanceResult = Omit<
   OtpBalanceOutput,
-  "walletId" | "walletScope"
+  "walletId" | "walletScope" | "promoBalance" | "promoNextExpiry"
 > &
-  Partial<Pick<OtpBalanceOutput, "walletId" | "walletScope">>;
+  Partial<
+    Pick<
+      OtpBalanceOutput,
+      "walletId" | "walletScope" | "promoBalance" | "promoNextExpiry"
+    >
+  >;
 export type ListTemplatesResult = ListTemplatesOutput;
 export type OtpTemplateSummary = TemplateSummary;
 export type GetTemplateInput = OpenApiOperations["getTemplate"]["params"];

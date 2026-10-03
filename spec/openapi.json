@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "k-otp API",
-    "version": "1.4.0",
+    "version": "1.7.0",
     "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`.\n\n**Rate limits.** `POST /issue` and `POST /verify` enforce the API key's rate-limit policy, a platform default for `pk_` keys and a platform ceiling.\nAn exceeded limit returns 429 `TOO_MANY_REQUESTS` with a `Retry-After` header (seconds) and `data.retryAfterMs`.\n\n**Request id.** Every response carries `X-Request-Id` (also exposed to allowed browser origins via CORS).\nA request `X-Request-Id` matching `^[A-Za-z0-9._:-]{8,128}$` is echoed; otherwise the API generates one.\nQuote it when contacting support."
   },
   "servers": [
@@ -46,7 +46,7 @@
         "properties": {
           "phoneNumber": {
             "type": "string",
-            "description": "Recipient mobile number (at most 32 characters after trimming). Stored only\nas a hash and never returned by any endpoint.",
+            "description": "Recipient mobile number (at most 32 characters after trimming, with at least\none digit). Handled in canonical form: a Korean mobile number in any spelling\n(`010-1234-5678`, `+82 10 1234 5678`) is `01012345678`; other numbers are\ntheir digits only (`+1 415-555-0100` is `14155550100`). Stored only as a\nhash and never returned by any endpoint.",
             "example": "01012345678"
           },
           "purpose": {
@@ -63,7 +63,7 @@
                 "const": "sms"
               }
             ],
-            "description": "Delivery channel. Defaults to `sms`."
+            "description": "Delivery channel. When omitted, the OTP is delivered by KakaoTalk AlimTalk\nwith an automatic SMS fallback if AlimTalk delivery fails (included in the\nAlimTalk price)."
           },
           "templateId": {
             "type": "string",
@@ -87,11 +87,11 @@
                 "const": "SMS"
               }
             ],
-            "description": "SMS message type for the `sms` channel."
+            "description": "Message type option; AlimTalk delivery and its SMS fallback ignore it."
           },
           "cost": {
             "type": "number",
-            "description": "Deprecated and ignored for billing. The credit amount reserved and debited\nis always decided server-side from the channel and message type (SMS, LMS,\nAlimTalk) and cannot be overridden by any key type. Still accepted for\ncompatibility: when sent it must be an integer from 1 to 100000, and it\nremains part of the idempotency fingerprint.",
+            "description": "Deprecated and ignored for billing. The credit amount reserved and debited\nis always decided server-side from the delivery channel and cannot be\noverridden by any key type. Still accepted for\ncompatibility: when sent it must be an integer from 1 to 100000, and it\nremains part of the idempotency fingerprint.",
             "deprecated": true
           },
           "metadata": {
@@ -110,6 +110,17 @@
             "type": "string",
             "description": "Idempotency key; alternative to the `Idempotency-Key` header. One of the two\nis required, and they must match when both are sent. 1-128 visible ASCII\ncharacters without spaces after trimming. Reuse the same key when retrying.",
             "example": "signup-3f2a9c1e-0001"
+          },
+          "webOtp": {
+            "oneOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "$ref": "#/components/schemas/IssueWebOtpOptions"
+              }
+            ],
+            "description": "Opt in to WebOTP (SMS code auto-fill on Android Chrome): the SMS fallback of\nthe AlimTalk message ends with the origin-bound line `@<host> #<code>`, so\n`navigator.credentials.get({ otp })` on that origin can read it when the code\narrives by SMS. `true` binds the request `Origin` header (any key\ntype that sends one, typically a `pk_` browser call); `{ origin }` names it\nexplicitly (for `sk_` server calls; with a `pk_` key it must equal the request\n`Origin`). The origin must be `https` without a path or port, and must be\nlisted in the key's `allowedOrigins`: a key without `allowedOrigins` cannot\nuse WebOTP (`http://localhost` and unlisted origins work only in local\ndevelopment). `false` or omitted: no WebOTP line.\n\nThe KakaoTalk message itself never carries the line (KakaoTalk is not\nreadable by the OS), so `webOtp.status` is `fallback_only`: auto-fill works\nwhen AlimTalk delivery fails and the SMS fallback is sent. WebOTP never\nchanges the price or the SMS type: the SMS fallback uses a compact template,\nand when the compact body plus the line would exceed one SMS (90 bytes; ASCII\n1, line break and other characters 2) the line is left out and the normal\ntext is sent. The response field `webOtp` reports the outcome. Part of the\nidempotency fingerprint (as the bound host)."
           }
         },
         "required": [
@@ -124,6 +135,22 @@
           "type": "string"
         },
         "description": "String-to-string map."
+      },
+      "IssueWebOtpOptions": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "description": "Origin of the page that reads the code, exactly as the browser serializes\nit (scheme and host, no path or trailing slash).",
+            "example": "https://app.example.com"
+          }
+        },
+        "required": [
+          "origin"
+        ],
+        "description": "Explicit WebOTP binding for `POST /v1/issue`."
       },
       "IssueOtpOutput": {
         "type": "object",
@@ -143,6 +170,10 @@
           "queuedAt": {
             "type": "string",
             "description": "When delivery was queued (RFC 3339)."
+          },
+          "webOtp": {
+            "$ref": "#/components/schemas/IssueWebOtpResult",
+            "description": "Present only when the request set `webOtp`."
           }
         },
         "required": [
@@ -152,6 +183,40 @@
           "queuedAt"
         ],
         "description": "Result of `POST /v1/issue`. The OTP code itself is never returned."
+      },
+      "IssueWebOtpResult": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "oneOf": [
+              {
+                "const": "applied"
+              },
+              {
+                "const": "fallback_only"
+              },
+              {
+                "const": "skipped"
+              }
+            ],
+            "description": "`fallback_only`: AlimTalk delivery (the default); the KakaoTalk message\ncannot carry the line, only the SMS fallback sent if AlimTalk delivery fails\ndoes, so auto-fill works only in that case. `applied`: the SMS carries\n`@<host> #<code>`. `skipped`: sent without the line (see `reason`)."
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "const": "channel_alimtalk"
+              },
+              {
+                "const": "host_too_long"
+              }
+            ],
+            "description": "Why it was skipped. `host_too_long`: the compact SMS plus the WebOTP line\nwould exceed one SMS, so the normal text was sent instead (the message type\nand price never change because of WebOTP). `channel_alimtalk`: AlimTalk\ndelivery while the SMS fallback is unavailable."
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "description": "WebOTP outcome of an issue that asked for it (`webOtp` on the request)."
       },
       "OtpRateLimitErrorData": {
         "type": "object",
@@ -205,9 +270,17 @@
               },
               {
                 "const": "OVERDRAFT_LIMIT_EXCEEDED"
+              },
+              {
+                "const": "TRIAL_DAILY_LIMIT_EXCEEDED"
               }
             ],
-            "description": "Why quota admission rejected the issue."
+            "description": "Why quota admission rejected the issue. `TRIAL_DAILY_LIMIT_EXCEEDED`: a\nwallet that has never bought credits reached its daily send limit (free\ntrial); it lifts at `resetAt` or as soon as credits are purchased."
+          },
+          "resetAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "With `TRIAL_DAILY_LIMIT_EXCEEDED`: when the daily trial limit resets (the\nnext 00:00 Asia/Seoul, RFC 3339)."
           }
         },
         "required": [
@@ -737,6 +810,15 @@
                 "const": "debit"
               },
               {
+                "const": "promo_credit"
+              },
+              {
+                "const": "promo_expire"
+              },
+              {
+                "const": "promo_revoke"
+              },
+              {
                 "const": "refund"
               }
             ],
@@ -797,11 +879,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "description": "Attribution app. Always the calling app for `debit`/`refund`; present on\norganization-wallet `credit`/`clawback` entries only when the purchase was\nattributed to an app."
+            "description": "Attribution app. Always the calling app for `debit`/`refund`; present on\norganization-wallet `credit`/`clawback`/`promo_credit` entries only when\nthe purchase or grant was attributed to an app."
           },
           "amountDelta": {
             "$ref": "#/components/schemas/OtpCreditSignedValue",
-            "description": "Signed wallet delta: debit and clawback are negative; credit and refund are positive."
+            "description": "Signed wallet delta: debit, clawback, promo_expire and promo_revoke are\nnegative; credit, refund and promo_credit are positive."
           },
           "balanceAfter": {
             "$ref": "#/components/schemas/OtpCreditSignedValue",
@@ -816,6 +898,11 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "`promo_credit` only: when the unused part of these promotional credits expires."
           }
         },
         "required": [
@@ -841,10 +928,19 @@
             "const": "debit"
           },
           {
+            "const": "promo_credit"
+          },
+          {
+            "const": "promo_expire"
+          },
+          {
+            "const": "promo_revoke"
+          },
+          {
             "const": "refund"
           }
         ],
-        "description": "Wallet ledger entry type: `credit` (top-up), `debit` (issue charge), `refund`\n(issue charge returned), or `clawback` (purchased credits removed, e.g. after\na credit-pack refund)."
+        "description": "Wallet ledger entry type: `credit` (purchased top-up), `debit` (issue\ncharge), `refund` (issue charge returned), `clawback` (purchased credits\nremoved, e.g. after a credit-pack refund), `promo_credit` (free promotional\ncredits granted, with `expiresAt`), `promo_expire` (unused promotional\ncredits expired) or `promo_revoke` (unused promotional credits taken back).\nNew types may be added; treat unknown values as other adjustments."
       },
       "OtpCreditSignedValue": {
         "type": "integer",
@@ -879,7 +975,7 @@
           },
           "balance": {
             "type": "number",
-            "description": "Current balance as a credit quantity (not money)."
+            "description": "Current total balance as a credit quantity (not money): purchased plus\npromotional credits."
           },
           "currency": {
             "type": "string",
@@ -888,6 +984,22 @@
           "updatedAt": {
             "type": "string",
             "description": "When the wallet last changed (RFC 3339)."
+          },
+          "promoBalance": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unused, unexpired promotional (free) credits included in `balance`.\nPurchased credits are roughly `balance - promoBalance`. Computed from the\npromotional lot summary, which can lag recent sends by about 10 minutes;\nnever more than `balance`. Always `0` for a legacy per-app wallet."
+          },
+          "promoNextExpiry": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PromoExpiry"
+              }
+            ],
+            "description": "The promotional credits that expire first, or `null` when there are none."
           }
         },
         "required": [
@@ -896,7 +1008,9 @@
           "walletScope",
           "balance",
           "currency",
-          "updatedAt"
+          "updatedAt",
+          "promoBalance",
+          "promoNextExpiry"
         ],
         "description": "Credit wallet balance visible to the authenticated app. For an app of an\norganization this is the organization wallet shared by all of its apps."
       },
@@ -910,6 +1024,26 @@
           }
         ],
         "description": "`organization`: the organization credit wallet (`org:<organizationId>`) shared\nby every app of the organization. `app`: the legacy per-app wallet, which is\nbeing retired."
+      },
+      "PromoExpiry": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When these credits expire (RFC 3339)."
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "How many credits expire then (at most `promoBalance`)."
+          }
+        },
+        "required": [
+          "at",
+          "amount"
+        ],
+        "description": "The earliest-expiring promotional credits of a wallet."
       },
       "ListTemplatesInput": {
         "type": "object",
@@ -958,7 +1092,7 @@
           },
           "providerTemplateCode": {
             "type": "string",
-            "description": "Pre-registered provider (AlimTalk) template code."
+            "description": "Pre-registered provider (AlimTalk) template code; empty when the template has no AlimTalk."
           },
           "channelSupport": {
             "type": "array",
@@ -1127,7 +1261,7 @@
       "post": {
         "operationId": "otp.issue",
         "summary": "Issue OTP and queue outbound delivery",
-        "description": "Generates a 6-digit OTP, applies quota admission, records the issue, and queues SMS or AlimTalk delivery. The plaintext code is never returned; only `issueId`, expiry, and attempt metadata are.\n\n**Idempotency.** An idempotency key is required, either in the `Idempotency-Key` header or the body `idempotencyKey` field (both must match when both are sent). A retry with the same key and payload returns the original response without re-sending or re-debiting. When the outcome of the first attempt is unknown (timeout, 503), retry only with the same key.\n\n**Replacement.** Issuing again for the same phone number and purpose (with a new key) marks the previous `issued` OTP as `replaced`.\n\n**Billing.** Credit is reserved at admission and finalized asynchronously after send processing; the response does not include balance or debit amounts. The charged amount is decided server-side per channel/message type (SMS, LMS, AlimTalk); the deprecated `cost` field is ignored for billing for every key type. Quota rejection returns 402 with `data.code`.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.\n\n**Rate limits.** The key's `perKey`, `perIp` and `perPhone` rules are enforced after validation. For `pk_` keys the platform default covers `perKey`/`perIp` the key does not set and its `perPhone` default always applies; `perKey`/`perIp` never exceed the platform ceiling. An exceeded rule returns 429 with `Retry-After` and `data.retryAfterMs`.",
+        "description": "Generates a 6-digit OTP, applies quota admission, records the issue, and queues delivery by KakaoTalk AlimTalk with an automatic SMS fallback when AlimTalk delivery fails. The plaintext code is never returned; only `issueId`, expiry, and attempt metadata are.\n\n**Idempotency.** An idempotency key is required, either in the `Idempotency-Key` header or the body `idempotencyKey` field (both must match when both are sent). A retry with the same key and payload returns the original response without re-sending or re-debiting. When the outcome of the first attempt is unknown (timeout, 503), retry only with the same key.\n\n**Replacement.** Issuing again for the same phone number and purpose (with a new key) marks the previous `issued` OTP as `replaced`. Phone numbers are compared in canonical form: a Korean mobile number is the same number in any spelling (`010-1234-5678`, `01012345678`, `+82 10 1234 5678`); other numbers are compared by their digits only (`+1 415-555-0100` = `14155550100`).\n\n**WebOTP.** With `webOtp` the SMS fallback ends with `@<host> #<code>` so Android Chrome can auto-fill the code on that origin when it arrives by SMS. `true` binds the request `Origin` header (any key type that sends one); `{ origin }` names it (server `sk_` calls; a `pk_` key may only name its own `Origin`). The origin must be `https` without a path or port and must be listed in the key's `allowedOrigins`; a key without `allowedOrigins` cannot use WebOTP (`http://localhost` and unlisted origins are accepted only in local development). It uses a compact template and never changes the message type or price: when the compact SMS with the line would exceed 90 bytes (line breaks counted as 2), the normal text is sent without it. The KakaoTalk message never carries the line, so the response `webOtp` reports `fallback_only` (or `skipped` with a `reason`).\n\n**Billing.** Credit is reserved at admission and finalized asynchronously after send processing; the response does not include balance or debit amounts. The charged amount is decided server-side per delivery channel (the SMS fallback is included in the AlimTalk price); the deprecated `cost` field is ignored for billing for every key type. Quota rejection returns 402 with `data.code`.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.\n\n**Rate limits.** The key's `perKey`, `perIp` and `perPhone` rules are enforced after validation. For `pk_` keys the platform default covers `perKey`/`perIp` the key does not set and its `perPhone` default always applies; `perKey`/`perIp` never exceed the platform ceiling. An exceeded rule returns 429 with `Retry-After` and `data.retryAfterMs`.",
         "tags": [
           "otp"
         ],
@@ -1140,7 +1274,7 @@
                 "properties": {
                   "phoneNumber": {
                     "type": "string",
-                    "description": "Recipient mobile number (at most 32 characters after trimming). Stored only\nas a hash and never returned by any endpoint.",
+                    "description": "Recipient mobile number (at most 32 characters after trimming, with at least\none digit). Handled in canonical form: a Korean mobile number in any spelling\n(`010-1234-5678`, `+82 10 1234 5678`) is `01012345678`; other numbers are\ntheir digits only (`+1 415-555-0100` is `14155550100`). Stored only as a\nhash and never returned by any endpoint.",
                     "example": "01012345678"
                   },
                   "purpose": {
@@ -1157,7 +1291,7 @@
                         "const": "sms"
                       }
                     ],
-                    "description": "Delivery channel. Defaults to `sms`."
+                    "description": "Delivery channel. When omitted, the OTP is delivered by KakaoTalk AlimTalk\nwith an automatic SMS fallback if AlimTalk delivery fails (included in the\nAlimTalk price)."
                   },
                   "templateId": {
                     "type": "string",
@@ -1181,11 +1315,11 @@
                         "const": "SMS"
                       }
                     ],
-                    "description": "SMS message type for the `sms` channel."
+                    "description": "Message type option; AlimTalk delivery and its SMS fallback ignore it."
                   },
                   "cost": {
                     "type": "number",
-                    "description": "Deprecated and ignored for billing. The credit amount reserved and debited\nis always decided server-side from the channel and message type (SMS, LMS,\nAlimTalk) and cannot be overridden by any key type. Still accepted for\ncompatibility: when sent it must be an integer from 1 to 100000, and it\nremains part of the idempotency fingerprint.",
+                    "description": "Deprecated and ignored for billing. The credit amount reserved and debited\nis always decided server-side from the delivery channel and cannot be\noverridden by any key type. Still accepted for\ncompatibility: when sent it must be an integer from 1 to 100000, and it\nremains part of the idempotency fingerprint.",
                     "deprecated": true
                   },
                   "metadata": {
@@ -1204,6 +1338,17 @@
                     "type": "string",
                     "description": "Idempotency key; alternative to the `Idempotency-Key` header. One of the two\nis required, and they must match when both are sent. 1-128 visible ASCII\ncharacters without spaces after trimming. Reuse the same key when retrying.",
                     "example": "signup-3f2a9c1e-0001"
+                  },
+                  "webOtp": {
+                    "oneOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "$ref": "#/components/schemas/IssueWebOtpOptions"
+                      }
+                    ],
+                    "description": "Opt in to WebOTP (SMS code auto-fill on Android Chrome): the SMS fallback of\nthe AlimTalk message ends with the origin-bound line `@<host> #<code>`, so\n`navigator.credentials.get({ otp })` on that origin can read it when the code\narrives by SMS. `true` binds the request `Origin` header (any key\ntype that sends one, typically a `pk_` browser call); `{ origin }` names it\nexplicitly (for `sk_` server calls; with a `pk_` key it must equal the request\n`Origin`). The origin must be `https` without a path or port, and must be\nlisted in the key's `allowedOrigins`: a key without `allowedOrigins` cannot\nuse WebOTP (`http://localhost` and unlisted origins work only in local\ndevelopment). `false` or omitted: no WebOTP line.\n\nThe KakaoTalk message itself never carries the line (KakaoTalk is not\nreadable by the OS), so `webOtp.status` is `fallback_only`: auto-fill works\nwhen AlimTalk delivery fails and the SMS fallback is sent. WebOTP never\nchanges the price or the SMS type: the SMS fallback uses a compact template,\nand when the compact body plus the line would exceed one SMS (90 bytes; ASCII\n1, line break and other characters 2) the line is left out and the normal\ntext is sent. The response field `webOtp` reports the outcome. Part of the\nidempotency fingerprint (as the bound host)."
                   }
                 },
                 "required": [
@@ -1238,6 +1383,10 @@
                     "queuedAt": {
                       "type": "string",
                       "description": "When delivery was queued (RFC 3339)."
+                    },
+                    "webOtp": {
+                      "$ref": "#/components/schemas/IssueWebOtpResult",
+                      "description": "Present only when the request set `webOtp`."
                     }
                   },
                   "required": [
@@ -1257,7 +1406,7 @@
             }
           },
           "400": {
-            "description": "BAD_REQUEST: invalid payload, missing/blank idempotency key, header/body key mismatch, unknown template or template variables, or `expiresInSec`/`maxAttempts`/`cost` out of range (`cost` is still range-checked though it no longer affects billing).",
+            "description": "BAD_REQUEST: invalid payload, missing/blank idempotency key, header/body key mismatch, a `phoneNumber` without digits, unknown template or template variables, a `channel` the template does not support, `expiresInSec`/`maxAttempts`/`cost` out of range (`cost` is still range-checked though it no longer affects billing), or a `webOtp` origin the key may not bind (not listed in the key `allowedOrigins` or the key has none, not https, has a path or a port, not a domain, missing request `Origin` for `true`, or a `pk_` origin other than the request `Origin`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1387,7 +1536,7 @@
             }
           },
           "402": {
-            "description": "PAYMENT_REQUIRED: quota admission rejected the issue. `data.code` is `INSUFFICIENT_CREDIT` or `OVERDRAFT_LIMIT_EXCEEDED`; top up the wallet before retrying.",
+            "description": "PAYMENT_REQUIRED: quota admission rejected the issue. `data.code` is `INSUFFICIENT_CREDIT` or `OVERDRAFT_LIMIT_EXCEEDED` (top up the wallet before retrying), or `TRIAL_DAILY_LIMIT_EXCEEDED`: a wallet that has never bought credits reached its daily free-trial send limit, which resets at `data.resetAt` (next 00:00 Asia/Seoul) or as soon as credits are purchased.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1418,9 +1567,17 @@
                                 },
                                 {
                                   "const": "OVERDRAFT_LIMIT_EXCEEDED"
+                                },
+                                {
+                                  "const": "TRIAL_DAILY_LIMIT_EXCEEDED"
                                 }
                               ],
-                              "description": "Why quota admission rejected the issue."
+                              "description": "Why quota admission rejected the issue. `TRIAL_DAILY_LIMIT_EXCEEDED`: a\nwallet that has never bought credits reached its daily send limit (free\ntrial); it lifts at `resetAt` or as soon as credits are purchased."
+                            },
+                            "resetAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "description": "With `TRIAL_DAILY_LIMIT_EXCEEDED`: when the daily trial limit resets (the\nnext 00:00 Asia/Seoul, RFC 3339)."
                             }
                           },
                           "required": [
@@ -1846,7 +2003,7 @@
               "maxLength": 128
             },
             "example": "signup-3f2a9c1e-0001",
-            "description": "Client-generated key that makes `POST /issue` safe to retry. Required for every issue request unless the body `idempotencyKey` is provided; if both are sent they must match. After trimming, the key must be 1-128 visible ASCII characters (no spaces). Retrying with the same key and payload replays the original result without a second send or debit; reusing a key with a different payload returns 409 CONFLICT. If the first attempt timed out or returned 503, retry with the same key — never mint a new key, because the provider outcome may be ambiguous and a new key can cause a duplicate SMS."
+            "description": "Client-generated key that makes `POST /issue` safe to retry. Required for every issue request unless the body `idempotencyKey` is provided; if both are sent they must match. After trimming, the key must be 1-128 visible ASCII characters (no spaces). Retrying with the same key and payload replays the original result without a second send or debit; reusing a key with a different payload returns 409 CONFLICT. If the first attempt timed out or returned 503, retry with the same key — never mint a new key, because the provider outcome may be ambiguous and a new key can cause a duplicate message."
           }
         ]
       }
@@ -4358,6 +4515,15 @@
                   "const": "debit"
                 },
                 {
+                  "const": "promo_credit"
+                },
+                {
+                  "const": "promo_expire"
+                },
+                {
+                  "const": "promo_revoke"
+                },
+                {
                   "const": "refund"
                 }
               ],
@@ -4869,7 +5035,7 @@
                     },
                     "balance": {
                       "type": "number",
-                      "description": "Current balance as a credit quantity (not money)."
+                      "description": "Current total balance as a credit quantity (not money): purchased plus\npromotional credits."
                     },
                     "currency": {
                       "type": "string",
@@ -4878,6 +5044,22 @@
                     "updatedAt": {
                       "type": "string",
                       "description": "When the wallet last changed (RFC 3339)."
+                    },
+                    "promoBalance": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Unused, unexpired promotional (free) credits included in `balance`.\nPurchased credits are roughly `balance - promoBalance`. Computed from the\npromotional lot summary, which can lag recent sends by about 10 minutes;\nnever more than `balance`. Always `0` for a legacy per-app wallet."
+                    },
+                    "promoNextExpiry": {
+                      "oneOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "$ref": "#/components/schemas/PromoExpiry"
+                        }
+                      ],
+                      "description": "The promotional credits that expire first, or `null` when there are none."
                     }
                   },
                   "required": [
@@ -4886,7 +5068,9 @@
                     "walletScope",
                     "balance",
                     "currency",
-                    "updatedAt"
+                    "updatedAt",
+                    "promoBalance",
+                    "promoNextExpiry"
                   ],
                   "description": "Credit wallet balance visible to the authenticated app. For an app of an\norganization this is the organization wallet shared by all of its apps."
                 }
