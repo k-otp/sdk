@@ -51,6 +51,12 @@ SAMPO_RELEASE_BRANCH=main sampo release --dry-run   # e.g. "@k-otp/sdk: 1.0.0 ->
    (`.github/workflows/release.yml`) runs Sampo, which keeps a single
    `sampo/release` PR up to date: it consumes the pending changesets, bumps
    `packages/sdk/package.json` and writes `packages/sdk/CHANGELOG.md`.
+   Sampo's lockfile refresh also moves every dependency (and the lockfile's
+   copy of the catalog), which the frozen installs reject, so the workflow
+   then runs `scripts/release-lockfile.sh`: it rebuilds the branch's
+   `bun.lock` from `main`'s with `bun install --lockfile-only` and pushes a
+   `chore(release): keep only the version bumps in bun.lock` commit, so the
+   release PR changes nothing in `bun.lock` but the workspace versions.
 3. Merging the release PR pushes the new version to `main`; the workflow sees
    an unpublished version and runs `scripts/publish-oidc.sh`, which builds,
    runs `check:pack` and `smoke:dist`, publishes the `bun pm pack` tarball
@@ -161,5 +167,6 @@ option in `packages/sdk/tsdown.config.ts`.
 ```bash
 ./scripts/publish-oidc.sh --check                  # should_publish / needs_finalize
 SAMPO_RELEASE_BRANCH=main sampo release --dry-run  # planned version bump
+./scripts/release-lockfile.sh                      # fix a drifted sampo/release lockfile (pushes)
 bun run check                                      # full local gate
 ```
