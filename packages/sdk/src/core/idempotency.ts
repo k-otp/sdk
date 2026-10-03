@@ -34,7 +34,7 @@ const randomUuid = (): string => {
  * state, session, DB row) and reuse it for every retry of that action. Only
  * mint a new key when the user intentionally asks for a new code. Retrying an
  * ambiguous failure (timeout, network error, 503) with a new key can send a
- * duplicate SMS and debit twice.
+ * duplicate message and debit twice.
  */
 export const createIdempotencyKey = (prefix?: string): string => {
   const key = prefix ? `${prefix}-${randomUuid()}` : randomUuid();

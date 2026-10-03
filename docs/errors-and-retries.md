@@ -47,7 +47,7 @@ and from `https://localhost:5173`). Details:
 
 ## Idempotency for `issue`
 
-`issue` sends a real SMS/AlimTalk message and reserves credit, so it must be
+`issue` sends a real message (AlimTalk, or SMS as the fallback) and reserves credit, so it must be
 safe to retry. The SDK requires an `idempotencyKey` on every call:
 
 1. Create one key per logical "send a code" action with
@@ -63,7 +63,7 @@ safe to retry. The SDK requires an `idempotencyKey` on every call:
 
 Why this matters: after a `TIMEOUT`, `NETWORK_ERROR` or `503`, the SDK cannot
 know whether the message was sent. Retrying with a new key can deliver a second
-SMS and debit twice. Retrying with the same key is always safe:
+message and debit twice. Retrying with the same key is always safe:
 
 - same key + same payload -> the original response (or `503` while the first
   attempt is still being resolved; keep retrying with backoff),

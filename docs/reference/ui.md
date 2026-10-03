@@ -25,7 +25,7 @@ keys, the resend cooldown and the 429/503 retry hints).
 | Option | Default | |
 | --- | --- | --- |
 | `purpose` | required | `issue` purpose label |
-| `issue` | | other `issue` fields (`channel`, `templateId`, `templateVariables`, `messageType`, `metadata`, `expiresInSec`, `maxAttempts`, `from`) |
+| `issue` | | other `issue` fields (`templateId`, `templateVariables`, `messageType`, `metadata`, `expiresInSec`, `maxAttempts`, `from`); delivery is KakaoTalk AlimTalk by default with automatic SMS fallback |
 | `codeLength` | `6` | digits per code |
 | `autoSubmit` | `true` | verify once every digit is entered |
 | `webOtp` | `true` | WebOTP after a send, when supported |

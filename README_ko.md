@@ -3,7 +3,8 @@
 [English](./README.md) | [한국어](./README_ko.md)
 
 [K-OTP](https://api.k-otp.dev) 한국형 OTP API의 공식 JavaScript/TypeScript SDK입니다.
-SMS 또는 카카오 알림톡으로 일회용 인증번호를 발급(issue)하고 검증(verify)합니다.
+일회용 인증번호를 발급(issue)하고 검증(verify)합니다. 인증번호는 기본적으로 카카오 알림톡으로 보내며,
+알림톡을 받을 수 없으면 자동으로 문자(SMS)로 대체 발송합니다.
 npm 패키지는 [`@k-otp/sdk`](./packages/sdk) 하나이며, 용도별 서브패스로 나뉩니다.
 
 | 임포트 | 용도 |
@@ -13,7 +14,7 @@ npm 패키지는 [`@k-otp/sdk`](./packages/sdk) 하나이며, 용도별 서브�
 | [`@k-otp/sdk/react`](./docs/reference/react.md) | React 18/19 훅: `OtpProvider`, `useOtpIssue`, `useOtpVerify`, `useOtpFlow`(재발송 쿨다운 + 멱등키 관리). |
 | [`@k-otp/sdk/vue`](./docs/reference/vue.md) | Vue 3 플러그인·컴포저블: `createOtpPlugin`, `useOtp`, `useOtpFlow`. |
 | [`@k-otp/sdk/svelte`](./docs/reference/svelte.md) | Svelte 4/5 스토어: `createOtpStores`, 플로우 스토어, `use:otpForm`. |
-| [`@k-otp/sdk/ui/react`, `/ui/vue`, `/ui/svelte`](./docs/ui.md#ui-컴포넌트-한국어) | 헤드리스 UI 컴포넌트: 한 줄짜리 `<OtpForm />` 과 조합 가능한 파트(번호 입력, 인증번호 받기/재전송, SMS 자동 입력을 지원하는 분할 인증번호 입력, 확인, 카운트다운, 메시지), 한국어/영어. |
+| [`@k-otp/sdk/ui/react`, `/ui/vue`, `/ui/svelte`](./docs/ui.md#ui-컴포넌트-한국어) | 헤드리스 UI 컴포넌트: 한 줄짜리 `<OtpForm />` 과 조합 가능한 파트(번호 입력, 인증번호 받기/재전송, 인증번호 자동 입력을 지원하는 분할 인증번호 입력, 확인, 카운트다운, 메시지), 한국어/영어. |
 | [`@k-otp/sdk/ui/theme.css`](./docs/ui.md#테마) | UI 컴포넌트용 선택적 기본 테마(라이트/다크, 토큰). |
 | [`@k-otp/sdk/ui`](./docs/reference/ui.md#k-otpsdkui) | 프레임워크 무관 UI 모델: 번호 정규화, 인증번호 입력, 폼 상태 머신, 메시지, WebOTP. |
 | [`@k-otp/sdk/headless`](./packages/sdk/README.md#headless-flow-k-otpsdkheadless) | 어댑터들이 공유하는 프레임워크 무관 발급 -> 검증 플로우. |
@@ -82,7 +83,7 @@ import "@k-otp/sdk/ui/theme.css"; // 선택: 기본 테마
   나타납니다. **curl로는 되는데 브라우저에서 네트워크 오류가 나면 키의 allowedOrigins를 확인하세요.**
 - **`issue`에는 멱등키가 필수입니다.** 한 번의 "인증번호 보내기" 동작마다 키를 하나 만들고 저장한 뒤,
   타임아웃·네트워크 오류·503 등으로 재시도할 때는 **반드시 같은 키**를 사용하세요. 새 키로 재시도하면
-  문자가 중복 발송되고 이중 차감될 수 있습니다. 같은 키에 다른 내용을 보내면 `409 CONFLICT`입니다.
+  인증 메시지가 중복 발송되고 이중 차감될 수 있습니다. 같은 키에 다른 내용을 보내면 `409 CONFLICT`입니다.
 - 잘못된 코드는 예외가 아니라 `verified: false` + `reasonCode`(`MISMATCH`, `MAX_ATTEMPTS`,
   `EXPIRED`, `ALREADY_VERIFIED`, `REPLACED`, `NOT_FOUND`)로 반환됩니다.
 - 어댑터의 `useOtpFlow`/플로우 스토어는 발송 시도마다 멱등키를 만들고, 모호한 실패(타임아웃, 네트워크,

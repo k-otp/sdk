@@ -87,7 +87,11 @@ export type OtpFormOperation = "send" | "verify";
 export type OtpFormConfig = {
   /** Purpose label sent with `issue` (1-64 characters), e.g. `"signup"`. */
   purpose: string;
-  /** Other `issue` fields: `channel`, `templateId`, `metadata`, ... */
+  /**
+   * Other `issue` fields: `templateId`, `templateVariables`, `metadata`, ...
+   * The code is delivered by KakaoTalk AlimTalk by default, with automatic
+   * SMS fallback.
+   */
   issue?: Omit<OtpFlowSendInput, "phoneNumber" | "purpose"> | undefined;
   /** Verify as soon as every digit is entered. Default `true`. */
   autoSubmit?: boolean | undefined;
@@ -341,7 +345,7 @@ export const createOtpForm = (
    * The idempotency key of a send dropped by "change number"/`reset()`
    * while in flight or after an ambiguous failure: the next send of the same
    * input reuses it, so a request that did reach the server is not sent
-   * twice (no second SMS).
+   * twice (no second message).
    */
   let retained: { key: string; input: string } | undefined;
   /**

@@ -1,7 +1,9 @@
 /**
  * WebOTP (`navigator.credentials.get({ otp })`): lets Chrome on Android read
  * the code from the incoming SMS after a one-tap consent, without leaving the
- * page.
+ * page. K-OTP delivers codes by KakaoTalk AlimTalk by default, so this only
+ * applies when the code arrives by SMS (the automatic fallback when AlimTalk
+ * cannot be delivered); otherwise the request simply never resolves.
  *
  * It only works when the SMS ends with an origin-bound line, on its own last
  * line, naming the page's host and the code:
@@ -37,7 +39,7 @@ export type ReceiveWebOtpOptions = {
 };
 
 /**
- * Waits for an SMS code through WebOTP. Resolves the sanitized code, or
+ * Waits for a code delivered by SMS (the AlimTalk fallback) through WebOTP. Resolves the sanitized code, or
  * `undefined` when WebOTP is unsupported, the request was aborted, the user
  * declined, or anything else failed. Never rejects and never throws.
  */

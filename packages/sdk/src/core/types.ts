@@ -27,6 +27,9 @@ import type {
  * Input of `issue`. Unlike the raw REST API, the SDK always requires
  * `idempotencyKey` (see `createIdempotencyKey`) and sends it both as the body
  * field and the `Idempotency-Key` header.
+ *
+ * The code is delivered by KakaoTalk AlimTalk by default, with automatic SMS
+ * fallback when AlimTalk cannot be delivered: leave `channel` out.
  */
 export type IssueInput = Omit<IssueOtpInput, "idempotencyKey"> & {
   /** 1-128 visible ASCII characters. Reuse the same key when retrying. */
@@ -37,6 +40,10 @@ export type VerifyInput = VerifyOtpInput;
 export type VerifyResult = VerifyOtpOutput;
 /** Verification failure reason (returned with HTTP 200 and `verified: false`). */
 export type VerifyReasonCode = NonNullable<VerifyOtpOutput["reasonCode"]>;
+/**
+ * Delivery channel of an issue. Codes are delivered by KakaoTalk AlimTalk by
+ * default, with automatic SMS fallback; `issue` callers leave `channel` out.
+ */
 export type OtpChannel = NonNullable<IssueOtpInput["channel"]>;
 export type PaymentRequiredData = IssueOtpPaymentErrorData;
 /** `data` of a 429 TOO_MANY_REQUESTS error from `issue`/`verify` (1.3.1+). */

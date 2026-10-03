@@ -145,7 +145,8 @@ export const getOtpCodeInputParts = (
       type: "text",
       inputmode: "numeric",
       pattern: "[0-9]*",
-      // The OS offers the SMS code on the first segment; the handlers spread
+      // The OS offers a code that arrived by SMS (the fallback when AlimTalk
+      // cannot be delivered) on the first segment; the handlers spread
       // a multi-digit autofill across the segments.
       autocomplete: index === 0 ? "one-time-code" : "off",
       autocapitalize: "off",

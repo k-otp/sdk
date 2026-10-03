@@ -1,7 +1,7 @@
 # Getting started
 
-K-OTP issues 6-digit one-time passwords over SMS or KakaoTalk AlimTalk and
-verifies them. Everything ships in one package, `@k-otp/sdk`
+K-OTP issues 6-digit one-time passwords, delivered by KakaoTalk AlimTalk by
+default with automatic SMS fallback, and verifies them. Everything ships in one package, `@k-otp/sdk`
 (`npm install @k-otp/sdk`), with one subpath per use:
 
 | Import | Where | Key | Operations |

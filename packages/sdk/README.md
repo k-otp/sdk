@@ -1,9 +1,9 @@
 # @k-otp/sdk
 
 The official JavaScript/TypeScript SDK for the [K-OTP](https://api.k-otp.dev)
-Korean OTP API: issue and verify one-time passwords (SMS / KakaoTalk
-AlimTalk) from browsers, SSR frameworks, edge runtimes and servers. One
-package, with a subpath per use:
+Korean OTP API: issue and verify one-time passwords (delivered by KakaoTalk AlimTalk by
+default, with automatic SMS fallback) from browsers, SSR frameworks, edge
+runtimes and servers. One package, with a subpath per use:
 
 | Import | Use it for | Key | Reference |
 | --- | --- | --- | --- |
@@ -135,10 +135,12 @@ key in a browser, no `fetch`) throw a `TypeError`.
 ### `client.issue(input, options?)` - `POST /v1/issue`
 
 `input`: `phoneNumber`, `purpose`, **`idempotencyKey` (required)**, and optional
-`channel` (`"sms"` | `"alimtalk"`), `templateId`, `templateVariables`, `from`,
-`messageType`, `metadata`, `expiresInSec`, `maxAttempts`. `cost` is still
-accepted but deprecated: the API decides the charged credit from the channel
-and message type and ignores it for billing.
+`templateId`, `templateVariables`, `from`, `messageType`, `metadata`,
+`expiresInSec`, `maxAttempts`. The code is delivered by KakaoTalk AlimTalk by
+default, with automatic SMS fallback when AlimTalk cannot be delivered; leave
+`channel` out. `cost` is still accepted but deprecated: the API decides the
+charged credit from the delivery channel and message type and ignores it for
+billing.
 Resolves `{ issueId, expiresAt, attemptsRemaining, queuedAt }`.
 
 The key is trimmed and validated (1-128 visible ASCII characters) before any

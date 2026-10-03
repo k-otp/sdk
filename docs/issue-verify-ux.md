@@ -1,7 +1,7 @@
 # Issue -> verify UX
 
 How to build the "send code / enter code" screen so that it is pleasant,
-safe to retry and never double-sends an SMS. The adapters' flow helpers
+safe to retry and never double-sends a code. The adapters' flow helpers
 (`useOtpFlow` in React and Vue, `createFlow()` / `createOtpFlowStore` in
 Svelte, and `createOtpFlow` from `@k-otp/sdk/headless` or
 `KOtp.createOtpFlow` for plain JavaScript) implement every rule below; with
@@ -42,7 +42,7 @@ idempotency key.
    `ABORTED`, the message may already be on its way. Retrying the same
    input with the **same key** is always safe: the API replays the original
    result (or answers 503 while the first attempt is still being resolved)
-   and never sends or charges twice. A new key could deliver a second SMS.
+   and never sends or charges twice. A new key could deliver a second message.
 4. **Definitive failure or success, drop the key.** After `BAD_REQUEST`,
    `UNAUTHORIZED`, `PAYMENT_REQUIRED`, `FORBIDDEN`, `CONFLICT` or a
    success, the next send is a new attempt with a new key.
@@ -57,7 +57,7 @@ code: `verify` on the old `issueId` then returns `reasonCode: "REPLACED"`.
 
 - Start a **local cooldown** after each successful send
   (`resendCooldownMs`, default 30 s in the flow helpers; `0` disables it). It prevents accidental double taps
-  and abuse, and matches what users expect from SMS codes.
+  and abuse, and matches what users expect from verification codes.
 - A **server cooldown** wins when it is longer: on `429 TOO_MANY_REQUESTS`
   (and on 503 with `Retry-After`), `error.retryAfterMs` tells you how long to
   wait. The flow helpers start a cooldown of `retryAfterMs` automatically.
@@ -118,7 +118,8 @@ It is not the end user's fault:
   succeeded you get `reasonCode: "ALREADY_VERIFIED"`, which you can treat as
   success when the outcome of the first attempt was unknown.
 - Use `autocomplete="one-time-code"` and `inputmode="numeric"` on the code
-  input so mobile keyboards can autofill SMS codes.
+  input so mobile keyboards can autofill the code when it arrives by SMS
+  (the fallback when AlimTalk cannot be delivered).
 - **Trust:** a browser-direct `verify` only tells the browser that the code
   matched. If your backend grants access based on it, verify on the backend
   (see [`examples/node-server`](../examples/node-server)) or confirm with

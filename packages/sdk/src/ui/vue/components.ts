@@ -604,7 +604,10 @@ export type OtpCodeInputProps = {
   id?: string | undefined;
   /** Focus the first empty segment on mount. */
   autoFocus?: boolean | undefined;
-  /** Fill the code from the SMS with WebOTP when supported. */
+  /**
+   * Fill the code with WebOTP when supported (only when it arrives by SMS,
+   * the fallback when AlimTalk cannot be delivered).
+   */
   webOtp?: boolean | undefined;
   /** Renders a hidden input with this name and the value, for form posts. */
   name?: string | undefined;

@@ -3,7 +3,7 @@
 [English](#ui-components) | [한국어](#ui-컴포넌트-한국어)
 
 Ready-to-use phone verification forms for React, Vue and Svelte: phone input,
-send/resend with the cooldown, a segmented code input with SMS autofill,
+send/resend with the cooldown, a segmented code input with one-time-code autofill,
 verify, an expiry countdown and status messages, in Korean or English.
 
 They are **headless first**: every part renders plain, unstyled elements and
@@ -69,7 +69,7 @@ to the browser that the code matched: if your backend grants access, confirm
 server-side with `getStatus` and an `sk_` key.
 
 Every form takes the same settings: `purpose` (required), `issue` (other
-`issue` fields: `channel`, `templateId`, `templateVariables`, `metadata`, ...),
+`issue` fields: `templateId`, `templateVariables`, `metadata`, ...),
 `codeLength` (6), `resendCooldownMs` (30 s, see [cooldowns](#cooldowns)),
 `idempotencyKeyPrefix`,
 `autoSubmit` (verify once all digits are in, `true`), `webOtp` (`true`, see
@@ -80,7 +80,7 @@ Every form takes the same settings: `purpose` (required), `issue` (other
 Requests in flight when the form is unmounted, reset or sent back to the
 phone step, or superseded by a newer send, are dropped silently: no `error`
 (`ABORTED`), `sent` or `verified` for them, and the next send of the same
-number reuses the dropped request's idempotency key (no second SMS if it had
+number reuses the dropped request's idempotency key (no second message if it had
 reached the server). Events:
 `sent`, `verified`, `error` and `phaseChange` (React and Svelte: `onSent`,
 `onVerified`, `onError`, `onPhaseChange` props; Vue: `@sent`, `@verified`,
@@ -199,7 +199,8 @@ Phases: `phone` (entering the number) -> `sending` -> `code` -> `verifying`
   standalone `OtpCodeInput` defaults to the "Verification code" message
   unless you pass `aria-label`/`aria-labelledby`) and described once; each
   segment is named "Digit 1 of 6", the first one has
-  `autocomplete="one-time-code"` (iOS/Android SMS autofill), all have
+  `autocomplete="one-time-code"` (iOS/Android autofill of a code that
+  arrives by SMS), all have
   `inputmode="numeric"`. It is always laid out left to right (`dir="ltr"`).
 - Keyboard: the code input is **one tab stop** (roving tabindex: the first
   empty segment); Tab and Shift+Tab leave it from any segment, and
@@ -292,8 +293,11 @@ rate limit). The input formats as you type (`010-1234-5678`).
 
 ## WebOTP (SMS autofill on Android Chrome)
 
-After a send, the form calls `navigator.credentials.get({ otp: { transport:
-["sms"] } })` when the browser supports it (feature-detected, aborted on
+K-OTP delivers codes by KakaoTalk AlimTalk by default; WebOTP and
+`one-time-code` autofill only apply when the code arrives by SMS, the
+automatic fallback when AlimTalk cannot be delivered. After a send, the form
+calls `navigator.credentials.get({ otp: { transport: ["sms"] } })` when the
+browser supports it (feature-detected, aborted on
 verify, "change number" and unmount; nothing runs on the server). Chrome
 fills the code after a one-tap consent **only if the SMS ends with an
 origin-bound line**:
@@ -355,7 +359,7 @@ future Svelte major that drops this syntax would need new component sources.
 # UI 컴포넌트 (한국어)
 
 React, Vue, Svelte용 휴대폰 인증 폼입니다. 휴대폰 번호 입력, 재전송
-쿨다운이 있는 인증번호 받기, SMS 자동 입력을 지원하는 분할 인증번호 입력,
+쿨다운이 있는 인증번호 받기, 인증번호 자동 입력을 지원하는 분할 인증번호 입력,
 확인, 만료 카운트다운, 상태 메시지를 한국어 또는 영어로 제공합니다.
 
 **헤드리스가 기본**입니다. 모든 파트는 스타일 없는 기본 요소를 렌더링하고
@@ -434,7 +438,9 @@ Vue는 `<OtpForm purpose="signup" @verified="..." />`, Svelte는
 
 ## WebOTP
 
-전송 후 브라우저가 지원하면 `navigator.credentials.get({ otp })` 를
+K-OTP 는 인증번호를 기본적으로 카카오 알림톡으로 보내며, WebOTP 와
+`one-time-code` 자동 입력은 알림톡을 받을 수 없어 자동으로 문자(SMS)로 대체
+발송된 경우에만 동작합니다. 전송 후 브라우저가 지원하면 `navigator.credentials.get({ otp })` 를
 호출합니다(기능 감지, 서버에서는 실행되지 않음). Android Chrome 은 SMS
 마지막 줄이 `@<페이지 도메인> #<인증번호>` 형식일 때만 자동 입력합니다.
 사용하는 템플릿의 SMS 가 도메인 줄로 끝나는지 확인하세요(기본 K-OTP 템플릿에는
