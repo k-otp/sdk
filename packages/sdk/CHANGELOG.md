@@ -1,5 +1,11 @@
 # @k-otp/sdk
 
+## 1.2.0 — 2026-10-05
+
+### Minor changes
+
+- [abac0a6](https://github.com/k-otp/sdk/commit/abac0a661c2b79e659a5d3850608bcc97f799544) The vendored OpenAPI spec is synced to API 1.8.0: `issue` accepts `smsFallback` (default `true`). `smsFallback: false` delivers the code by KakaoTalk AlimTalk only, with no SMS fallback; the price is unchanged, the field is ignored for SMS deliveries, and `webOtp` then reports `skipped` with `channel_alimtalk`. The JSDoc of `IssueInput` and `OtpChannel` mentions the option. — Thanks @imjlk!
+
 ## 1.1.0 — 2026-10-03
 
 ### Minor changes

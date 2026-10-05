@@ -87,7 +87,7 @@
     },
     "packages/sdk": {
       "name": "@k-otp/sdk",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "dependencies": {
         "@orpc/client": "catalog:",
         "@orpc/contract": "catalog:",
