@@ -136,9 +136,10 @@ key in a browser, no `fetch`) throw a `TypeError`.
 
 `input`: `phoneNumber`, `purpose`, **`idempotencyKey` (required)**, and optional
 `templateId`, `templateVariables`, `from`, `messageType`, `metadata`,
-`expiresInSec`, `maxAttempts`. The code is delivered by KakaoTalk AlimTalk by
-default, with automatic SMS fallback when AlimTalk cannot be delivered; leave
-`channel` out. `cost` is still accepted but deprecated: the API decides the
+`expiresInSec`, `maxAttempts`, `smsFallback`. The code is delivered by KakaoTalk
+AlimTalk by default, with automatic SMS fallback when AlimTalk cannot be
+delivered; leave `channel` out. `smsFallback: false` (API 1.8.0+) sends by
+AlimTalk only, at the same price. `cost` is still accepted but deprecated: the API decides the
 charged credit from the delivery channel and message type and ignores it for
 billing.
 Resolves `{ issueId, expiresAt, attemptsRemaining, queuedAt }`.

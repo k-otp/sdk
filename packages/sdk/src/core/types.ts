@@ -29,7 +29,8 @@ import type {
  * field and the `Idempotency-Key` header.
  *
  * The code is delivered by KakaoTalk AlimTalk by default, with automatic SMS
- * fallback when AlimTalk cannot be delivered: leave `channel` out.
+ * fallback when AlimTalk cannot be delivered: leave `channel` out. Pass
+ * `smsFallback: false` (API 1.8.0+) to deliver by AlimTalk only.
  */
 export type IssueInput = Omit<IssueOtpInput, "idempotencyKey"> & {
   /** 1-128 visible ASCII characters. Reuse the same key when retrying. */
@@ -42,7 +43,8 @@ export type VerifyResult = VerifyOtpOutput;
 export type VerifyReasonCode = NonNullable<VerifyOtpOutput["reasonCode"]>;
 /**
  * Delivery channel of an issue. Codes are delivered by KakaoTalk AlimTalk by
- * default, with automatic SMS fallback; `issue` callers leave `channel` out.
+ * default, with automatic SMS fallback (`smsFallback: false` turns it off);
+ * `issue` callers leave `channel` out.
  */
 export type OtpChannel = NonNullable<IssueOtpInput["channel"]>;
 export type PaymentRequiredData = IssueOtpPaymentErrorData;
