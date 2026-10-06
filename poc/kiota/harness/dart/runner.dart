@@ -66,7 +66,10 @@ Future<void> main()async {
       final value=await attempt().timeout(Duration(milliseconds:test['timeoutMs']??10000));observation['response']=serialize(value);
     }on TimeoutException{observation['outcome']='unknown';}
     on ArgumentError catch(error){observation['outcome']='configuration_error';observation['diagnostic']=error.message;}
-    on ApiException catch(error){observation['response']=serialize(error);observation['status']=error.statusCode;observation['headers']=error.responseHeaders;observation['exception']=error.runtimeType.toString();}
+    on ApiException catch(error){
+      observation['status']=error.statusCode;observation['headers']=error.responseHeaders;observation['exception']=error.runtimeType.toString();
+      try{observation['response']=serialize(error);}catch(serializationError){observation['diagnostic']='Parsed error serialization failed: $serializationError';}
+    }
     catch(error){observation['outcome']='unexpected_exception';observation['diagnostic']=error.toString();}
     finally{httpClient.close();}
     observations.add(observation);

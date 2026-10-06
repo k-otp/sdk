@@ -57,6 +57,10 @@ const result = {
   },
   dependencyLockHash: {},
   inputVariant: variant,
+  inputSha256: sha256(await Bun.file(inputSpecPath).bytes()),
+  fixtureSha256: sha256(
+    await Bun.file(path.join(root, "poc/kiota/fixtures/contract.json")).bytes(),
+  ),
   generatedSourceFiles: 0,
   generation: stage("not_run"),
   buildOrLoad: stage("not_run"),
@@ -155,6 +159,22 @@ try {
     if (!result.generatedSourceFiles)
       throw new Error("Generator exited 0 but produced no source files");
     await json(path.join(reports, "source-manifest.json"), manifest);
+    const publicDeclarations = [];
+    for (const file of Object.keys(manifest)) {
+      const text = await Bun.file(path.join(generated, file)).text();
+      const declarations = text
+        .split("\n")
+        .filter((line) =>
+          /^(export |type |func |class )|^\s*(public |protected |attr_accessor |def |async def )/.test(
+            line,
+          ),
+        );
+      publicDeclarations.push(`## ${file}\n${declarations.join("\n")}`);
+    }
+    await Bun.write(
+      path.join(reports, "public-api.txt"),
+      publicDeclarations.join("\n\n"),
+    );
     result.generation = stage("passed");
     const repeat = path.join(out, "regenerated");
     const regenerated = await command(

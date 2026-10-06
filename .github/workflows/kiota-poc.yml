@@ -53,6 +53,8 @@ jobs:
         uses: microsoft/setup-kiota@111eb592b2b3b2602ba9e0d979d4a4509cd59bb5 # v0.5.0
         with:
           version: v1.35.0
+      - name: Discover, generate and compare clean regenerations
+        run: bun run poc/kiota/scripts/generate.ts "${{ matrix.target }}" "${{ matrix.variant }}"
       - name: Setup .NET
         if: matrix.target == 'CSharp'
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
@@ -97,8 +99,9 @@ jobs:
         uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1
         with:
           sdk: '3.9.4'
-      - name: Discover, generate and compare clean regenerations
-        run: bun run poc/kiota/scripts/generate.ts "${{ matrix.target }}" "${{ matrix.variant }}"
+      - name: Confirm minimal schema/runtime regressions and fixes
+        if: matrix.target == 'Java' || matrix.target == 'Go'
+        run: bun run poc/kiota/scripts/reproduce.ts "${{ matrix.target }}" "${{ matrix.variant }}"
       - name: Build, run HTTP fixtures and install package consumers
         run: bun run poc/kiota/scripts/harness.ts "${{ matrix.target }}" "${{ matrix.variant }}"
       - name: Upload evidence (including failed stages)
@@ -127,12 +130,33 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
       - run: bunx --no-install ttsc --noEmit -p poc/kiota/tsconfig.json
-      - run: bun test poc/kiota/overlays poc/kiota/mock
+      - run: bun test poc/kiota/overlays poc/kiota/mock poc/kiota/scripts/evidence.test.ts
       - run: bun run check
 
+  existing-sdk-comparison:
+    name: Existing TypeScript SDK on the common contract fixture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - name: Preserve actual public error-view differences
+        run: bun run poc/kiota/scripts/compare-existing.ts
+      - name: Upload comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiota-existing-typescript-comparison
+          path: .cache/kiota-poc/runs/
+          if-no-files-found: error
+          retention-days: 14
+
   report:
-    name: Evidence report and required-language gate
-    needs: [matrix, investigate, existing-sdk]
+    name: Evidence report and required overlay candidate gate
+    needs: [matrix, investigate, existing-sdk, existing-sdk-comparison]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10

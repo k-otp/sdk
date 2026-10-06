@@ -4,6 +4,7 @@ import {
   codeManifest,
   command,
   config,
+  files,
   json,
   outputRoot,
   root,
@@ -124,6 +125,7 @@ try {
     );
   await rm(sdk, { recursive: true, force: true });
   await rm(consumer, { recursive: true, force: true });
+  await rm(path.join(out, "packages"), { recursive: true, force: true });
   await mkdir(consumer, { recursive: true });
   const sourceManifest = await codeManifest(
     path.join(out, "generated"),
@@ -622,11 +624,83 @@ try {
       "passed",
       "ttsc checks every generated TypeScript input and consumer",
     );
-    result.packageConsumer = stage(
-      "not_run",
-      "Source harness exercised; artifact package consumer remains unverified",
+    await execute(
+      "packageConsumer",
+      "typescript-build",
+      [
+        "bun",
+        "build",
+        "generated/kOtpApiClient.ts",
+        "--outdir",
+        "dist",
+        "--target",
+        "bun",
+        "--packages",
+        "external",
+      ],
+      sdk,
     );
-    await runWire(["bun", path.join(sdk, "runner.ts")]);
+    const manifestPath = path.join(sdk, "package.json");
+    const manifest = await Bun.file(manifestPath).json();
+    manifest.files = ["dist", "generated/**/*.ts"];
+    manifest.exports = {
+      ".": "./dist/kOtpApiClient.js",
+      "./issue": "./generated/issue/index.ts",
+      "./verify": "./generated/verify/index.ts",
+    };
+    await json(manifestPath, manifest);
+    const packages = path.join(out, "packages");
+    await mkdir(packages, { recursive: true });
+    await execute(
+      "packageConsumer",
+      "typescript-pack",
+      ["bun", "pm", "pack", "--destination", packages],
+      sdk,
+    );
+    const archive = path.join(packages, "kotp-kiota-poc-typescript-0.0.0.tgz");
+    await json(path.join(consumer, "package.json"), {
+      name: "kotp-kiota-typescript-consumer",
+      private: true,
+      type: "module",
+      dependencies: { "kotp-kiota-poc-typescript": `file:${archive}` },
+      devDependencies: {
+        ttsc: "0.30.4",
+        typescript: "7.0.2",
+        "@types/bun": "1.4.2",
+      },
+    });
+    const runner = (
+      await Bun.file(path.join(template("typescript"), "runner.ts")).text()
+    )
+      .replace('"./generated/kOtpApiClient"', '"kotp-kiota-poc-typescript"')
+      .replace('"./generated/issue"', '"kotp-kiota-poc-typescript/issue"')
+      .replace('"./generated/verify"', '"kotp-kiota-poc-typescript/verify"');
+    await Bun.write(path.join(consumer, "runner.ts"), runner);
+    await cp(
+      path.join(template("typescript"), "tsconfig.json"),
+      path.join(consumer, "tsconfig.json"),
+    );
+    await execute(
+      "packageConsumer",
+      "typescript-consumer-install",
+      ["bun", "install"],
+      consumer,
+    );
+    await execute(
+      "packageConsumer",
+      "typescript-consumer-import",
+      [
+        "bun",
+        "-e",
+        "import {createKOtpApiClient} from 'kotp-kiota-poc-typescript';if(typeof createKOtpApiClient!=='function')throw new Error('missing packaged client')",
+      ],
+      consumer,
+    );
+    result.packageConsumer = stage(
+      "passed",
+      "Built client packed as a local tarball and loaded from an independent Bun consumer",
+    );
+    await runWire(["bun", "runner.ts"]);
   } else if (name === "Ruby") {
     const ruby = process.env.RUBY_BIN ?? "ruby";
     await tool("ruby", [ruby, "--version"]);
@@ -665,9 +739,81 @@ try {
       "passed",
       `${result.generatedSourceFiles} generated Ruby files syntax checked and required with official runtimes`,
     );
+    const packages = path.join(out, "packages");
+    await mkdir(packages, { recursive: true });
     await cp(
-      path.join(template("ruby"), "runner.rb"),
-      path.join(sdk, "runner.rb"),
+      path.join(template("ruby"), "kotp_kiota_poc.gemspec"),
+      path.join(sdk, "kotp_kiota_poc.gemspec"),
+    );
+    await execute(
+      "packageConsumer",
+      "gem-build",
+      [
+        ruby,
+        "-S",
+        "gem",
+        "build",
+        "kotp_kiota_poc.gemspec",
+        "--output",
+        path.join(packages, "kotp_kiota_poc-0.0.0.gem"),
+      ],
+      sdk,
+      rubyEnv,
+    );
+    await execute(
+      "packageConsumer",
+      "gem-consumer-install",
+      [
+        ruby,
+        "-S",
+        "gem",
+        "install",
+        "--local",
+        path.join(packages, "kotp_kiota_poc-0.0.0.gem"),
+        "--install-dir",
+        path.join(consumer, "gems"),
+        "--ignore-dependencies",
+        "--no-document",
+      ],
+      consumer,
+    );
+    const apiVersion = await command(
+      [ruby, "-e", "print Gem.ruby_api_version"],
+      log("ruby-api-version"),
+    );
+    const installedRuntimes = path.join(
+      out,
+      "ruby-dependencies/ruby",
+      apiVersion.output.trim(),
+    );
+    const gemEnv = {
+      ...env,
+      GEM_HOME: path.join(consumer, "gems"),
+      GEM_PATH: [path.join(consumer, "gems"), installedRuntimes].join(
+        path.delimiter,
+      ),
+    };
+    const rubySource = (
+      await Bun.file(path.join(template("ruby"), "runner.rb")).text()
+    ).replace(
+      "require_relative 'generated/k_otp_api_client'",
+      "require 'k_otp_api_client'",
+    );
+    await Bun.write(path.join(consumer, "runner.rb"), rubySource);
+    await execute(
+      "packageConsumer",
+      "gem-load",
+      [
+        ruby,
+        "-e",
+        "require 'k_otp_api_client';puts KOtpSdkGenerated::KOtpApiClient.name",
+      ],
+      consumer,
+      gemEnv,
+    );
+    result.packageConsumer = stage(
+      "passed",
+      "Built gem installed from a local artifact; runtime dependencies are real installed gems from the frozen lock, not source stubs",
     );
     const rubyWire = await command(
       [
@@ -675,15 +821,11 @@ try {
         "run",
         path.join(root, "poc/kiota/scripts/wire.ts"),
         ruby,
-        "-S",
-        "bundle",
-        "exec",
-        ruby,
-        path.join(sdk, "runner.rb"),
+        "runner.rb",
       ],
       log("wire-evaluation"),
-      sdk,
-      { ...env, ...rubyEnv, BUNDLE_GEMFILE: path.join(sdk, "Gemfile") },
+      root,
+      gemEnv,
     );
     result.wireContract = stage(
       rubyWire.exitCode ? "failed" : "passed",
@@ -693,10 +835,6 @@ try {
       result.blockers.push(
         "Ruby runtime wire fixtures failed; inspect per-case evidence",
       );
-    result.packageConsumer = stage(
-      "not_run",
-      "Gem packaging consumer is pending",
-    );
   } else if (name === "Dart") {
     const dart = process.env.DART_BIN ?? "dart";
     await tool("dart", [dart, "--version"]);
@@ -717,15 +855,63 @@ try {
       "passed",
       `${result.generatedSourceFiles} generated Dart source inputs analyzed with official pub dependencies`,
     );
-    await cp(
-      path.join(template("dart"), "runner.dart"),
-      path.join(sdk, "runner.dart"),
+    const packages = path.join(out, "packages");
+    await mkdir(packages, { recursive: true });
+    const archive = path.join(packages, "kotp-kiota-poc-dart.tar.gz");
+    await execute(
+      "packageConsumer",
+      "dart-archive",
+      ["tar", "-czf", archive, "lib", "pubspec.yaml", "pubspec.lock"],
+      sdk,
     );
-    await runWire([dart, "run", path.join(sdk, "runner.dart")]);
+    const installed = path.join(consumer, "installed-sdk");
+    await mkdir(installed, { recursive: true });
+    await execute("packageConsumer", "dart-consumer-extract", [
+      "tar",
+      "-xzf",
+      archive,
+      "-C",
+      installed,
+    ]);
+    await Bun.write(
+      path.join(consumer, "pubspec.yaml"),
+      "name: kotp_dart_consumer\npublish_to: none\nenvironment:\n  sdk: '>=3.9.0 <4.0.0'\ndependencies:\n  kotp_kiota_poc:\n    path: installed-sdk\n  microsoft_kiota_bundle: 0.1.1\n",
+    );
+    let dartSource = (
+      await Bun.file(path.join(template("dart"), "runner.dart")).text()
+    ).replaceAll("'lib/generated/", "'package:kotp_kiota_poc/generated/");
+    if (variant === "overlay") {
+      dartSource =
+        "import 'package:kotp_kiota_poc/generated/issues/get_verification_status_query_parameter_type.dart';\n" +
+        "import 'package:kotp_kiota_poc/generated/creditLedger/get_entry_type_query_parameter_type.dart';\n" +
+        dartSource
+          .replace(
+            "c.queryParameters.verificationStatus=query['verificationStatus']",
+            "c.queryParameters.verificationStatus=query['verificationStatus']==null?null:GetVerificationStatusQueryParameterType.values.firstWhere((v)=>v.value==query['verificationStatus'])",
+          )
+          .replace(
+            "c.queryParameters.entryType=query['entryType']",
+            "c.queryParameters.entryType=query['entryType']==null?null:GetEntryTypeQueryParameterType.values.firstWhere((v)=>v.value==query['entryType'])",
+          );
+    }
+    await Bun.write(path.join(consumer, "runner.dart"), dartSource);
+    await execute(
+      "packageConsumer",
+      "dart-consumer-install",
+      [dart, "pub", "get"],
+      consumer,
+    );
+    await execute(
+      "packageConsumer",
+      "dart-consumer-compile",
+      [dart, "compile", "kernel", "runner.dart", "-o", "runner.dill"],
+      consumer,
+    );
     result.packageConsumer = stage(
-      "not_run",
-      "Dart package consumer is pending",
+      "passed",
+      "Local archive extracted into a separate Pub consumer; kernel compilation references packaged SDK files",
     );
+    await runWire([dart, "run", "runner.dart"]);
   } else if (name === "HTTP") {
     result.buildOrLoad = stage(
       "not_applicable",
@@ -753,6 +939,26 @@ try {
     result.buildOrLoad = stage("failed", String(error));
   }
 } finally {
+  const packages = path.join(out, "packages");
+  await mkdir(packages, { recursive: true });
+  for (const file of [
+    path.join(sdk, `target/kiota-sdk-${version}.jar`),
+    path.join(sdk, "dist/kotp_kiota_poc-0.0.0-py3-none-any.whl"),
+  ]) {
+    if (await Bun.file(file).exists())
+      await cp(file, path.join(packages, path.basename(file)));
+  }
+  result.fixtureSha256 = sha256(
+    await Bun.file(path.join(root, "poc/kiota/fixtures/contract.json")).bytes(),
+  );
+  result.packageArtifacts = Object.fromEntries(
+    await Promise.all(
+      (await files(packages)).map(async (file) => [
+        path.relative(packages, file),
+        sha256(await Bun.file(file).bytes()),
+      ]),
+    ),
+  );
   await json(resultFile, result);
 }
 console.log(
