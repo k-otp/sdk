@@ -1,8 +1,20 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { config, json, outputRoot, stage } from "./common";
+import {
+  config,
+  json,
+  outputRoot,
+  type Stage,
+  type StageResult,
+  stage,
+} from "./common";
 
-const results = [];
+type ReportRow = {
+  target: string;
+  inputVariant: string;
+  blockers: string[];
+} & Record<Stage, StageResult>;
+const results: ReportRow[] = [];
 for (const target of config.targets) {
   const location = path.join(
     outputRoot,
@@ -28,7 +40,7 @@ for (const target of config.targets) {
       target: target.target,
       inputVariant: "raw",
       blockers: ["missing evidence for this run"],
-      ...missing,
+      ...(missing as Record<Stage, StageResult>),
     });
   }
 }
@@ -39,7 +51,7 @@ const table = [
   ...results.map((r) => [
     r.target,
     r.inputVariant,
-    ...config.stages.map((key) => r[key].status),
+    ...config.stages.map((key) => r[key as Stage].status),
   ]),
 ]
   .map((row) => `| ${row.join(" | ")} |`)
@@ -66,7 +78,7 @@ if (process.argv.includes("--gate")) {
         "packageConsumer",
         "reproducibility",
         ...(t.target === "Kotlin" ? ["kotlinInterop"] : []),
-      ].every((key) => r?.[key].status === "passed");
+      ].every((key) => r?.[key as Stage].status === "passed");
     })
     ? 0
     : 1;

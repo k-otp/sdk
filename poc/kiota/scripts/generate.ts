@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { compatibilityOverlay } from "../overlays/compat";
 import {
   codeManifest,
   command,
@@ -12,18 +13,28 @@ import {
 } from "./common";
 
 const name = process.argv[2];
+if (!name) throw new Error("Target is required");
 const variant = process.argv[3] ?? "raw";
 const target = config.targets.find((value) => value.target === name);
 if (!target) throw new Error(`Unknown target ${name}`);
-if (variant !== "raw") throw new Error(`Unknown input variant ${variant}`);
+if (!["raw", "overlay"].includes(variant))
+  throw new Error(`Unknown input variant ${variant}`);
 const out = path.join(outputRoot, `${name}-${variant}`);
 const generated = path.join(out, "generated");
 const logs = path.join(out, "logs");
 const reports = path.join(out, "reports");
 await mkdir(reports, { recursive: true });
-const spec = Bun.file(path.join(root, config.spec));
+const specPath = path.join(root, config.spec);
+const spec = Bun.file(specPath);
 const specText = await spec.text();
 const specObject = JSON.parse(specText);
+let inputSpecPath = specPath;
+if (variant === "overlay") {
+  const overlay = compatibilityOverlay(specObject);
+  inputSpecPath = path.join(reports, "openapi-overlay.json");
+  await json(inputSpecPath, overlay.spec);
+  await json(path.join(reports, "overlay-changes.json"), overlay.changes);
+}
 const cli = process.env.KIOTA_BIN ?? "kiota";
 const result = {
   sourceCommit: (
@@ -81,7 +92,7 @@ try {
       "Vendored spec hash changed: review fixtures and targets.json before running",
     );
   const supported =
-    /<([^>]+)>\s*\(REQUIRED\)/.exec(help.output)?.[1].split("|") ?? [];
+    /<([^>]+)>\s*\(REQUIRED\)/.exec(help.output)?.[1]?.split("|") ?? [];
   await json(path.join(reports, "discovery.json"), {
     supported,
     requested: target.language,
@@ -107,7 +118,7 @@ try {
     const args = [
       "generate",
       "--openapi",
-      spec.name,
+      inputSpecPath,
       "--language",
       target.language,
       "--class-name",
@@ -126,9 +137,9 @@ try {
     for (const warning of generation.output.matchAll(
       /warn: [^\n]*\[(\d+)\]\r?\n\s+([^\n]+)/g,
     )) {
-      const message = warning[2].trim();
+      const message = (warning[2] ?? "").trim();
       result.warningSummary.push({
-        code: warning[1],
+        code: warning[1] ?? "",
         message,
         category: message.includes("Could not create error type")
           ? "missing-error-mapping"

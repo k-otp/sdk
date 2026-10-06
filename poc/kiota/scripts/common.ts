@@ -18,7 +18,13 @@ export type Status =
   | "unsupported"
   | "not_run"
   | "not_applicable";
-export type Stage = (typeof config.stages)[number];
+export type Stage =
+  | "generation"
+  | "buildOrLoad"
+  | "wireContract"
+  | "kotlinInterop"
+  | "packageConsumer"
+  | "reproducibility";
 export type Target = (typeof config.targets)[number];
 export const stage = (status: Status, detail = "") => ({ status, detail });
 export type StageResult = ReturnType<typeof stage>;
