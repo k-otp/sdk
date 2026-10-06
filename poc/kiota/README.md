@@ -1,22 +1,128 @@
 # Kiota multi-language PoC
 
-These unpublished fixtures evaluate the vendored public OpenAPI with Kiota
-1.35.0. The generated code does not replace `@k-otp/sdk`.
+This evaluates the vendored public `/v1` OpenAPI with Kiota 1.35.0. All native
+SDKs are unpublished fixtures outside the Bun/Sampo release workspace. See the
+[adoption report](../../docs/kiota-poc-results.md) for the measured scope and
+remaining failures.
+
+## Run a target
+
+Run from the repository root with Bun 1.4.2 and the native toolchain installed.
+Use a new `POC_OUTPUT` directory when comparing commits; result collection
+rejects another commit/run/spec/fixture's evidence.
 
 ```sh
-KIOTA_BIN=/absolute/path/to/kiota bun run poc/kiota/scripts/generate.ts Java raw
+bun install --frozen-lockfile
+export KIOTA_BIN=/absolute/path/to/kiota
+export POC_OUTPUT=.cache/kiota-poc/local-current
+
+bun run poc/kiota/scripts/generate.ts Java raw
+bun run poc/kiota/scripts/reproduce.ts Java raw
+bun run poc/kiota/scripts/harness.ts Java raw
+
+bun run poc/kiota/scripts/generate.ts Java overlay
+bun run poc/kiota/scripts/reproduce.ts Java overlay
+bun run poc/kiota/scripts/harness.ts Java overlay
+
 bun run poc/kiota/scripts/report.ts
 ```
 
-The selected release is `v1.35.0`; setup-kiota v0.5.0 resolves to commit
-`111eb592b2b3b2602ba9e0d979d4a4509cd59bb5`. CLI version discovery must match the
-full build string in `targets.json`. Logs, generated sources, hashes and results
-are kept in `.cache/kiota-poc/runs`, outside the release workspace.
+Raw HTTP tests currently exit nonzero: this is the preserved baseline failure,
+not a prerequisite to hide before running the overlay. Execute the commands
+separately and inspect each exit code. `report.ts --gate` requires complete
+overlay generation/build/wire/package/regeneration evidence for CSharp, Java,
+Kotlin, PHP, Go and Python, plus Kotlin interoperability. Running only Java
+does not satisfy that gate.
 
-Generation and a byte-for-byte second generation are the first two checks.
-Other stages remain `not_run` until real runtime harnesses provide evidence.
-Swift is not in the execution matrix; its absence is checked against the pinned
-CLI help. HTTP is a request-example target and is not counted as an SDK.
+`targets.json` generates all raw/overlay matrix entries. Kotlin uses the Java
+generator and a separate Kotlin JVM consumer; HTTP inspects request examples.
+Swift is outside the generation matrix:
 
-No remote spec downloads, external registry publishing or production OTP calls
-are part of this PoC. See the final adoption report in `docs/kiota-poc-results.md`.
+```sh
+bun run poc/kiota/scripts/generate.ts Swift raw
+bun run poc/kiota/scripts/compare-existing.ts
+bunx --no-install ttsc --noEmit -p poc/kiota/tsconfig.json
+bun test poc/kiota/overlays poc/kiota/mock poc/kiota/scripts/evidence.test.ts
+bun run check
+```
+
+The existing SDK comparison deliberately uses the same strict fixture. Its
+normalized error API does not expose every raw envelope/header field. The
+comparison records those differences with a failing exit code; `bun run check`
+is the independent existing SDK regression gate.
+
+## Pinned environment
+
+CI runs on `ubuntu-24.04` (actual OS/architecture/runner/tool output is recorded
+in result JSON and logs). The action and CLI are separate pins:
+
+- setup-kiota v0.5.0: `111eb592b2b3b2602ba9e0d979d4a4509cd59bb5`
+- Release `v1.35.0`, action input `version: v1.35.0`
+- Required full CLI build: `1.35.0+114aa7ee609262d892fd9ceb02b2d9f7ecb84190`
+- OpenAPI `3.1.1`; service contract `1.8.0`
+- Vendored SHA-256: `f8e49375574f1e01fb566453707d1d382c4e5fe158648863200baf8b6353b84e`
+
+| Target | Native toolchain | Main Kiota runtime pin |
+| --- | --- | --- |
+| CSharp | .NET SDK 8.0.303 | Bundle 2.0.0 + NuGet lock |
+| Java / Kotlin | Temurin 21.0.8+9, Maven 3.9.9, Kotlin 2.1.20 | Java bundle/serializers 1.9.3; Jakarta annotations 2.1.1 |
+| PHP | PHP 8.4.4, Composer 2.8.6 | Bundle 2.1.0 + Composer lock |
+| Go | Go 1.26.5 | Abstractions 1.11.1, HTTP 1.5.4 + module sums |
+| Python | Python 3.13.2 | Bundle 1.14.2 + exact hash-locked requirements |
+| Ruby | Ruby 3.3.6, Bundler 2.5.22 | Abstractions/Faraday/JSON 0.20.0 + Gemfile lock |
+| Dart | Dart 3.9.4 | Bundle 0.1.1 + Pub lock |
+| TypeScript | Bun 1.4.2, ttsc 0.30.4, TypeScript 7.0.2 | Bundle 1.0.0-preview.106 + Bun lock |
+
+Optional `MAVEN_BIN`, `GO_BIN`, `RUBY_BIN`, `DART_BIN` select absolute executables
+locally. Other native executables must be on `PATH`. The JVM emits Java 17
+bytecode; Android and Kotlin Multiplatform are untested.
+
+## What the harness proves
+
+`generate.ts` saves `--version`, `generate --help`, `info`, per-language runtime
+recommendations, warning categories, source hashes, public declarations and
+operation inventory. It performs two clean generations and compares every code
+file byte for byte; no source normalization or generated edits are used.
+
+`harness.ts` compiles/loads all generated files with the real runtimes. It then
+creates a local NuGet package, Java JAR, wheel, Composer ZIP, Go module ZIP,
+gem, Dart source archive or Bun tarball and uses a separate consumer. Consumers
+reference the installed artifact, not the original generated source workspace.
+Package hashes and dependency metadata are retained. HTTP has no SDK package.
+
+`wire.ts` starts a guarded loopback HTTP server. Real generated request builders,
+serializers and adapters process 28 shared contract cases covering all nine
+operations. A separate observation records the runtime's default retry chain;
+it is not counted as a successful K-OTP contract case. The PoC usage policy
+disables automatic retries, validates issue idempotency before transport, and
+allows one explicit 503 retry with the same key/body. Timeouts remain unknown.
+
+The overlay is generated by `overlays/compat.ts`, with every change and its
+reason saved. Enum/type adaptations preserve permitted values; the common error
+view deliberately loses branch-specific const/typed-data validation. The raw
+spec stays intact. `reproduce.ts Java` confirms the smallest oneOf error-mapping
+failure/fix; `reproduce.ts Go` confirms the nil optional-date panic in 1.9.3 and
+its absence in the selected 1.11.1 runtime.
+
+## Evidence and CI
+
+For each target/variant, `.cache/kiota-poc/runs/<Target>-<variant>/` contains:
+
+- `generated/`, `regenerated/`: original generator output, ignored by Git.
+- `logs/`: commands and native tool output, separate from clean-output paths.
+- `reports/result.json`: six independent stage statuses and provenance.
+- `reports/source-manifest.json`, `public-api.txt`, `operations.json`,
+  `regeneration-diff.json`: reproducibility and API review evidence.
+- `reports/wire-cases.json`, `http-requests.json`, `consumer-observations.json`,
+  `default-retry.json`: actual wire behavior; keys/OTP/phone numbers masked.
+- `packages/`, `repros/`: local artifacts and minimal regressions when applicable.
+
+CI uploads evidence even when a native stage fails, then writes JSON/Markdown
+and Job Summary from this run only. Missing or mismatched artifacts never
+satisfy the gate. Raw/experimental comparison jobs retain their real failure
+conclusions; a successful required overlay gate is not an all-language claim.
+The investigation workflow can therefore be red while all required overlay
+candidates pass. There is no `continue-on-error` suppression.
+
+No production OTP requests, remote spec replacement, package publication,
+release/tag/mirror creation, main merge or SDK version change is performed.
