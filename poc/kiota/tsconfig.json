@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["bun"],
+    "isolatedDeclarations": false,
+    "plugins": []
+  },
+  "include": ["scripts/**/*.ts", "overlays/**/*.ts", "mock/**/*.ts"]
+}

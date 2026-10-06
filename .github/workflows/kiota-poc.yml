@@ -2,125 +2,103 @@ name: Kiota multi-language PoC
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main, poc/kiota-multilang]
+    paths: ["spec/openapi.json", ".github/workflows/kiota-poc.yml", "poc/kiota/**", "docs/kiota-poc-results.md"]
   push:
-    branches:
-      - poc/kiota-multilang
-    paths:
-      - "spec/openapi.json"
-      - ".github/workflows/kiota-poc.yml"
+    branches: [poc/kiota-multilang]
+    paths: ["spec/openapi.json", ".github/workflows/kiota-poc.yml", "poc/kiota/**", "docs/kiota-poc-results.md"]
 
 permissions:
   contents: read
 
-jobs:
-  generate:
-    name: Generate ${{ matrix.language }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - language: CSharp
-            namespace: KOtp.Sdk.Generated
-          - language: Go
-            namespace: kotp
-          - language: Java
-            namespace: dev.kotp.sdk.generated
-          - language: PHP
-            namespace: KOtp\\Sdk\\Generated
-          - language: Python
-            namespace: kotp_sdk_generated
-          - language: Ruby
-            namespace: KOtpSdkGenerated
-          - language: Swift
-            namespace: KOtpSdkGenerated
-          - language: TypeScript
-            namespace: KOtpSdkGenerated
+concurrency:
+  group: kiota-poc-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
+env:
+  BUN_VERSION: "1.4.2"
+  KIOTA_OFFLINE_ENABLED: "true"
+  KIOTA_CLI_TELEMETRY_OPTOUT: "true"
+
+jobs:
+  matrix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - id: matrix
+        run: bun run poc/kiota/scripts/matrix.ts
 
-      # Official Microsoft setup action. Keep this pinned during the PoC so
-      # generated diffs are attributable to the OpenAPI document, not Kiota.
-      - name: Setup Kiota
-        uses: microsoft/setup-kiota@v0.5.0
-
-      - name: Show Kiota version
-        run: kiota --version
-
-      - name: Generate client
-        id: generate
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p "poc-output/${{ matrix.language }}"
-          kiota generate \
-            --openapi spec/openapi.json \
-            --language "${{ matrix.language }}" \
-            --class-name KOtpApiClient \
-            --namespace-name "${{ matrix.namespace }}" \
-            --output "poc-output/${{ matrix.language }}" \
-            --clean-output \
-            --log-level Information \
-            2>&1 | tee "poc-output/${{ matrix.language }}/kiota-generate.log"
-
-      - name: Inventory generated output
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo "# ${{ matrix.language }}"
-            echo
-            echo "Files: $(find "poc-output/${{ matrix.language }}" -type f 2>/dev/null | wc -l | tr -d ' ')"
-            echo
-            echo "## Extensions"
-            find "poc-output/${{ matrix.language }}" -type f 2>/dev/null \
-              | sed 's/.*\.//' | sort | uniq -c | sort -nr || true
-            echo
-            echo "## Potential K-OTP schema hotspots"
-            grep -R -n -E "webOtp|smsFallback|idempotency|Idempotency|additionalData|AdditionalData" \
-              "poc-output/${{ matrix.language }}" 2>/dev/null | head -80 || true
-          } | tee "poc-output/${{ matrix.language }}/POC-INVENTORY.md"
-
-      - name: Upload generated client
+  investigate:
+    name: ${{ matrix.target }} / ${{ matrix.variant }}
+    needs: matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: ${{ fromJSON(needs.matrix.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Setup pinned Kiota
+        uses: microsoft/setup-kiota@111eb592b2b3b2602ba9e0d979d4a4509cd59bb5 # v0.5.0
+        with:
+          version: v1.35.0
+      - name: Discover, generate and compare clean regenerations
+        run: bun run poc/kiota/scripts/generate.ts "${{ matrix.target }}" "${{ matrix.variant }}"
+      - name: Upload evidence (including failed stages)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: kiota-${{ matrix.language }}
-          path: poc-output/${{ matrix.language }}
-          if-no-files-found: warn
+          name: kiota-${{ matrix.target }}-${{ matrix.variant }}
+          path: .cache/kiota-poc/runs/
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 14
 
-  kotlin-compat-plan:
-    name: Kotlin/JVM compatibility gate
-    runs-on: ubuntu-latest
-    needs: generate
+  report:
+    name: Evidence report and required-language gate
+    needs: [matrix, investigate]
     if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - name: Record Kotlin strategy
-        run: |
-          mkdir -p poc-output/Kotlin
-          cat > poc-output/Kotlin/README.md <<'EOF'
-          # Kotlin compatibility PoC
-
-          Kiota has no dedicated Kotlin generator. K-OTP will treat the generated
-          Java client as the JVM SDK candidate and validate it from Kotlin.
-
-          The next PoC gate, after reviewing the generated Java artifact, is:
-          1. create a minimal Gradle JVM fixture,
-          2. compile the generated Java client with its Kiota runtime dependencies,
-          3. compile Kotlin code that constructs the client and exercises issue,
-             verify, status, balance and template request builders,
-          4. record Java interop pain points (nullable types, builders, enums/unions,
-             async return types), and
-          5. decide whether a thin Kotlin facade is warranted.
-
-          This job intentionally does not claim Kotlin compatibility before the
-          generated Java dependency graph has been inspected.
-          EOF
-      - uses: actions/upload-artifact@v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          name: kiota-Kotlin-plan
-          path: poc-output/Kotlin
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: microsoft/setup-kiota@111eb592b2b3b2602ba9e0d979d4a4509cd59bb5 # v0.5.0
+        with:
+          version: v1.35.0
+      - name: Download only this run's evidence
+        uses: actions/download-artifact@v5
+        with:
+          pattern: kiota-*
+          merge-multiple: true
+          path: .cache/kiota-poc/runs/
+      - name: Verify Swift is unsupported by the pinned CLI
+        if: always()
+        run: bun run poc/kiota/scripts/generate.ts Swift raw
+      - name: Collect stage report
+        if: always()
+        run: bun run poc/kiota/scripts/report.ts
+      - name: Upload aggregate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiota-evidence-report
+          path: .cache/kiota-poc/runs/aggregate/
+          if-no-files-found: error
           retention-days: 14
+      - name: Require real build, wire, package and regeneration evidence
+        if: always()
+        run: bun run poc/kiota/scripts/report.ts --gate
