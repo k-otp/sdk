@@ -188,6 +188,21 @@ try {
       "Consumer.csproj",
       "Program.cs",
     ]);
+    if (variant === "raw") {
+      const program = path.join(consumer, "Program.cs");
+      await Bun.write(
+        program,
+        (await Bun.file(program).text())
+          .replace(
+            /VerificationStatusAsGetVerificationStatusQueryParameterType=Enum\.Parse<[^>]+>\(([^;]+)\.GetValue<string>\(\),true\)/g,
+            "VerificationStatus=$1.GetValue<string>()",
+          )
+          .replace(
+            /EntryTypeAsGetEntryTypeQueryParameterType=Enum\.Parse<[^>]+>\(([^;]+)\.GetValue<string>\(\),true\)/g,
+            "EntryType=$1.GetValue<string>()",
+          ),
+      );
+    }
     const project = path.join(consumer, "Consumer.csproj");
     await Bun.write(
       project,
@@ -274,6 +289,25 @@ try {
     );
     const language = name === "Kotlin" ? "kotlin-consumer" : "java-consumer";
     await cp(template(language), consumer, { recursive: true });
+    if (variant === "raw") {
+      const relative =
+        name === "Kotlin"
+          ? "src/main/kotlin/KotlinConsumer.kt"
+          : "src/main/java/WireConsumer.java";
+      const source = path.join(consumer, relative);
+      await Bun.write(
+        source,
+        (await Bun.file(source).text())
+          .replace(
+            /^import dev\.kotp\.sdk\.generated\.(issues|creditledger)\.Get(VerificationStatus|EntryType)QueryParameterType;?\r?\n/gm,
+            "",
+          )
+          .replace(
+            /Get(VerificationStatus|EntryType)QueryParameterType\.forValue\((q|query)\.get\("(verificationStatus|entryType)"\)\.(getAsString\(\)|asString)\)/g,
+            '$2.get("$3").$4',
+          ),
+      );
+    }
     const consumerPom = path.join(consumer, "pom.xml");
     const consumerText = await Bun.file(consumerPom).text();
     await Bun.write(
@@ -382,6 +416,21 @@ try {
       path.join(template("python"), "runner.py"),
       path.join(consumer, "runner.py"),
     );
+    if (variant === "raw") {
+      const runner = path.join(consumer, "runner.py");
+      await Bun.write(
+        runner,
+        (await Bun.file(runner).text())
+          .replace(
+            /^from kotp_sdk_generated\.(issues|credit_ledger)\.get_[^ ]+ import Get[^\n]+\n/gm,
+            "",
+          )
+          .replace(
+            /Get(VerificationStatus|EntryType)QueryParameterType\(query\["(verificationStatus|entryType)"\]\)/g,
+            'query["$2"]',
+          ),
+      );
+    }
     result.packageConsumer = stage(
       "passed",
       "Wheel installed into a separate venv; consumer has no source checkout on sys.path",
@@ -488,6 +537,25 @@ try {
       "go.sum",
       "main.go",
     ]);
+    if (variant === "raw") {
+      const source = path.join(consumer, "main.go");
+      await Bun.write(
+        source,
+        (await Bun.file(source).text())
+          .replace(
+            /\t\tenum, err := (issues|creditledger)\.ParseGet[^\n]+\n\t\tif err != nil \{\n\t\t\treturn nil, err\n\t\t\}\n/g,
+            "",
+          )
+          .replace(
+            /VerificationStatusAsGetVerificationStatusQueryParameterType: enum\.\(\*issues\.GetVerificationStatusQueryParameterType\)/g,
+            'VerificationStatus: ptr(test.Query["verificationStatus"].(string))',
+          )
+          .replace(
+            /EntryTypeAsGetEntryTypeQueryParameterType: enum\.\(\*creditledger\.GetEntryTypeQueryParameterType\)/g,
+            'EntryType: ptr(test.Query["entryType"].(string))',
+          ),
+      );
+    }
     const moduleFile = path.join(consumer, "go.mod");
     await Bun.write(
       moduleFile,
@@ -560,7 +628,8 @@ try {
     );
     await runWire(["bun", path.join(sdk, "runner.ts")]);
   } else if (name === "Ruby") {
-    await tool("ruby", ["ruby", "--version"]);
+    const ruby = process.env.RUBY_BIN ?? "ruby";
+    await tool("ruby", [ruby, "--version"]);
     await copyTemplate("ruby", sdk, ["Gemfile", "Gemfile.lock"]);
     await lock("ruby", ["Gemfile.lock"]);
     await cp(path.join(out, "generated"), path.join(sdk, "generated"), {
@@ -573,7 +642,7 @@ try {
     await execute(
       "buildOrLoad",
       "install",
-      ["bundle", "install"],
+      [ruby, "-S", "bundle", "install"],
       sdk,
       rubyEnv,
     );
@@ -581,9 +650,11 @@ try {
       "buildOrLoad",
       "load-all",
       [
+        ruby,
+        "-S",
         "bundle",
         "exec",
-        "ruby",
+        ruby,
         "-e",
         "files=Dir.glob('generated/**/*.rb');files.each{|f|abort('syntax failure '+f)unless system(RbConfig.ruby,'-c',f,out:File::NULL)};files.each{|f|require File.expand_path(f)};puts 'Loaded '+files.length.to_s+' generated files'",
       ],
@@ -594,10 +665,34 @@ try {
       "passed",
       `${result.generatedSourceFiles} generated Ruby files syntax checked and required with official runtimes`,
     );
-    result.wireContract = stage(
-      "not_run",
-      "Runtime HTTP fixture consumer is pending",
+    await cp(
+      path.join(template("ruby"), "runner.rb"),
+      path.join(sdk, "runner.rb"),
     );
+    const rubyWire = await command(
+      [
+        "bun",
+        "run",
+        path.join(root, "poc/kiota/scripts/wire.ts"),
+        ruby,
+        "-S",
+        "bundle",
+        "exec",
+        ruby,
+        path.join(sdk, "runner.rb"),
+      ],
+      log("wire-evaluation"),
+      sdk,
+      { ...env, ...rubyEnv, BUNDLE_GEMFILE: path.join(sdk, "Gemfile") },
+    );
+    result.wireContract = stage(
+      rubyWire.exitCode ? "failed" : "passed",
+      rubyWire.output.trim(),
+    );
+    if (rubyWire.exitCode)
+      result.blockers.push(
+        "Ruby runtime wire fixtures failed; inspect per-case evidence",
+      );
     result.packageConsumer = stage(
       "not_run",
       "Gem packaging consumer is pending",
@@ -622,10 +717,11 @@ try {
       "passed",
       `${result.generatedSourceFiles} generated Dart source inputs analyzed with official pub dependencies`,
     );
-    result.wireContract = stage(
-      "not_run",
-      "Runtime HTTP fixture consumer is pending",
+    await cp(
+      path.join(template("dart"), "runner.dart"),
+      path.join(sdk, "runner.dart"),
     );
+    await runWire([dart, "run", path.join(sdk, "runner.dart")]);
     result.packageConsumer = stage(
       "not_run",
       "Dart package consumer is pending",

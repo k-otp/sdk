@@ -63,7 +63,7 @@ jobs:
         uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
-          java-version: '21.0.8+9'
+          java-version: '21.0.8+9.0.LTS'
       - name: Setup checksum-verified Maven
         if: matrix.target == 'Java' || matrix.target == 'Kotlin'
         run: bash poc/kiota/scripts/setup-maven.sh
