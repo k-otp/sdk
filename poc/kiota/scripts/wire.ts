@@ -1,3 +1,4 @@
+import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import {
   evaluate,
@@ -14,6 +15,8 @@ if (!argv.length)
 const mock = startContractServer();
 const resultFile = path.join(out, "reports/consumer-observations.json");
 try {
+  await mkdir(path.dirname(resultFile), { recursive: true });
+  await rm(resultFile, { force: true });
   const runner = await command(
     argv,
     path.join(out, "logs/wire-consumer.txt"),
@@ -25,10 +28,18 @@ try {
     },
     180_000,
   );
-  const observations: Observation[] = (await Bun.file(resultFile).exists())
-    ? await Bun.file(resultFile).json()
-    : [];
+  let observations: Observation[] = [];
+  try {
+    if (await Bun.file(resultFile).exists())
+      observations = await Bun.file(resultFile).json();
+  } catch {
+    mock.violations.push("missing-case: malformed consumer observations");
+  }
+  await Bun.write(resultFile, redact(JSON.stringify(observations, null, 2)));
   const cases = evaluate(observations, mock.requests, mock.violations);
+  const contractCases = cases.filter(
+    (entry) => entry.kind !== "retry-observation",
+  );
   await json(path.join(out, "reports/wire-cases.json"), {
     runnerExitCode: runner.exitCode,
     cases,
@@ -40,14 +51,21 @@ try {
     path.join(out, "reports/http-requests.json"),
     redact(JSON.stringify(mock.requests, null, 2)),
   );
+  await json(
+    path.join(out, "reports/default-retry.json"),
+    cases.filter((entry) => entry.id === "probe-default-verify-429"),
+  );
   console.log(
-    `${cases.filter((test) => test.status === "passed").length}/${cases.length} wire cases passed`,
+    `${contractCases.filter((test) => test.status === "passed").length}/${contractCases.length} wire cases passed`,
   );
   for (const test of cases.filter((test) => test.status === "failed"))
     console.log(`${test.id}: ${test.failures.join("; ")}`);
   process.exitCode =
     runner.exitCode === 0 &&
-    cases.every((test) => test.status === "passed") &&
+    contractCases.every((test) => test.status === "passed") &&
+    cases
+      .filter((entry) => entry.kind === "retry-observation")
+      .every((entry) => entry.observationCaptured) &&
     mock.violations.every((v) => !v.startsWith("missing-case"))
       ? 0
       : 1;

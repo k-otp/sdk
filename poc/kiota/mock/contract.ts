@@ -129,23 +129,39 @@ export function evaluate(
       value.startsWith(`${test.id}:`),
     );
     const received = requests.filter((request) => request.id === test.id);
-    if (received.length !== test.requestCount)
+    if (!test.defaultRetryProbe && received.length !== test.requestCount)
       failures.push(
         `request count: expected ${test.requestCount}, got ${received.length}`,
       );
+    if (test.defaultRetryProbe) {
+      return {
+        id: test.id,
+        kind: "retry-observation",
+        status: "not_applicable",
+        failures: [],
+        observedViolations: failures,
+        received: received.length,
+        observation,
+        observationCaptured: Boolean(observation) && received.length > 0,
+      };
+    }
     if (!observation) failures.push("missing consumer observation");
     else if ("expectedOutcome" in test) {
       if (observation.outcome !== test.expectedOutcome)
         failures.push(`expected ${test.expectedOutcome} outcome`);
     } else {
-      for (const check of test.checks)
-        if (
-          !isDeepStrictEqual(
-            lookup(observation.response, check.path),
-            check.value,
-          )
-        )
-          failures.push(`response field ${check.path} differs`);
+      for (const check of test.checks) {
+        const actual = lookup(observation.response, check.path);
+        const matches =
+          "comparison" in check &&
+          check.comparison === "instant" &&
+          typeof actual === "string" &&
+          typeof check.value === "string"
+            ? Number.isFinite(Date.parse(actual)) &&
+              Date.parse(actual) === Date.parse(check.value)
+            : isDeepStrictEqual(actual, check.value);
+        if (!matches) failures.push(`response field ${check.path} differs`);
+      }
       if (test.response.status >= 400) {
         if (observation.status !== test.response.status)
           failures.push("HTTP error status inaccessible");

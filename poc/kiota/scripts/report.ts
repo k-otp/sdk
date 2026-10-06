@@ -16,32 +16,34 @@ type ReportRow = {
 } & Record<Stage, StageResult>;
 const results: ReportRow[] = [];
 for (const target of config.targets) {
-  const location = path.join(
-    outputRoot,
-    `${target.target}-raw/reports/result.json`,
-  );
-  if (await Bun.file(location).exists())
-    results.push(await Bun.file(location).json());
-  else {
-    const missing = Object.fromEntries(
-      config.stages.map((key) => [
-        key,
-        stage(
-          target.target === "Swift"
-            ? key === "generation"
-              ? "unsupported"
-              : "not_applicable"
-            : "not_run",
-          "missing evidence for this run",
-        ),
-      ]),
+  for (const variant of target.target === "Swift"
+    ? ["raw"]
+    : ["raw", "overlay"]) {
+    const location = path.join(
+      outputRoot,
+      `${target.target}-${variant}/reports/result.json`,
     );
-    results.push({
-      target: target.target,
-      inputVariant: "raw",
-      blockers: ["missing evidence for this run"],
-      ...(missing as Record<Stage, StageResult>),
-    });
+    if (await Bun.file(location).exists())
+      results.push(await Bun.file(location).json());
+    else {
+      const missing = Object.fromEntries(
+        config.stages.map((key) => [
+          key,
+          stage(
+            key === "kotlinInterop" && target.target !== "Kotlin"
+              ? "not_applicable"
+              : "not_run",
+            "missing evidence for this run",
+          ),
+        ]),
+      );
+      results.push({
+        target: target.target,
+        inputVariant: variant,
+        blockers: ["missing evidence for this run"],
+        ...(missing as Record<Stage, StageResult>),
+      });
+    }
   }
 }
 const header = ["Target", "Input", ...config.stages];
@@ -70,7 +72,9 @@ if (process.argv.includes("--gate")) {
   process.exitCode = config.targets
     .filter((t) => t.required)
     .every((t) => {
-      const r = results.find((r) => r.target === t.target);
+      const r = results.find(
+        (r) => r.target === t.target && r.inputVariant === "overlay",
+      );
       return [
         "generation",
         "buildOrLoad",

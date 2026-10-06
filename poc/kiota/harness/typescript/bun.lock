@@ -1,0 +1,67 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "kotp-kiota-poc-typescript",
+      "dependencies": {
+        "@microsoft/kiota-bundle": "1.0.0-preview.106",
+      },
+      "devDependencies": {
+        "@types/bun": "1.4.2",
+        "ttsc": "0.30.4",
+      },
+    },
+  },
+  "packages": {
+    "@microsoft/kiota-abstractions": ["@microsoft/kiota-abstractions@1.0.0-preview.109", "", { "dependencies": { "@opentelemetry/api": "^1.7.0", "@std-uritemplate/std-uritemplate": "^2.0.0", "tinyduration": "^3.3.0", "tslib": "^2.6.2" } }, "sha512-CQEuWccWQvcLxXnAIYJw53tC0KuOETMQKbIu/4XTKYrmdSSufzXRouPolpGYSu3lJu8rfY//55TJJWNg7m8PpA=="],
+
+    "@microsoft/kiota-bundle": ["@microsoft/kiota-bundle@1.0.0-preview.106", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.106", "@microsoft/kiota-http-fetchlibrary": "^1.0.0-preview.106", "@microsoft/kiota-serialization-form": "^1.0.0-preview.106", "@microsoft/kiota-serialization-json": "^1.0.0-preview.106", "@microsoft/kiota-serialization-multipart": "^1.0.0-preview.106", "@microsoft/kiota-serialization-text": "^1.0.0-preview.106" } }, "sha512-gIiPK3mt/FzX6qa3QSKb97jkngeLOItAvyFamDckR2NxqpVjbX1B+KHIXnOaFP6iB/cxIQ0d6owEq5G/YshaJQ=="],
+
+    "@microsoft/kiota-http-fetchlibrary": ["@microsoft/kiota-http-fetchlibrary@1.0.0-preview.109", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.109", "@opentelemetry/api": "^1.7.0", "tslib": "^2.6.2" } }, "sha512-vi8FSDS8yp6ZMzNJ0q/PLVci+VLRXUtC2/TtC2TpFrJJ1VTTxKDogu8zFWXSAVpdHNkVOi7d1S9XoMnM1bI1aA=="],
+
+    "@microsoft/kiota-serialization-form": ["@microsoft/kiota-serialization-form@1.0.0-preview.109", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.109", "tslib": "^2.6.2" } }, "sha512-U1XixT9+ANDcYXrUmSxhQDRj+e0bsEv8SwPMfw7bFSknFTou+/bNifphov9LunbQiOrrvFx2Y+DxX52bC0sLWg=="],
+
+    "@microsoft/kiota-serialization-json": ["@microsoft/kiota-serialization-json@1.0.0-preview.109", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.109", "tslib": "^2.6.2" } }, "sha512-u4y/OP1i5IDEFr5U8waPbrlyG9QdtoWXDn3qXXR2TM+MNxbHm/X+nmETbxII1+QRLcoET7dBlh9N0zD1Z7//FA=="],
+
+    "@microsoft/kiota-serialization-multipart": ["@microsoft/kiota-serialization-multipart@1.0.0-preview.109", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.109", "tslib": "^2.6.2" } }, "sha512-Q2gQjSjMnwHuXMQcHpIKe8FUIje1mR4Iv5fnUL9VABBcZoCG3P2bHhW5YGOdvfX8GSSpuFpOfIfiAIyWYpqBAw=="],
+
+    "@microsoft/kiota-serialization-text": ["@microsoft/kiota-serialization-text@1.0.0-preview.109", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.109", "tslib": "^2.6.2" } }, "sha512-SATz7wflQ/Wro0c4EJj3jXwdCooOamdDXphqiVHKAWOR/L6UPESbt51B5S6VdZKUAYlXYLeT5crYfrhZpuB72A=="],
+
+    "@opentelemetry/api": ["@opentelemetry/api@1.9.1", "", {}, "sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q=="],
+
+    "@std-uritemplate/std-uritemplate": ["@std-uritemplate/std-uritemplate@2.0.12", "", {}, "sha512-s/R828vYTrFPgAOFAUiHuP4i1eSZHCO9PKVfzVR+2DFERJ/G71BpZJVObM2yy3xeMjMW3wB61gvanb6/pV1lJw=="],
+
+    "@ttsc/darwin-arm64": ["@ttsc/darwin-arm64@0.30.4", "", { "os": "darwin", "cpu": "arm64" }, "sha512-+x5qOR5kTTjVJKUYqZtkIs33dS3MnNflJfu4Lg1XRvipqjqzIb6RtUlYJ0uTJcGF1ZZ6N1s+ddGocpFqxD9Zpw=="],
+
+    "@ttsc/darwin-x64": ["@ttsc/darwin-x64@0.30.4", "", { "os": "darwin", "cpu": "x64" }, "sha512-thPKMLZhpqaV/HgeEEKvGq8pUrY+cV/8dLT/gF5lbBHvz3kRn5xN9CzPnommQj0dwtcpHEdn/JOSbIW16NPsCA=="],
+
+    "@ttsc/linux-arm": ["@ttsc/linux-arm@0.30.4", "", { "os": "linux", "cpu": "arm" }, "sha512-qNh2qlSnJoZXdYhsejsUXfA8nbOJEyR611S30p6Meqc2Sg6TVlsQT2XaLEDF2CrEcDALCi3pOQAhfWGjwyCa+A=="],
+
+    "@ttsc/linux-arm64": ["@ttsc/linux-arm64@0.30.4", "", { "os": "linux", "cpu": "arm64" }, "sha512-05Qtl4KOHiAuQIa/qRfwvp0vU7bVWjHQcOjJe0r9R9FdUsBAm51WQe18BnJTxV6cfE0xNaV/Ja/HWm7Qsq5vGQ=="],
+
+    "@ttsc/linux-x64": ["@ttsc/linux-x64@0.30.4", "", { "os": "linux", "cpu": "x64" }, "sha512-JZrx4sXeQVAJeyGpA8phlffrvbeyIjwme8ZVoBG8gvyT+BswfVgKQhskBaEGDodi6VyM3k53i53e+QcywFN+xQ=="],
+
+    "@ttsc/win32-arm64": ["@ttsc/win32-arm64@0.30.4", "", { "os": "win32", "cpu": "arm64" }, "sha512-8B9uOwajWhuklP1wvu7ynLddvsLpDygRHtp8zATnIGpipPDqUImcFmsQ7alwI40aEeIvfbI5COFBUd5aDOfbeQ=="],
+
+    "@ttsc/win32-x64": ["@ttsc/win32-x64@0.30.4", "", { "os": "win32", "cpu": "x64" }, "sha512-DDdWzQWrmzljRkoHnVxRACO8ikiM3rjuC/QRkPMmyzina0AimihHnOfOOWKdNttfkU9sAdCe3MIkg4ktpL38mQ=="],
+
+    "@types/bun": ["@types/bun@1.4.2", "", { "dependencies": { "bun-types": "1.4.2" } }, "sha512-GimotNn7+ZV0uVArItBbriZsR1oNf0+WTzPkdcFrzShI7k2norL0uzEaJT8T33dWr7O/c9ZDuAFQrctKCi72oQ=="],
+
+    "@types/node": ["@types/node@26.6.4", "", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-ldVPDCzj7fsaGZrLB0NuHuTvJcsNasysBAqMolr/cgxrLd1xbqxIr3XJiPnHHJUCxj5sNF1vnRj9aWnrVh5Jcg=="],
+
+    "acorn": ["acorn@8.16.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw=="],
+
+    "bun-types": ["bun-types@1.4.2", "", { "dependencies": { "@types/node": "*" } }, "sha512-bxV1FgK7yBIzjRe5zBozIM4Bem11ZJcCXSrjWRG3YWLt8yFDePu4cLjpebO8OvPeIE9trbyPF4fuj3Cia4Fj3w=="],
+
+    "cjs-module-lexer": ["cjs-module-lexer@2.2.1", "", {}, "sha512-Ca8swihM+/4yKecYHY52kgJd300hi2lADU/a1RxNTRe+RJ9jvqQlESpbz9DnG9mowez8qwXHB8qYdIUw9e+F5Q=="],
+
+    "tinyduration": ["tinyduration@3.4.1", "", {}, "sha512-NemFoamVYn7TmtwZKZ3OiliM9fZkr6EWiTM+wKknco6POSy2gS689xx/pXip0JYp40HXpUw6k65CUYHWYUXdaA=="],
+
+    "tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
+
+    "ttsc": ["ttsc@0.30.4", "", { "dependencies": { "acorn": "8.16.0", "cjs-module-lexer": "2.2.1" }, "optionalDependencies": { "@ttsc/darwin-arm64": "0.30.4", "@ttsc/darwin-x64": "0.30.4", "@ttsc/linux-arm": "0.30.4", "@ttsc/linux-arm64": "0.30.4", "@ttsc/linux-x64": "0.30.4", "@ttsc/win32-arm64": "0.30.4", "@ttsc/win32-x64": "0.30.4" }, "bin": { "ttsc": "lib/launcher/ttsc.js", "ttsx": "lib/launcher/ttsx.js", "ttscserver": "lib/launcher/ttscserver.js" } }, "sha512-JDw66o8hIkelLp0gMWj7izVzXAXxT+oObILBTOa6MxBGA8a2lqdfMsP++XN0hPYYxKNpyuLVnClBBvehNZyIpw=="],
+
+    "undici-types": ["undici-types@8.9.0", "", {}, "sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg=="],
+  }
+}

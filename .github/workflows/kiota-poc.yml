@@ -53,21 +53,86 @@ jobs:
         uses: microsoft/setup-kiota@111eb592b2b3b2602ba9e0d979d4a4509cd59bb5 # v0.5.0
         with:
           version: v1.35.0
+      - name: Setup .NET
+        if: matrix.target == 'CSharp'
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 8.0.303
+      - name: Setup JVM
+        if: matrix.target == 'Java' || matrix.target == 'Kotlin'
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21.0.8+9'
+      - name: Setup checksum-verified Maven
+        if: matrix.target == 'Java' || matrix.target == 'Kotlin'
+        run: bash poc/kiota/scripts/setup-maven.sh
+      - name: Setup PHP and Composer
+        if: matrix.target == 'PHP'
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4.4'
+          tools: composer:2.8.6
+          extensions: curl, zip
+          coverage: none
+      - name: Setup Go
+        if: matrix.target == 'Go'
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.26.5'
+          cache: false
+      - name: Setup Python
+        if: matrix.target == 'Python'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13.2'
+      - name: Setup Ruby
+        if: matrix.target == 'Ruby'
+        uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # verified master commit
+        with:
+          ruby-version: '3.3.6'
+          bundler: '2.5.22'
+      - name: Setup Dart
+        if: matrix.target == 'Dart'
+        uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1
+        with:
+          sdk: '3.9.4'
       - name: Discover, generate and compare clean regenerations
         run: bun run poc/kiota/scripts/generate.ts "${{ matrix.target }}" "${{ matrix.variant }}"
+      - name: Build, run HTTP fixtures and install package consumers
+        run: bun run poc/kiota/scripts/harness.ts "${{ matrix.target }}" "${{ matrix.variant }}"
       - name: Upload evidence (including failed stages)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: kiota-${{ matrix.target }}-${{ matrix.variant }}
-          path: .cache/kiota-poc/runs/
+          path: |
+            .cache/kiota-poc/runs/
+            !.cache/kiota-poc/runs/*/sdk/**
+            !.cache/kiota-poc/runs/*/consumer/**
+            !.cache/kiota-poc/runs/*/module-cache/**
+            !.cache/kiota-poc/runs/*/ruby-dependencies/**
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
 
+  existing-sdk:
+    name: Existing SDK regression and PoC infrastructure
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bunx --no-install ttsc --noEmit -p poc/kiota/tsconfig.json
+      - run: bun test poc/kiota/overlays poc/kiota/mock
+      - run: bun run check
+
   report:
     name: Evidence report and required-language gate
-    needs: [matrix, investigate]
+    needs: [matrix, investigate, existing-sdk]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10

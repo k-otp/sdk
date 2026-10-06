@@ -99,7 +99,7 @@ export function compatibilityOverlay(input: ObjectValue) {
       defined: { type: "boolean" },
       code: { type: "string" },
       status: { type: "number" },
-      message: { type: "string", "x-ms-primary-error-message": true },
+      message: { type: "string" },
       data: {},
     },
     required: ["defined", "code", "status", "message"],

@@ -1,0 +1,5 @@
+source "https://rubygems.org"
+ruby ">= 3.3.0"
+gem "microsoft_kiota_abstractions", "0.20.0"
+gem "microsoft_kiota_faraday", "0.20.0"
+gem "microsoft_kiota_serialization_json", "0.20.0"

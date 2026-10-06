@@ -24,9 +24,9 @@ test("mock refuses unexpected requests and reports counts; artifacts mask creden
       "missing-case: unexpected network request",
     );
     expect(
-      evaluate([], mock.requests, mock.violations).every(
-        (value) => value.status === "failed",
-      ),
+      evaluate([], mock.requests, mock.violations)
+        .filter((value) => value.kind !== "retry-observation")
+        .every((value) => value.status === "failed"),
     ).toBe(true);
     expect(
       redact(

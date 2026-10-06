@@ -399,7 +399,8 @@
         },
         {
           "path": "createdAt",
-          "value": "2026-10-07T00:00:00Z"
+          "value": "2026-10-07T00:00:00Z",
+          "comparison": "instant"
         }
       ],
       "requestCount": 1,
@@ -489,7 +490,8 @@
         },
         {
           "path": "promoNextExpiry.at",
-          "value": "2026-10-08T00:00:00Z"
+          "value": "2026-10-08T00:00:00Z",
+          "comparison": "instant"
         },
         {
           "path": "promoNextExpiry.amount",
@@ -1316,6 +1318,62 @@
       "checks": [],
       "requestCount": 0,
       "expectedOutcome": "configuration_error"
+    },
+    {
+      "id": "probe-default-verify-429",
+      "operation": "verify",
+      "method": "POST",
+      "path": "/verify",
+      "query": {},
+      "request": {
+        "issueId": "00000000-0000-4000-8000-000000000001",
+        "code": "001203"
+      },
+      "response": {
+        "status": 429,
+        "headers": {
+          "X-Request-Id": "poc-request-probe-default-verify-429",
+          "Retry-After": "0"
+        },
+        "body": {
+          "defined": true,
+          "code": "TOO_MANY_REQUESTS",
+          "status": 429,
+          "message": "모의 오류 TOO_MANY_REQUESTS",
+          "data": {
+            "retryAfterMs": 1500,
+            "scope": "perKey"
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "defined",
+          "value": true
+        },
+        {
+          "path": "code",
+          "value": "TOO_MANY_REQUESTS"
+        },
+        {
+          "path": "status",
+          "value": 429
+        },
+        {
+          "path": "message",
+          "value": "모의 오류 TOO_MANY_REQUESTS"
+        },
+        {
+          "path": "data",
+          "value": {
+            "retryAfterMs": 1500,
+            "scope": "perKey"
+          }
+        }
+      ],
+      "requestCount": 1,
+      "pathValue": "otp_default_kr",
+      "defaultRetryProbe": true
     }
   ]
 }
