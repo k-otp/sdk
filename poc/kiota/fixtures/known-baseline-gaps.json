@@ -1,0 +1,1558 @@
+{
+  "metadata": {
+    "kiotaVersion": "1.35.0+114aa7ee609262d892fd9ceb02b2d9f7ecb84190",
+    "specSha256": "f8e49375574f1e01fb566453707d1d382c4e5fe158648863200baf8b6353b84e",
+    "fixtureSha256": "293bbdccd8d4d50e8684dc00960a5e46b50a7bef3c4b2b662ed94a5ef954a399",
+    "sourceRunId": "37515801223",
+    "sourceHeadCommit": "ffda3fb092f9b8a0795ccbb759a4fd936ba656b2",
+    "note": "Core/HTTP/existing comparison observed in sourceRunId; Ruby/Dart/TypeScript raw cases re-observed locally after the reviewed runtime/usage fixes. CI never updates this file."
+  },
+  "targets": {
+    "CSharp/raw": {
+      "reason": "Unmodified OpenAPI 3.1 oneOf/const generation baseline; the supported overlay profile must pass all contracts.",
+      "cases": {
+        "error-400": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-401": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-403": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-404": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-409": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-429": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-500": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-503": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "undefined-error": {
+          "failures": [
+            "response field data differs",
+            "response field defined differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        }
+      }
+    },
+    "Java/raw": {
+      "reason": "Unmodified OpenAPI 3.1 oneOf/const generation baseline; the supported overlay profile must pass all contracts.",
+      "cases": {
+        "error-400": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": "the server returned an unexpected status code and no error class is registered for this code 400"
+        },
+        "error-401": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": "the server returned an unexpected status code and no error class is registered for this code 401"
+        },
+        "error-403": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": "the server returned an unexpected status code and no error class is registered for this code 403"
+        },
+        "error-404": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": "the server returned an unexpected status code and no error class is registered for this code 404"
+        },
+        "error-409": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": "the server returned an unexpected status code and no error class is registered for this code 409"
+        },
+        "error-429": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": "the server returned an unexpected status code and no error class is registered for this code 429"
+        },
+        "error-500": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": "the server returned an unexpected status code and no error class is registered for this code 500"
+        },
+        "error-503": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": "the server returned an unexpected status code and no error class is registered for this code 503"
+        },
+        "undefined-error": {
+          "failures": [
+            "response field data differs",
+            "response field defined differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": "the server returned an unexpected status code and no error class is registered for this code 400"
+        }
+      }
+    },
+    "Kotlin/raw": {
+      "reason": "Unmodified OpenAPI 3.1 oneOf/const generation baseline; the supported overlay profile must pass all contracts.",
+      "cases": {
+        "error-400": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-401": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-403": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-404": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-409": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-429": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-500": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-503": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "undefined-error": {
+          "failures": [
+            "response field data differs",
+            "response field defined differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        }
+      }
+    },
+    "PHP/raw": {
+      "reason": "Unmodified OpenAPI 3.1 oneOf/const generation baseline; the supported overlay profile must pass all contracts.",
+      "cases": {
+        "status-encoding": {
+          "failures": [
+            "response field deliveryStatus differs",
+            "response field overallStatus differs"
+          ],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "issues-page-0": {
+          "failures": [
+            "request count: expected 1, got 0",
+            "response field items.0.billingStatus differs",
+            "response field items.0.channel differs",
+            "response field nextCursor differs"
+          ],
+          "received": 0,
+          "exception": "Error",
+          "outcome": "unexpected_exception",
+          "diagnostic": "Class \"KOtp\\Sdk\\Generated\\Issues\\GetVerificationStatusQueryParameterType\" not found"
+        },
+        "issues-page-1": {
+          "failures": [
+            "request count: expected 1, got 0",
+            "response field items.0.billingStatus differs",
+            "response field items.0.channel differs"
+          ],
+          "received": 0,
+          "exception": "Error",
+          "outcome": "unexpected_exception",
+          "diagnostic": "Class \"KOtp\\Sdk\\Generated\\Issues\\GetVerificationStatusQueryParameterType\" not found"
+        },
+        "ledger": {
+          "failures": [
+            "request count: expected 1, got 0",
+            "response field items.0.amountDelta differs",
+            "response field items.0.entryType differs"
+          ],
+          "received": 0,
+          "exception": "Error",
+          "outcome": "unexpected_exception",
+          "diagnostic": "Class \"KOtp\\Sdk\\Generated\\CreditLedger\\GetEntryTypeQueryParameterType\" not found"
+        },
+        "error-400": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Microsoft\\Kiota\\Abstractions\\ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-401": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Microsoft\\Kiota\\Abstractions\\ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-403": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Microsoft\\Kiota\\Abstractions\\ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-404": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Microsoft\\Kiota\\Abstractions\\ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-409": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Microsoft\\Kiota\\Abstractions\\ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-429": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Microsoft\\Kiota\\Abstractions\\ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-500": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Microsoft\\Kiota\\Abstractions\\ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-503": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Microsoft\\Kiota\\Abstractions\\ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "undefined-error": {
+          "failures": [
+            "response field data differs",
+            "response field defined differs"
+          ],
+          "received": 1,
+          "exception": "Microsoft\\Kiota\\Abstractions\\ApiException",
+          "outcome": null,
+          "diagnostic": null
+        }
+      }
+    },
+    "Go/raw": {
+      "reason": "Unmodified OpenAPI 3.1 oneOf/const generation baseline; the supported overlay profile must pass all contracts.",
+      "cases": {
+        "error-400": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "*abstractions.ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-401": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "*abstractions.ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-403": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "*abstractions.ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-404": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "*abstractions.ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-409": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "*abstractions.ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-429": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "*abstractions.ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-500": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "*abstractions.ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-503": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "*abstractions.ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "undefined-error": {
+          "failures": [
+            "response field data differs",
+            "response field defined differs"
+          ],
+          "received": 1,
+          "exception": "*abstractions.ApiError",
+          "outcome": null,
+          "diagnostic": null
+        }
+      }
+    },
+    "Python/raw": {
+      "reason": "Unmodified OpenAPI 3.1 oneOf/const generation baseline; the supported overlay profile must pass all contracts.",
+      "cases": {
+        "status-encoding": {
+          "failures": [
+            "response field deliveryStatus differs",
+            "response field overallStatus differs"
+          ],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "issues-page-0": {
+          "failures": [
+            "response field items.0.billingStatus differs",
+            "response field items.0.channel differs"
+          ],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "issues-page-1": {
+          "failures": [
+            "response field items.0.billingStatus differs",
+            "response field items.0.channel differs"
+          ],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "ledger": {
+          "failures": ["response field items.0.entryType differs"],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-400": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "APIError",
+          "outcome": null,
+          "diagnostic": "The server returned an unexpected status code and no error class is registered for this code 400 (status 400)"
+        },
+        "error-401": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "APIError",
+          "outcome": null,
+          "diagnostic": "The server returned an unexpected status code and no error class is registered for this code 401 (status 401)"
+        },
+        "error-403": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "APIError",
+          "outcome": null,
+          "diagnostic": "The server returned an unexpected status code and no error class is registered for this code 403 (status 403)"
+        },
+        "error-404": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "APIError",
+          "outcome": null,
+          "diagnostic": "The server returned an unexpected status code and no error class is registered for this code 404 (status 404)"
+        },
+        "error-409": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "APIError",
+          "outcome": null,
+          "diagnostic": "The server returned an unexpected status code and no error class is registered for this code 409 (status 409)"
+        },
+        "error-402": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Issue402Error",
+          "outcome": null,
+          "diagnostic": "Issue402Error (status 402)"
+        },
+        "error-429": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "APIError",
+          "outcome": null,
+          "diagnostic": "The server returned an unexpected status code and no error class is registered for this code 429 (status 429)"
+        },
+        "error-500": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "APIError",
+          "outcome": null,
+          "diagnostic": "The server returned an unexpected status code and no error class is registered for this code 500 (status 500)"
+        },
+        "error-503": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "APIError",
+          "outcome": null,
+          "diagnostic": "The server returned an unexpected status code and no error class is registered for this code 503 (status 503)"
+        },
+        "undefined-error": {
+          "failures": [
+            "response field data differs",
+            "response field defined differs"
+          ],
+          "received": 1,
+          "exception": "APIError",
+          "outcome": null,
+          "diagnostic": "The server returned an unexpected status code and no error class is registered for this code 400 (status 400)"
+        }
+      }
+    },
+    "Ruby/raw": {
+      "reason": "Unmodified OpenAPI 3.1 oneOf/const generation baseline; the supported overlay profile must pass all contracts.",
+      "cases": {
+        "issue-0": {
+          "failures": [
+            "response field attemptsRemaining differs",
+            "response field issueId differs"
+          ],
+          "received": 1,
+          "exception": "NameError",
+          "outcome": "unexpected_exception",
+          "diagnostic": "Error during deserialization"
+        },
+        "issue-1": {
+          "failures": [
+            "response field attemptsRemaining differs",
+            "response field issueId differs",
+            "response field webOtp.status differs"
+          ],
+          "received": 1,
+          "exception": "NameError",
+          "outcome": "unexpected_exception",
+          "diagnostic": "Error during deserialization"
+        },
+        "issue-2": {
+          "failures": [
+            "response field attemptsRemaining differs",
+            "response field issueId differs"
+          ],
+          "received": 1,
+          "exception": "NameError",
+          "outcome": "unexpected_exception",
+          "diagnostic": "Error during deserialization"
+        },
+        "issue-3": {
+          "failures": [
+            "response field attemptsRemaining differs",
+            "response field issueId differs",
+            "response field webOtp.status differs"
+          ],
+          "received": 1,
+          "exception": "NameError",
+          "outcome": "unexpected_exception",
+          "diagnostic": "Error during deserialization"
+        },
+        "verify-false": {
+          "failures": [
+            "response field reasonCode differs",
+            "response field verified differs"
+          ],
+          "received": 1,
+          "exception": "NameError",
+          "outcome": "unexpected_exception",
+          "diagnostic": "Error during deserialization"
+        },
+        "status-encoding": {
+          "failures": [
+            "response field deliveryStatus differs",
+            "response field overallStatus differs",
+            "response field providerOutcomeAmbiguous differs"
+          ],
+          "received": 1,
+          "exception": "NameError",
+          "outcome": "unexpected_exception",
+          "diagnostic": "Error during deserialization"
+        },
+        "issues-page-0": {
+          "failures": [
+            "response field items.0.billingStatus differs",
+            "response field items.0.channel differs"
+          ],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "issues-page-1": {
+          "failures": [
+            "response field items.0.billingStatus differs",
+            "response field items.0.channel differs"
+          ],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "ledger": {
+          "failures": ["response field items.0.entryType differs"],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "balance-object": {
+          "failures": [
+            "response field promoBalance differs",
+            "response field promoNextExpiry.amount differs",
+            "response field promoNextExpiry.at differs",
+            "response field walletId differs",
+            "response field walletScope differs"
+          ],
+          "received": 1,
+          "exception": "NameError",
+          "outcome": "unexpected_exception",
+          "diagnostic": "Error during deserialization"
+        },
+        "balance-null": {
+          "failures": [
+            "response field promoBalance differs",
+            "response field walletId differs",
+            "response field walletScope differs"
+          ],
+          "received": 1,
+          "exception": "NameError",
+          "outcome": "unexpected_exception",
+          "diagnostic": "Error during deserialization"
+        },
+        "error-400": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "MicrosoftKiotaAbstractions::ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-401": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "MicrosoftKiotaAbstractions::ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-403": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "MicrosoftKiotaAbstractions::ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-404": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "MicrosoftKiotaAbstractions::ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-409": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "MicrosoftKiotaAbstractions::ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-402": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "KOtpSdkGenerated::Issue::Issue402Error",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-429": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "MicrosoftKiotaAbstractions::ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-500": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "MicrosoftKiotaAbstractions::ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-503": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "MicrosoftKiotaAbstractions::ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "undefined-error": {
+          "failures": [
+            "response field data differs",
+            "response field defined differs"
+          ],
+          "received": 1,
+          "exception": "MicrosoftKiotaAbstractions::ApiError",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "issue-explicit-retry": {
+          "failures": ["response field issueId differs"],
+          "received": 2,
+          "exception": "NameError",
+          "outcome": "unexpected_exception",
+          "diagnostic": "Error during deserialization"
+        }
+      }
+    },
+    "Dart/raw": {
+      "reason": "Unmodified OpenAPI 3.1 oneOf/const generation baseline; the supported overlay profile must pass all contracts.",
+      "cases": {
+        "error-400": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-401": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-403": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-404": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-409": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-402": {
+          "failures": ["response field data differs"],
+          "received": 1,
+          "exception": "Issue402Error",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-429": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-500": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-503": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "undefined-error": {
+          "failures": [
+            "response field data differs",
+            "response field defined differs"
+          ],
+          "received": 1,
+          "exception": "ApiException",
+          "outcome": null,
+          "diagnostic": null
+        }
+      }
+    },
+    "TypeScript/raw": {
+      "reason": "Unmodified OpenAPI 3.1 oneOf/const generation baseline; the supported overlay profile must pass all contracts.",
+      "cases": {
+        "error-400": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Error",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-401": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Error",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-403": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Error",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-404": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Error",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-409": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Error",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-402": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "non-Error",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-429": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Error",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-500": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Error",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-503": {
+          "failures": [
+            "response field code differs",
+            "response field data differs",
+            "response field defined differs",
+            "response field message differs",
+            "response field status differs"
+          ],
+          "received": 1,
+          "exception": "Error",
+          "outcome": null,
+          "diagnostic": null
+        },
+        "undefined-error": {
+          "failures": [
+            "response field data differs",
+            "response field defined differs"
+          ],
+          "received": 1,
+          "exception": "Error",
+          "outcome": null,
+          "diagnostic": null
+        }
+      }
+    },
+    "HTTP/raw": {
+      "reason": "Pinned HTTP writer emits invalid JSON POST examples; generation is preserved.",
+      "examples": [
+        {
+          "file": "generated/Balance/BalanceRequestBuilder.http",
+          "operation": ["GET", "{{hostAddress}}/balance"],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/CreditLedger/CreditLedgerRequestBuilder.http",
+          "operation": [
+            "GET",
+            "{{hostAddress}}/credit-ledger?createdFrom={{createdFrom}}&createdTo={{createdTo}}&cursor={{cursor}}&entryType={{entryType}}&limit={{limit}}"
+          ],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/Issue/IssueRequestBuilder.http",
+          "operation": ["POST", "{{hostAddress}}/issue"],
+          "status": "failed",
+          "failures": [
+            "example request body is not valid JSON (generation is preserved verbatim)"
+          ]
+        },
+        {
+          "file": "generated/Issues/IssuesRequestBuilder.http",
+          "operation": [
+            "GET",
+            "{{hostAddress}}/issues?createdFrom={{createdFrom}}&createdTo={{createdTo}}&cursor={{cursor}}&limit={{limit}}&verificationStatus={{verificationStatus}}"
+          ],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/Issues/Item/WithIssueItemRequestBuilder.http",
+          "operation": ["GET", "{{hostAddress}}/issues/"],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/Status/StatusRequestBuilder.http",
+          "operation": ["GET", "{{hostAddress}}/status?issueId={{issueId}}"],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/Templates/Item/WithTemplateItemRequestBuilder.http",
+          "operation": ["GET", "{{hostAddress}}/templates/"],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/Templates/TemplatesRequestBuilder.http",
+          "operation": ["GET", "{{hostAddress}}/templates"],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/Verify/VerifyRequestBuilder.http",
+          "operation": ["POST", "{{hostAddress}}/verify"],
+          "status": "failed",
+          "failures": [
+            "example request body is not valid JSON (generation is preserved verbatim)"
+          ]
+        }
+      ]
+    },
+    "HTTP/overlay": {
+      "reason": "Pinned HTTP writer emits invalid JSON POST examples; generation is preserved.",
+      "examples": [
+        {
+          "file": "generated/Balance/BalanceRequestBuilder.http",
+          "operation": ["GET", "{{hostAddress}}/balance"],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/CreditLedger/CreditLedgerRequestBuilder.http",
+          "operation": [
+            "GET",
+            "{{hostAddress}}/credit-ledger?createdFrom={{createdFrom}}&createdTo={{createdTo}}&cursor={{cursor}}&entryType={{entryType}}&limit={{limit}}"
+          ],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/Issue/IssueRequestBuilder.http",
+          "operation": ["POST", "{{hostAddress}}/issue"],
+          "status": "failed",
+          "failures": [
+            "example request body is not valid JSON (generation is preserved verbatim)"
+          ]
+        },
+        {
+          "file": "generated/Issues/IssuesRequestBuilder.http",
+          "operation": [
+            "GET",
+            "{{hostAddress}}/issues?createdFrom={{createdFrom}}&createdTo={{createdTo}}&cursor={{cursor}}&limit={{limit}}&verificationStatus={{verificationStatus}}"
+          ],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/Issues/Item/WithIssueItemRequestBuilder.http",
+          "operation": ["GET", "{{hostAddress}}/issues/"],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/Status/StatusRequestBuilder.http",
+          "operation": ["GET", "{{hostAddress}}/status?issueId={{issueId}}"],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/Templates/Item/WithTemplateItemRequestBuilder.http",
+          "operation": ["GET", "{{hostAddress}}/templates/{{templateId}}"],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/Templates/TemplatesRequestBuilder.http",
+          "operation": ["GET", "{{hostAddress}}/templates"],
+          "status": "passed",
+          "failures": []
+        },
+        {
+          "file": "generated/Verify/VerifyRequestBuilder.http",
+          "operation": ["POST", "{{hostAddress}}/verify"],
+          "status": "failed",
+          "failures": [
+            "example request body is not valid JSON (generation is preserved verbatim)"
+          ]
+        }
+      ]
+    },
+    "ExistingTypeScript/raw": {
+      "reason": "Existing public normalized error view differs from the raw-envelope comparison.",
+      "cases": {
+        "error-400": {
+          "failures": ["response field defined differs"],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-401": {
+          "failures": ["response field defined differs"],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-403": {
+          "failures": ["response field defined differs"],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-404": {
+          "failures": ["response field defined differs"],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-409": {
+          "failures": ["response field defined differs"],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-402": {
+          "failures": ["response field defined differs"],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-429": {
+          "failures": [
+            "Retry-After inaccessible (seconds, separate from data.retryAfterMs)",
+            "response field defined differs"
+          ],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-500": {
+          "failures": ["response field defined differs"],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "error-503": {
+          "failures": ["response field defined differs"],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "undefined-error": {
+          "failures": ["response field defined differs"],
+          "received": 1,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "issue-invalid-idempotency": {
+          "failures": ["expected configuration_error outcome"],
+          "received": 0,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        },
+        "issue-missing-idempotency": {
+          "failures": ["expected configuration_error outcome"],
+          "received": 0,
+          "exception": null,
+          "outcome": null,
+          "diagnostic": null
+        }
+      }
+    }
+  }
+}

@@ -73,6 +73,7 @@ const BUDGETS = {
   theme: 4 * 1024,
   // Server client with every public /v1 operation (Node target).
   server: 14 * 1024,
+  kiota: 100 * 1024,
 } as const;
 
 type Subpath = {
@@ -156,6 +157,8 @@ const RESTRICTED_OWNERS = [
   "ui-svelte",
   "server",
   "server.browser",
+  "kiota",
+  "kiota.browser",
 ];
 
 const kb = (bytes: number): string => `${(bytes / 1024).toFixed(2)} kB`;
@@ -439,6 +442,10 @@ try {
     noUi: true,
     target: "node",
   });
+  await whole("@k-otp/sdk/kiota", "kiota.js", BUDGETS.kiota, {
+    noUi: true,
+    target: "node",
+  });
 
   // A browser bundle that imports `@k-otp/sdk/server` builds, but gets the
   // throwing stub ("browser" export condition), never the real client.
@@ -464,6 +471,23 @@ try {
         "@k-otp/sdk/server in a browser bundle is the real client",
       );
     }
+    await writeFile(
+      entry,
+      'import {KotpClient} from "@k-otp/sdk/kiota"; export const run = () => new KotpClient({apiKey:"sk_x"});',
+    );
+    const kiotaBrowser = await bundle("@k-otp/sdk/kiota (browser)", entry);
+    if (
+      !kiotaBrowser.bytes
+        .toString()
+        .includes("requires a server environment") ||
+      [...kiotaBrowser.seen].some(
+        (name) =>
+          name.includes("@microsoft/") || name.endsWith("dist/kiota.js"),
+      )
+    )
+      isolation.push(
+        "@k-otp/sdk/kiota in a browser bundle must contain only the server guard",
+      );
   } finally {
     await rm(browserDir, { recursive: true, force: true });
   }

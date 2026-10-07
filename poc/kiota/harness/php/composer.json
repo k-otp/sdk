@@ -1,0 +1,10 @@
+{
+  "name": "k-otp/kiota-poc",
+  "description": "Unpublished local Kiota consumer fixture",
+  "version": "0.0.0",
+  "type": "library",
+  "license": "MIT",
+  "require": { "php": ">=8.2", "microsoft/kiota-bundle": "2.1.0" },
+  "autoload": { "psr-4": { "KOtp\\Sdk\\Generated\\": "generated/" } },
+  "config": { "allow-plugins": false, "sort-packages": true }
+}

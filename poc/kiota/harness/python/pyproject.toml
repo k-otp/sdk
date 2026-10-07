@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools==80.9.0", "wheel==0.45.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kotp-kiota-poc"
+version = "0.0.0"
+description = "Unpublished local Kiota consumer fixture"
+requires-python = ">=3.11"
+dependencies = ["microsoft-kiota-bundle==1.14.2"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["kotp_sdk_generated*"]
+namespaces = true

@@ -1,0 +1,115 @@
+{
+  "kiotaVersion": "1.35.0",
+  "kiotaBuild": "1.35.0+114aa7ee609262d892fd9ceb02b2d9f7ecb84190",
+  "actionCommit": "111eb592b2b3b2602ba9e0d979d4a4509cd59bb5",
+  "spec": "spec/openapi.json",
+  "specSha256": "f8e49375574f1e01fb566453707d1d382c4e5fe158648863200baf8b6353b84e",
+  "className": "KOtpApiClient",
+  "stages": [
+    "generation",
+    "buildOrLoad",
+    "wireContract",
+    "kotlinInterop",
+    "packageConsumer",
+    "reproducibility"
+  ],
+  "statuses": [
+    "passed",
+    "failed",
+    "blocked",
+    "unsupported",
+    "not_run",
+    "not_applicable"
+  ],
+  "targets": [
+    {
+      "target": "CSharp",
+      "language": "CSharp",
+      "namespace": "KOtp.Sdk.Generated",
+      "extension": ".cs",
+      "harness": "dotnet",
+      "required": true
+    },
+    {
+      "target": "Java",
+      "language": "Java",
+      "namespace": "dev.kotp.sdk.generated",
+      "extension": ".java",
+      "harness": "java",
+      "required": true
+    },
+    {
+      "target": "Kotlin",
+      "language": "Java",
+      "namespace": "dev.kotp.sdk.generated",
+      "extension": ".java",
+      "harness": "kotlin-consumer",
+      "required": true
+    },
+    {
+      "target": "PHP",
+      "language": "PHP",
+      "namespace": "KOtp\\Sdk\\Generated",
+      "extension": ".php",
+      "harness": "php",
+      "required": true
+    },
+    {
+      "target": "Go",
+      "language": "Go",
+      "namespace": "github.com/k-otp/sdk/sdks/go/generated",
+      "extension": ".go",
+      "harness": "go",
+      "required": true
+    },
+    {
+      "target": "Python",
+      "language": "Python",
+      "namespace": "kotp_sdk_generated",
+      "extension": ".py",
+      "harness": "python",
+      "required": true
+    },
+    {
+      "target": "Ruby",
+      "language": "Ruby",
+      "namespace": "KOtpSdkGenerated",
+      "extension": ".rb",
+      "harness": "ruby",
+      "required": true
+    },
+    {
+      "target": "Dart",
+      "language": "Dart",
+      "namespace": "kotp_sdk_generated",
+      "extension": ".dart",
+      "harness": "dart",
+      "required": true
+    },
+    {
+      "target": "TypeScript",
+      "language": "TypeScript",
+      "namespace": "KOtpSdkGenerated",
+      "extension": ".ts",
+      "harness": "typescript",
+      "required": true
+    },
+    {
+      "target": "HTTP",
+      "language": "HTTP",
+      "namespace": "KOtpSdkGenerated",
+      "extension": ".http",
+      "harness": "http",
+      "required": false,
+      "kind": "request-examples"
+    },
+    {
+      "target": "Swift",
+      "language": "Swift",
+      "namespace": "KOtpSdkGenerated",
+      "extension": ".swift",
+      "harness": null,
+      "required": false
+    }
+  ]
+}

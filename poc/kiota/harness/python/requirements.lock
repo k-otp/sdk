@@ -1,0 +1,79 @@
+# Exact, cross-platform distribution hashes resolved for Python 3.13.2.
+anyio==4.15.1 \
+    --hash=sha256:6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101 \
+    --hash=sha256:9f28306018cbd6d329e64a36d58256edff76dd996fe423bc957326e578b82a94
+build==1.3.0 \
+    --hash=sha256:698edd0ea270bde950f53aed21f3a0135672206f3911e0176261a31e0e07b397 \
+    --hash=sha256:7145f0b5061ba90a1500d60bd1b13ca0a8a4cebdd0cc16ed8adf1c0e739f43b4
+certifi==2026.7.22 \
+    --hash=sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775 \
+    --hash=sha256:741e2c3b351ddf169a738da9f2c048608ff7f2c5cc02f1ebc6b118bb090d5d55
+h11==0.16.0 \
+    --hash=sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1 \
+    --hash=sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86
+h2==4.4.1 \
+    --hash=sha256:0e25f1462b23c9cb82d9eb02e28bc706dac2a68cb457c6a0d74d63c8a2a5d0e6 \
+    --hash=sha256:4e866ffb1a869ae14dd9b5e6beb5c24a13da0495ad72b65925ded182521c1516
+hpack==4.2.0 \
+    --hash=sha256:0895cfa3b5531fc65fe439c05eb65144f123bf7a394fcaa56aa423548d8e45c0 \
+    --hash=sha256:858ac0b02280fa582b5080d68db0899c62a80375e0e5413a74970c5e518b6986
+httpcore==1.0.9 \
+    --hash=sha256:2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55 \
+    --hash=sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8
+httpx==0.28.1 \
+    --hash=sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc \
+    --hash=sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad
+hyperframe==6.1.0 \
+    --hash=sha256:b03380493a519fce58ea5af42e4a42317bf9bd425596f7a0835ffce80f1a42e5 \
+    --hash=sha256:f630908a00854a7adeabd6382b43923a4c4cd4b821fcb527e6ab9e15382a3b08
+idna==3.20 \
+    --hash=sha256:a7db850025b95ded1eae8a46181a1a6c56c92c96f0e2b005d9ff8dc0210cab44 \
+    --hash=sha256:ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c
+microsoft-kiota-abstractions==1.14.2 \
+    --hash=sha256:349ca8a3b65fc3d5583992f1fea8b2362d97761904e699b0636556bdae5a6d1e \
+    --hash=sha256:fd948ad977e50961330c04ed3909cc0de68fcce57b88256577195f28ffeb0f70
+microsoft-kiota-bundle==1.14.2 \
+    --hash=sha256:37541c145ee0e6058a28c70fd35c828b07c805a22d044672e0a85a4e947c1c74 \
+    --hash=sha256:55f0c1ebdfce6d8a3a959d7bc7854654692f42e6f813c5fb27b45d2b7437baad
+microsoft-kiota-http==1.14.2 \
+    --hash=sha256:97742f6180a3986df3568bf15d298a0ae971189dfd62e0c90c213c6083b6fb55 \
+    --hash=sha256:999ad1338cf13877981592b1854974307a4c3aa1dddeb02a0039cadf11d0aef4
+microsoft-kiota-serialization-form==1.14.2 \
+    --hash=sha256:378101b39d61d30f8ada51c0a4967281bc592a735c97b2efd9698d8a0e0f6c06 \
+    --hash=sha256:40455c1defefe7a87f2cc8833037d5bc98f14621cfa782fbd20b059860dcce7a
+microsoft-kiota-serialization-json==1.14.2 \
+    --hash=sha256:028d44cb5c5962add0e5e75daf96cb97038444bb9a4c4842211575421339f0e6 \
+    --hash=sha256:b48f944ac4c671b651ebb5638df3f21f8e1972d82490f5e3c380a63a54d6bd50
+microsoft-kiota-serialization-multipart==1.14.2 \
+    --hash=sha256:3f8652682674e3075bcb20d83d72e681e03dfa7526a3c58e828f8516dcad0ac5 \
+    --hash=sha256:878de1be9b0755b6d315135bae9ab6e1055553fe5d471b6b7048d0c608bb64e3
+microsoft-kiota-serialization-text==1.14.2 \
+    --hash=sha256:184dfcc1822e0468cb6e82b89def35ea3ef4d81d6b1133e1f12304cf4eff4605 \
+    --hash=sha256:be2a6bb5878a50bae9cff5abd7ede6fb99689b31c3f9ab7ccc3e3e6cc971f94f
+opentelemetry-api==1.45.0 \
+    --hash=sha256:711ede81773c8025c2c03dac0450bc89f3d30aea6eabcc815c570d4e35a963f7 \
+    --hash=sha256:80e068aba7cd56c8b58512d6a36f8d25cb1dfaa0c0a4cc1c938ccf9f362d9cb3
+opentelemetry-sdk==1.45.0 \
+    --hash=sha256:20caa5130505e386c67c3da1c76e446c842698ced54c76c6148679539aa97972 \
+    --hash=sha256:5dc634c946546f61b757c5b1781f9fd1a10e96ffaf7357c797e508fe9c57e75e
+opentelemetry-semantic-conventions==0.66b0 \
+    --hash=sha256:175b19dd98c4473f4f43a2b1df59186fd7b4a48cd3f77cbe03438b6d6fda230a \
+    --hash=sha256:97a77dce484c54861e7eeff7651fd8a806dd3c30e501dc316730215ec36890e6
+packaging==26.3 \
+    --hash=sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79 \
+    --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+pyproject_hooks==1.3.3 \
+    --hash=sha256:5fc53fdac9f7bd63fbcdc868fb5f90b4784d78a53a3d3388cd738b807441a20b \
+    --hash=sha256:defda19b854fa0d3bd4f76ea4ddcba8abd7dcfcdd585a6690ade050744fc5f43
+setuptools==80.9.0 \
+    --hash=sha256:062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922 \
+    --hash=sha256:f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c
+std-uritemplate==2.0.12 \
+    --hash=sha256:42b702d8d7eb8c13b586c527b8f2edaff456b69fee88e817d2f5dc5f088b8765 \
+    --hash=sha256:c245e6d9c6804e435c45fa94ee4a3c8a57e08aeeb45af261101cb0d513964534
+typing_extensions==4.16.0 \
+    --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8 \
+    --hash=sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5
+wheel==0.45.1 \
+    --hash=sha256:661e1abd9198507b1409a20c02106d9670b2576e916d58f520316666abca6729 \
+    --hash=sha256:708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248

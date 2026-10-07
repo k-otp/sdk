@@ -25,9 +25,9 @@
  * Run `bun run build` first.
  */
 import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
-import { isBuiltin } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { bareImports } from "./package-imports";
 
 const root = path.resolve(import.meta.dir, "..");
 
@@ -59,6 +59,7 @@ const EXPECTED_EXPORTS = [
   "./headless",
   "./contract",
   "./server",
+  "./kiota",
   "./react",
   "./vue",
   "./svelte",
@@ -74,6 +75,13 @@ const EXPECTED_EXPORTS = [
 
 /** Allowed runtime dependencies (regular and peer). */
 const ALLOWED_DEPENDENCIES = [
+  "@microsoft/kiota-abstractions",
+  "@microsoft/kiota-bundle",
+  "@microsoft/kiota-http-fetchlibrary",
+  "@microsoft/kiota-serialization-form",
+  "@microsoft/kiota-serialization-json",
+  "@microsoft/kiota-serialization-multipart",
+  "@microsoft/kiota-serialization-text",
   "@orpc/client",
   "@orpc/contract",
   "@orpc/openapi-client",
@@ -167,26 +175,6 @@ const exportTargets = (value: unknown): string[] => {
     return Object.values(value).flatMap(exportTargets);
   }
   return [];
-};
-
-const bareImports = (code: string): string[] => {
-  const specifiers = new Set<string>();
-  const patterns = [
-    /\bfrom\s*["']([^"']+)["']/g,
-    /\bimport\s*["']([^"']+)["']/g,
-    /\bimport\(\s*["']([^"']+)["']\s*\)/g,
-    /\brequire\(\s*["']([^"']+)["']\s*\)/g,
-  ];
-  for (const pattern of patterns) {
-    for (const match of code.matchAll(pattern)) {
-      const specifier = match[1] ?? "";
-      // Relative paths and Node builtins (`node:fs` as well as `fs`).
-      if (!specifier.startsWith(".") && !isBuiltin(specifier)) {
-        specifiers.add(specifier);
-      }
-    }
-  }
-  return [...specifiers];
 };
 
 const packageName = (specifier: string): string =>
@@ -358,7 +346,7 @@ const checkPackage = async (dir: string): Promise<void> => {
       fail(name, `${file} has no React code and must not contain "use client"`);
     }
     if (file.includes(".iife.")) continue; // self-contained CDN bundle
-    for (const specifier of bareImports(code)) {
+    for (const specifier of bareImports(code, file.endsWith(".svelte"))) {
       const dep = packageName(specifier);
       if (!Object.hasOwn(runtimeDeps, dep)) {
         fail(name, `${file} imports undeclared package "${specifier}"`);

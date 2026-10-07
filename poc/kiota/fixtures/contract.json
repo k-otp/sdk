@@ -1,0 +1,1379 @@
+{
+  "schemaVersion": 1,
+  "fakeSecretKey": "sk_poc_fake_never_valid",
+  "cases": [
+    {
+      "id": "issue-0",
+      "operation": "issue",
+      "method": "POST",
+      "path": "/issue",
+      "query": {},
+      "request": {
+        "phoneNumber": "00000000000",
+        "purpose": "로그인 🔐",
+        "idempotencyKey": "poc-key-0001"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-issue-0"
+        },
+        "body": {
+          "issueId": "00000000-0000-4000-8000-000000000001",
+          "expiresAt": "2026-10-07T00:03:00Z",
+          "attemptsRemaining": 5,
+          "queuedAt": "2026-10-07T00:00:00Z"
+        }
+      },
+      "checks": [
+        {
+          "path": "issueId",
+          "value": "00000000-0000-4000-8000-000000000001"
+        },
+        {
+          "path": "attemptsRemaining",
+          "value": 5
+        }
+      ],
+      "requestCount": 1
+    },
+    {
+      "id": "issue-1",
+      "operation": "issue",
+      "method": "POST",
+      "path": "/issue",
+      "query": {},
+      "request": {
+        "phoneNumber": "00000000000",
+        "purpose": "로그인 🔐",
+        "idempotencyKey": "poc-key-0001",
+        "smsFallback": true,
+        "webOtp": true
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-issue-1"
+        },
+        "body": {
+          "issueId": "00000000-0000-4000-8000-000000000001",
+          "expiresAt": "2026-10-07T00:03:00Z",
+          "attemptsRemaining": 5,
+          "queuedAt": "2026-10-07T00:00:00Z",
+          "webOtp": {
+            "status": "fallback_only"
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "issueId",
+          "value": "00000000-0000-4000-8000-000000000001"
+        },
+        {
+          "path": "attemptsRemaining",
+          "value": 5
+        },
+        {
+          "path": "webOtp.status",
+          "value": "fallback_only"
+        }
+      ],
+      "requestCount": 1
+    },
+    {
+      "id": "issue-2",
+      "operation": "issue",
+      "method": "POST",
+      "path": "/issue",
+      "query": {},
+      "request": {
+        "phoneNumber": "00000000000",
+        "purpose": "로그인 🔐",
+        "idempotencyKey": "poc-key-0001",
+        "smsFallback": false,
+        "webOtp": false
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-issue-2"
+        },
+        "body": {
+          "issueId": "00000000-0000-4000-8000-000000000001",
+          "expiresAt": "2026-10-07T00:03:00Z",
+          "attemptsRemaining": 5,
+          "queuedAt": "2026-10-07T00:00:00Z"
+        }
+      },
+      "checks": [
+        {
+          "path": "issueId",
+          "value": "00000000-0000-4000-8000-000000000001"
+        },
+        {
+          "path": "attemptsRemaining",
+          "value": 5
+        }
+      ],
+      "requestCount": 1
+    },
+    {
+      "id": "issue-3",
+      "operation": "issue",
+      "method": "POST",
+      "path": "/issue",
+      "query": {},
+      "request": {
+        "phoneNumber": "00000000000",
+        "purpose": "로그인 🔐",
+        "idempotencyKey": "poc-key-0001",
+        "channel": "sms",
+        "smsFallback": false,
+        "webOtp": {
+          "origin": "https://poc.example.com"
+        },
+        "metadata": {
+          "tag": "서울 🔐",
+          "leading": "001"
+        },
+        "templateVariables": {
+          "name": "홍길동"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-issue-3"
+        },
+        "body": {
+          "issueId": "00000000-0000-4000-8000-000000000001",
+          "expiresAt": "2026-10-07T00:03:00Z",
+          "attemptsRemaining": 5,
+          "queuedAt": "2026-10-07T00:00:00Z",
+          "webOtp": {
+            "status": "applied"
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "issueId",
+          "value": "00000000-0000-4000-8000-000000000001"
+        },
+        {
+          "path": "attemptsRemaining",
+          "value": 5
+        },
+        {
+          "path": "webOtp.status",
+          "value": "applied"
+        }
+      ],
+      "requestCount": 1
+    },
+    {
+      "id": "verify-false",
+      "operation": "verify",
+      "method": "POST",
+      "path": "/verify",
+      "query": {},
+      "request": {
+        "issueId": "00000000-0000-4000-8000-000000000001",
+        "code": "001203"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-verify-false"
+        },
+        "body": {
+          "issueId": "00000000-0000-4000-8000-000000000001",
+          "verified": false,
+          "reasonCode": "MISMATCH",
+          "attemptsRemaining": 4,
+          "expiresAt": "2026-10-07T00:03:00Z"
+        }
+      },
+      "checks": [
+        {
+          "path": "verified",
+          "value": false
+        },
+        {
+          "path": "reasonCode",
+          "value": "MISMATCH"
+        }
+      ],
+      "requestCount": 1
+    },
+    {
+      "id": "status-encoding",
+      "operation": "status",
+      "method": "GET",
+      "path": "/status",
+      "query": {
+        "issueId": "issue/가+?="
+      },
+      "request": null,
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-status-encoding"
+        },
+        "body": {
+          "issueId": "00000000-0000-4000-8000-000000000001",
+          "messageId": "poc-message",
+          "purpose": "로그인 🔐",
+          "templateId": "otp_default_kr",
+          "verificationStatus": "issued",
+          "deliveryStatus": "unknown",
+          "overallStatus": "pending_lookup",
+          "providerOutcomeAmbiguous": true,
+          "expiresAt": "2026-10-07T00:03:00Z",
+          "attemptsUsed": 1,
+          "maxAttempts": 5,
+          "attemptsRemaining": 4,
+          "createdAt": "2026-10-07T00:00:00Z",
+          "updatedAt": "2026-10-07T00:00:00Z"
+        }
+      },
+      "checks": [
+        {
+          "path": "providerOutcomeAmbiguous",
+          "value": true
+        },
+        {
+          "path": "deliveryStatus",
+          "value": "unknown"
+        },
+        {
+          "path": "overallStatus",
+          "value": "pending_lookup"
+        }
+      ],
+      "requestCount": 1
+    },
+    {
+      "id": "issues-page-0",
+      "operation": "issues",
+      "method": "GET",
+      "path": "/issues",
+      "query": {
+        "limit": 1,
+        "verificationStatus": "issued"
+      },
+      "request": null,
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-issues-page-0"
+        },
+        "body": {
+          "items": [
+            {
+              "issueId": "00000000-0000-4000-8000-000000000001",
+              "purpose": "로그인 🔐",
+              "templateId": "otp_default_kr",
+              "channel": "sms",
+              "verificationStatus": "issued",
+              "deliveryStatus": "unknown",
+              "overallStatus": "pending_lookup",
+              "billingStatus": "reserved",
+              "debitedAmount": 0,
+              "currency": "CREDIT",
+              "attemptsUsed": 0,
+              "maxAttempts": 5,
+              "attemptsRemaining": 5,
+              "createdAt": "2026-10-07T00:00:00Z",
+              "updatedAt": "2026-10-07T00:00:00Z"
+            }
+          ],
+          "nextCursor": "다음/+?="
+        }
+      },
+      "checks": [
+        {
+          "path": "items.0.channel",
+          "value": "sms"
+        },
+        {
+          "path": "items.0.billingStatus",
+          "value": "reserved"
+        },
+        {
+          "path": "nextCursor",
+          "value": "다음/+?="
+        }
+      ],
+      "requestCount": 1
+    },
+    {
+      "id": "issues-page-1",
+      "operation": "issues",
+      "method": "GET",
+      "path": "/issues",
+      "query": {
+        "limit": 1,
+        "cursor": "다음/+?=",
+        "verificationStatus": "issued"
+      },
+      "request": null,
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-issues-page-1"
+        },
+        "body": {
+          "items": [
+            {
+              "issueId": "00000000-0000-4000-8000-000000000001",
+              "purpose": "로그인 🔐",
+              "templateId": "otp_default_kr",
+              "channel": "sms",
+              "verificationStatus": "issued",
+              "deliveryStatus": "unknown",
+              "overallStatus": "pending_lookup",
+              "billingStatus": "reserved",
+              "debitedAmount": 0,
+              "currency": "CREDIT",
+              "attemptsUsed": 0,
+              "maxAttempts": 5,
+              "attemptsRemaining": 5,
+              "createdAt": "2026-10-07T00:00:00Z",
+              "updatedAt": "2026-10-07T00:00:00Z"
+            }
+          ]
+        }
+      },
+      "checks": [
+        {
+          "path": "items.0.channel",
+          "value": "sms"
+        },
+        {
+          "path": "items.0.billingStatus",
+          "value": "reserved"
+        },
+        {
+          "path": "nextCursor",
+          "value": null
+        }
+      ],
+      "requestCount": 1
+    },
+    {
+      "id": "issue-detail",
+      "operation": "issueDetail",
+      "method": "GET",
+      "path": "/issues/00000000-0000-4000-8000-000000000001",
+      "query": {},
+      "request": null,
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-issue-detail"
+        },
+        "body": {
+          "issueId": "00000000-0000-4000-8000-000000000001",
+          "purpose": "로그인 🔐",
+          "templateId": "otp_default_kr",
+          "channel": "sms",
+          "verificationStatus": "issued",
+          "deliveryStatus": "unknown",
+          "overallStatus": "pending_lookup",
+          "billingStatus": "reserved",
+          "debitedAmount": 0,
+          "currency": "CREDIT",
+          "attemptsUsed": 0,
+          "maxAttempts": 5,
+          "attemptsRemaining": 5,
+          "createdAt": "2026-10-07T00:00:00Z",
+          "updatedAt": "2026-10-07T00:00:00Z"
+        }
+      },
+      "checks": [
+        {
+          "path": "issueId",
+          "value": "00000000-0000-4000-8000-000000000001"
+        },
+        {
+          "path": "createdAt",
+          "value": "2026-10-07T00:00:00Z",
+          "comparison": "instant"
+        }
+      ],
+      "requestCount": 1,
+      "pathValue": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "id": "ledger",
+      "operation": "creditLedger",
+      "method": "GET",
+      "path": "/credit-ledger",
+      "query": {
+        "limit": 1,
+        "entryType": "promo_credit"
+      },
+      "request": null,
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-ledger"
+        },
+        "body": {
+          "items": [
+            {
+              "ledgerId": "00000000-0000-4000-8000-000000000002",
+              "entryType": "promo_credit",
+              "appId": "poc-app",
+              "amountDelta": 40,
+              "balanceAfter": 100,
+              "currency": "CREDIT",
+              "createdAt": "2026-10-07T00:00:00Z",
+              "expiresAt": "2026-10-08T00:00:00Z"
+            }
+          ]
+        }
+      },
+      "checks": [
+        {
+          "path": "items.0.entryType",
+          "value": "promo_credit"
+        },
+        {
+          "path": "items.0.amountDelta",
+          "value": 40
+        }
+      ],
+      "requestCount": 1
+    },
+    {
+      "id": "balance-object",
+      "operation": "balance",
+      "method": "GET",
+      "path": "/balance",
+      "query": {},
+      "request": null,
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-balance-object"
+        },
+        "body": {
+          "appId": "poc-app",
+          "walletId": "org:poc-org",
+          "walletScope": "organization",
+          "organizationId": "poc-org",
+          "balance": 100,
+          "currency": "CREDIT",
+          "updatedAt": "2026-10-07T00:00:00Z",
+          "promoBalance": 40,
+          "promoNextExpiry": {
+            "at": "2026-10-08T00:00:00Z",
+            "amount": 20
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "walletScope",
+          "value": "organization"
+        },
+        {
+          "path": "walletId",
+          "value": "org:poc-org"
+        },
+        {
+          "path": "promoBalance",
+          "value": 40
+        },
+        {
+          "path": "promoNextExpiry.at",
+          "value": "2026-10-08T00:00:00Z",
+          "comparison": "instant"
+        },
+        {
+          "path": "promoNextExpiry.amount",
+          "value": 20
+        }
+      ],
+      "requestCount": 1
+    },
+    {
+      "id": "balance-null",
+      "operation": "balance",
+      "method": "GET",
+      "path": "/balance",
+      "query": {},
+      "request": null,
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-balance-null"
+        },
+        "body": {
+          "appId": "poc-app",
+          "walletId": "org:poc-org",
+          "walletScope": "organization",
+          "organizationId": "poc-org",
+          "balance": 100,
+          "currency": "CREDIT",
+          "updatedAt": "2026-10-07T00:00:00Z",
+          "promoBalance": 40,
+          "promoNextExpiry": null
+        }
+      },
+      "checks": [
+        {
+          "path": "walletScope",
+          "value": "organization"
+        },
+        {
+          "path": "walletId",
+          "value": "org:poc-org"
+        },
+        {
+          "path": "promoBalance",
+          "value": 40
+        },
+        {
+          "path": "promoNextExpiry",
+          "value": null
+        }
+      ],
+      "requestCount": 1
+    },
+    {
+      "id": "templates",
+      "operation": "templates",
+      "method": "GET",
+      "path": "/templates",
+      "query": {},
+      "request": null,
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-templates"
+        },
+        "body": {
+          "defaultTemplateId": "otp_default_kr",
+          "templates": [
+            {
+              "templateId": "otp_default_kr",
+              "name": "가입 템플릿",
+              "channelSupport": ["alimtalk", "sms"],
+              "body": "인증번호 #{code}",
+              "isDefault": true,
+              "providerTemplateCode": "poc-template"
+            }
+          ],
+          "note": "공개 fixture"
+        }
+      },
+      "checks": [
+        {
+          "path": "templates.0.channelSupport",
+          "value": ["alimtalk", "sms"]
+        },
+        {
+          "path": "templates.0.name",
+          "value": "가입 템플릿"
+        }
+      ],
+      "requestCount": 1
+    },
+    {
+      "id": "template-detail-encoding",
+      "operation": "templateDetail",
+      "method": "GET",
+      "path": "/templates/템플릿/가+?=",
+      "query": {},
+      "request": null,
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-template-detail-encoding"
+        },
+        "body": {
+          "templateId": "otp_default_kr",
+          "name": "가입 템플릿",
+          "channelSupport": ["alimtalk", "sms"],
+          "body": "인증번호 #{code}",
+          "variables": {
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "이름",
+                "pattern": ".+"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "variables.additionalProperties",
+          "value": false
+        },
+        {
+          "path": "variables.properties.name.type",
+          "value": "string"
+        },
+        {
+          "path": "variables.required",
+          "value": ["name"]
+        }
+      ],
+      "requestCount": 1,
+      "pathValue": "템플릿/가+?="
+    },
+    {
+      "id": "error-400",
+      "operation": "verify",
+      "method": "POST",
+      "path": "/verify",
+      "query": {},
+      "request": {
+        "issueId": "00000000-0000-4000-8000-000000000001",
+        "code": "001203"
+      },
+      "response": {
+        "status": 400,
+        "headers": {
+          "X-Request-Id": "poc-request-error-400"
+        },
+        "body": {
+          "defined": true,
+          "code": "BAD_REQUEST",
+          "status": 400,
+          "message": "모의 오류 BAD_REQUEST",
+          "data": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "defined",
+          "value": true
+        },
+        {
+          "path": "code",
+          "value": "BAD_REQUEST"
+        },
+        {
+          "path": "status",
+          "value": 400
+        },
+        {
+          "path": "message",
+          "value": "모의 오류 BAD_REQUEST"
+        },
+        {
+          "path": "data",
+          "value": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      ],
+      "requestCount": 1,
+      "pathValue": "otp_default_kr"
+    },
+    {
+      "id": "error-401",
+      "operation": "balance",
+      "method": "GET",
+      "path": "/balance",
+      "query": {},
+      "request": null,
+      "response": {
+        "status": 401,
+        "headers": {
+          "X-Request-Id": "poc-request-error-401"
+        },
+        "body": {
+          "defined": true,
+          "code": "UNAUTHORIZED",
+          "status": 401,
+          "message": "모의 오류 UNAUTHORIZED",
+          "data": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "defined",
+          "value": true
+        },
+        {
+          "path": "code",
+          "value": "UNAUTHORIZED"
+        },
+        {
+          "path": "status",
+          "value": 401
+        },
+        {
+          "path": "message",
+          "value": "모의 오류 UNAUTHORIZED"
+        },
+        {
+          "path": "data",
+          "value": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      ],
+      "requestCount": 1,
+      "pathValue": "otp_default_kr"
+    },
+    {
+      "id": "error-403",
+      "operation": "templates",
+      "method": "GET",
+      "path": "/templates",
+      "query": {},
+      "request": null,
+      "response": {
+        "status": 403,
+        "headers": {
+          "X-Request-Id": "poc-request-error-403"
+        },
+        "body": {
+          "defined": true,
+          "code": "FORBIDDEN",
+          "status": 403,
+          "message": "모의 오류 FORBIDDEN",
+          "data": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "defined",
+          "value": true
+        },
+        {
+          "path": "code",
+          "value": "FORBIDDEN"
+        },
+        {
+          "path": "status",
+          "value": 403
+        },
+        {
+          "path": "message",
+          "value": "모의 오류 FORBIDDEN"
+        },
+        {
+          "path": "data",
+          "value": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      ],
+      "requestCount": 1,
+      "pathValue": "otp_default_kr"
+    },
+    {
+      "id": "error-404",
+      "operation": "templateDetail",
+      "method": "GET",
+      "path": "/templates/otp_default_kr",
+      "query": {},
+      "request": null,
+      "response": {
+        "status": 404,
+        "headers": {
+          "X-Request-Id": "poc-request-error-404"
+        },
+        "body": {
+          "defined": true,
+          "code": "NOT_FOUND",
+          "status": 404,
+          "message": "모의 오류 NOT_FOUND",
+          "data": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "defined",
+          "value": true
+        },
+        {
+          "path": "code",
+          "value": "NOT_FOUND"
+        },
+        {
+          "path": "status",
+          "value": 404
+        },
+        {
+          "path": "message",
+          "value": "모의 오류 NOT_FOUND"
+        },
+        {
+          "path": "data",
+          "value": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      ],
+      "requestCount": 1,
+      "pathValue": "otp_default_kr"
+    },
+    {
+      "id": "error-409",
+      "operation": "issue",
+      "method": "POST",
+      "path": "/issue",
+      "query": {},
+      "request": {
+        "phoneNumber": "00000000000",
+        "purpose": "로그인 🔐",
+        "idempotencyKey": "poc-key-0001"
+      },
+      "response": {
+        "status": 409,
+        "headers": {
+          "X-Request-Id": "poc-request-error-409"
+        },
+        "body": {
+          "defined": true,
+          "code": "CONFLICT",
+          "status": 409,
+          "message": "모의 오류 CONFLICT",
+          "data": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "defined",
+          "value": true
+        },
+        {
+          "path": "code",
+          "value": "CONFLICT"
+        },
+        {
+          "path": "status",
+          "value": 409
+        },
+        {
+          "path": "message",
+          "value": "모의 오류 CONFLICT"
+        },
+        {
+          "path": "data",
+          "value": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      ],
+      "requestCount": 1,
+      "pathValue": "otp_default_kr"
+    },
+    {
+      "id": "error-402",
+      "operation": "issue",
+      "method": "POST",
+      "path": "/issue",
+      "query": {},
+      "request": {
+        "phoneNumber": "00000000000",
+        "purpose": "로그인 🔐",
+        "idempotencyKey": "poc-key-0001"
+      },
+      "response": {
+        "status": 402,
+        "headers": {
+          "X-Request-Id": "poc-request-error-402"
+        },
+        "body": {
+          "defined": true,
+          "code": "PAYMENT_REQUIRED",
+          "status": 402,
+          "message": "모의 오류 PAYMENT_REQUIRED",
+          "data": {
+            "code": "TRIAL_DAILY_LIMIT_EXCEEDED",
+            "resetAt": "2026-10-08T00:00:00+09:00"
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "defined",
+          "value": true
+        },
+        {
+          "path": "code",
+          "value": "PAYMENT_REQUIRED"
+        },
+        {
+          "path": "status",
+          "value": 402
+        },
+        {
+          "path": "message",
+          "value": "모의 오류 PAYMENT_REQUIRED"
+        },
+        {
+          "path": "data",
+          "value": {
+            "code": "TRIAL_DAILY_LIMIT_EXCEEDED",
+            "resetAt": "2026-10-08T00:00:00+09:00"
+          }
+        }
+      ],
+      "requestCount": 1,
+      "pathValue": "otp_default_kr"
+    },
+    {
+      "id": "error-429",
+      "operation": "verify",
+      "method": "POST",
+      "path": "/verify",
+      "query": {},
+      "request": {
+        "issueId": "00000000-0000-4000-8000-000000000001",
+        "code": "001203"
+      },
+      "response": {
+        "status": 429,
+        "headers": {
+          "X-Request-Id": "poc-request-error-429",
+          "Retry-After": "0"
+        },
+        "body": {
+          "defined": true,
+          "code": "TOO_MANY_REQUESTS",
+          "status": 429,
+          "message": "모의 오류 TOO_MANY_REQUESTS",
+          "data": {
+            "retryAfterMs": 1500,
+            "scope": "perKey"
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "defined",
+          "value": true
+        },
+        {
+          "path": "code",
+          "value": "TOO_MANY_REQUESTS"
+        },
+        {
+          "path": "status",
+          "value": 429
+        },
+        {
+          "path": "message",
+          "value": "모의 오류 TOO_MANY_REQUESTS"
+        },
+        {
+          "path": "data",
+          "value": {
+            "retryAfterMs": 1500,
+            "scope": "perKey"
+          }
+        }
+      ],
+      "requestCount": 1,
+      "pathValue": "otp_default_kr"
+    },
+    {
+      "id": "error-500",
+      "operation": "issue",
+      "method": "POST",
+      "path": "/issue",
+      "query": {},
+      "request": {
+        "phoneNumber": "00000000000",
+        "purpose": "로그인 🔐",
+        "idempotencyKey": "poc-key-0001"
+      },
+      "response": {
+        "status": 500,
+        "headers": {
+          "X-Request-Id": "poc-request-error-500"
+        },
+        "body": {
+          "defined": false,
+          "code": "INTERNAL_SERVER_ERROR",
+          "status": 500,
+          "message": "모의 오류 INTERNAL_SERVER_ERROR",
+          "data": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "defined",
+          "value": false
+        },
+        {
+          "path": "code",
+          "value": "INTERNAL_SERVER_ERROR"
+        },
+        {
+          "path": "status",
+          "value": 500
+        },
+        {
+          "path": "message",
+          "value": "모의 오류 INTERNAL_SERVER_ERROR"
+        },
+        {
+          "path": "data",
+          "value": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      ],
+      "requestCount": 1,
+      "pathValue": "otp_default_kr"
+    },
+    {
+      "id": "error-503",
+      "operation": "issue",
+      "method": "POST",
+      "path": "/issue",
+      "query": {},
+      "request": {
+        "phoneNumber": "00000000000",
+        "purpose": "로그인 🔐",
+        "idempotencyKey": "poc-key-0001"
+      },
+      "response": {
+        "status": 503,
+        "headers": {
+          "X-Request-Id": "poc-request-error-503"
+        },
+        "body": {
+          "defined": true,
+          "code": "SERVICE_UNAVAILABLE",
+          "status": 503,
+          "message": "모의 오류 SERVICE_UNAVAILABLE",
+          "data": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "defined",
+          "value": true
+        },
+        {
+          "path": "code",
+          "value": "SERVICE_UNAVAILABLE"
+        },
+        {
+          "path": "status",
+          "value": 503
+        },
+        {
+          "path": "message",
+          "value": "모의 오류 SERVICE_UNAVAILABLE"
+        },
+        {
+          "path": "data",
+          "value": {
+            "detail": {
+              "한국어": "오류 🔐",
+              "leading": "001"
+            },
+            "values": [null, false, 3, "문자열"]
+          }
+        }
+      ],
+      "requestCount": 1,
+      "pathValue": "otp_default_kr"
+    },
+    {
+      "id": "undefined-error",
+      "operation": "verify",
+      "method": "POST",
+      "path": "/verify",
+      "query": {},
+      "request": {
+        "issueId": "00000000-0000-4000-8000-000000000001",
+        "code": "001203"
+      },
+      "response": {
+        "status": 400,
+        "headers": {
+          "X-Request-Id": "poc-request-undefined-error"
+        },
+        "body": {
+          "defined": false,
+          "code": "CUSTOM_REMOTE_ERROR",
+          "status": 400,
+          "message": "동적 오류",
+          "data": {
+            "nested": [
+              true,
+              null,
+              {
+                "zero": "001"
+              }
+            ]
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "defined",
+          "value": false
+        },
+        {
+          "path": "data",
+          "value": {
+            "nested": [
+              true,
+              null,
+              {
+                "zero": "001"
+              }
+            ]
+          }
+        }
+      ],
+      "requestCount": 1
+    },
+    {
+      "id": "issue-explicit-retry",
+      "operation": "issue",
+      "method": "POST",
+      "path": "/issue",
+      "query": {},
+      "request": {
+        "phoneNumber": "00000000000",
+        "purpose": "로그인 🔐",
+        "idempotencyKey": "poc-key-0001"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-issue-explicit-retry"
+        },
+        "body": {
+          "issueId": "00000000-0000-4000-8000-000000000001",
+          "expiresAt": "2026-10-07T00:03:00Z",
+          "attemptsRemaining": 5,
+          "queuedAt": "2026-10-07T00:00:00Z"
+        }
+      },
+      "checks": [
+        {
+          "path": "issueId",
+          "value": "00000000-0000-4000-8000-000000000001"
+        }
+      ],
+      "requestCount": 2,
+      "explicitRetry": true
+    },
+    {
+      "id": "issue-timeout",
+      "operation": "issue",
+      "method": "POST",
+      "path": "/issue",
+      "query": {},
+      "request": {
+        "phoneNumber": "00000000000",
+        "purpose": "로그인 🔐",
+        "idempotencyKey": "poc-key-0001"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-issue-timeout"
+        },
+        "body": {
+          "issueId": "00000000-0000-4000-8000-000000000001",
+          "expiresAt": "2026-10-07T00:03:00Z",
+          "attemptsRemaining": 5,
+          "queuedAt": "2026-10-07T00:00:00Z"
+        }
+      },
+      "checks": [],
+      "requestCount": 1,
+      "delayMs": 500,
+      "timeoutMs": 50,
+      "expectedOutcome": "unknown"
+    },
+    {
+      "id": "issue-invalid-idempotency",
+      "operation": "issue",
+      "method": "POST",
+      "path": "/issue",
+      "query": {},
+      "request": {
+        "phoneNumber": "00000000000",
+        "purpose": "로그인 🔐",
+        "idempotencyKey": " "
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-issue-invalid-idempotency"
+        },
+        "body": {
+          "issueId": "00000000-0000-4000-8000-000000000001",
+          "expiresAt": "2026-10-07T00:03:00Z",
+          "attemptsRemaining": 5,
+          "queuedAt": "2026-10-07T00:00:00Z"
+        }
+      },
+      "checks": [],
+      "requestCount": 0,
+      "expectedOutcome": "configuration_error"
+    },
+    {
+      "id": "issue-missing-idempotency",
+      "operation": "issue",
+      "method": "POST",
+      "path": "/issue",
+      "query": {},
+      "request": {
+        "phoneNumber": "00000000000",
+        "purpose": "로그인 🔐"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Request-Id": "poc-request-issue-missing-idempotency"
+        },
+        "body": {
+          "issueId": "00000000-0000-4000-8000-000000000001",
+          "expiresAt": "2026-10-07T00:03:00Z",
+          "attemptsRemaining": 5,
+          "queuedAt": "2026-10-07T00:00:00Z"
+        }
+      },
+      "checks": [],
+      "requestCount": 0,
+      "expectedOutcome": "configuration_error"
+    },
+    {
+      "id": "probe-default-verify-429",
+      "operation": "verify",
+      "method": "POST",
+      "path": "/verify",
+      "query": {},
+      "request": {
+        "issueId": "00000000-0000-4000-8000-000000000001",
+        "code": "001203"
+      },
+      "response": {
+        "status": 429,
+        "headers": {
+          "X-Request-Id": "poc-request-probe-default-verify-429",
+          "Retry-After": "0"
+        },
+        "body": {
+          "defined": true,
+          "code": "TOO_MANY_REQUESTS",
+          "status": 429,
+          "message": "모의 오류 TOO_MANY_REQUESTS",
+          "data": {
+            "retryAfterMs": 1500,
+            "scope": "perKey"
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": "defined",
+          "value": true
+        },
+        {
+          "path": "code",
+          "value": "TOO_MANY_REQUESTS"
+        },
+        {
+          "path": "status",
+          "value": 429
+        },
+        {
+          "path": "message",
+          "value": "모의 오류 TOO_MANY_REQUESTS"
+        },
+        {
+          "path": "data",
+          "value": {
+            "retryAfterMs": 1500,
+            "scope": "perKey"
+          }
+        }
+      ],
+      "requestCount": 1,
+      "pathValue": "otp_default_kr",
+      "defaultRetryProbe": true
+    }
+  ]
+}

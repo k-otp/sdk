@@ -21,6 +21,40 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // resolves from here like it would from an app's node_modules.
 const require = createRequire(import.meta.url);
 
+for (const sdk of [
+  await import("@k-otp/sdk/kiota"),
+  require("@k-otp/sdk/kiota"),
+]) {
+  let calls = 0;
+  const client = new sdk.KotpClient({
+    apiKey: "sk_smoke_fake",
+    fetch: async () => {
+      calls++;
+      return new Response('{"orgId":"o_fake","balance":100}', {
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  await assert.rejects(client.issue({ idempotencyKey: "" }), TypeError);
+  assert.equal(calls, 0, "Kiota rejects invalid idempotency before HTTP");
+  assert.equal((await client.balance()).balance, 100);
+  assert.equal(calls, 1);
+}
+const kiotaStub = spawnSync(
+  process.execPath,
+  [
+    "--conditions=browser",
+    "--input-type=module",
+    "-e",
+    'import {KotpClient} from "@k-otp/sdk/kiota"; try {new KotpClient({apiKey:"sk_fake"});process.exit(1)} catch(e) {if(!e.message.includes("requires a server environment")) throw e}',
+  ],
+  { cwd: root, encoding: "utf8" },
+);
+assert.equal(kiotaStub.status, 0, kiotaStub.stderr);
+console.log(
+  "ok - kiota: Node ESM/CJS requests, idempotency before HTTP, browser guard",
+);
+
 const issueOutput = {
   issueId: "i_1",
   expiresAt: "2026-01-01T00:03:00Z",

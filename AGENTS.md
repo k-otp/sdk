@@ -41,6 +41,11 @@ Public, MIT-licensed SDK for the K-OTP Korean OTP API (`https://api.k-otp.dev/v1
     compiled `runtime.ts`. `src/ui/theme.css` -> `@k-otp/sdk/ui/theme.css`
     (only `[data-k-otp]`, `:where()` selectors).
   - `src/iife.ts` -> `dist/k-otp.iife(.min).js` exposing `window.KOtp`.
+- `sdks/`: native server wrappers and language guides. `sdks/packages.json`
+  owns their independent release coordinates. `@k-otp/sdk/kiota` uses the
+  TypeScript wrapper, bundles generated code from `.cache/kiota/npm`, and emits
+  `KotpApiError` / `KotpTransportError`. It has a throwing browser export.
+  Build with the pinned Kiota CLI; never edit generated output.
 - `tests/`: private workspace running under happy-dom: adapter tests, the
   cross-adapter parity suite (`tests/parity`) and the UI component tests
   (`tests/ui`, including the cross-framework UI parity suite; the

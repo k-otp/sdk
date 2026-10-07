@@ -1,0 +1,49 @@
+name: Release language SDKs
+
+on:
+  workflow_dispatch:
+    inputs:
+      sdk_run_id:
+        description: Successful main SDK validation run at this commit
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: release-language-sdks
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.2
+      - uses: actions/download-artifact@v5
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.sdk_run_id }}
+          pattern: kiota-*-overlay
+          merge-multiple: true
+          path: .cache/kiota-poc/release-evidence
+      - name: Verify the source, every consumer, package contents and hashes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SDK_RUN_ID: ${{ inputs.sdk_run_id }}
+        run: bun run scripts/release-sdks.ts collect .cache/sdk-release .cache/kiota-poc/release-evidence "$SDK_RUN_ID"
+      - name: Upload the exact verified assets and publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bun run scripts/release-sdks.ts publish .cache/sdk-release

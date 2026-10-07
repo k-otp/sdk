@@ -1,0 +1,10 @@
+name: kotp_kiota_poc
+description: Unpublished generated client build and consumer fixture.
+version: 0.0.0
+publish_to: none
+environment:
+  sdk: ">=3.9.0 <4.0.0"
+dependencies:
+  microsoft_kiota_bundle: 0.1.1
+dev_dependencies:
+  test: 1.25.14
