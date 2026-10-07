@@ -210,11 +210,10 @@ retryable), `retryAfterMs` and `data: { limit, policy, retryAfterMs }`
   A timeout rejects with `TIMEOUT`; for `issue` that outcome is ambiguous, so
   retry with the same idempotency key.
 
-## Not included
+## Scope
 
-Internal billing (credit/debit), quota maintenance and provider reconciliation
-endpoints are private to the K-OTP platform and are intentionally not part of
-this SDK.
+The client covers exactly the operations of the public OpenAPI document
+(`spec/openapi.json`); nothing outside it is part of this SDK.
 
 ## License
 

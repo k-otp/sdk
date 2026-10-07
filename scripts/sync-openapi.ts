@@ -3,8 +3,7 @@
  * Refreshes the vendored `spec/openapi.json`.
  *
  *   bun run sync:openapi                               # from the live API
- *   bun run sync:openapi --from <path>                 # from a local API checkout
- *   bun run sync:openapi --from ./openapi.api.json     # from a file
+ *   bun run sync:openapi --from ./openapi.json         # from a file
  *   bun run sync:openapi --from https://.../v1.json    # from a URL
  *   bun run sync:openapi --check                       # exit 1 if it would change
  *
@@ -16,8 +15,6 @@ import path from "node:path";
 import { type OpenApiDocument, summarizeOperations } from "./lib/openapi-types";
 
 const DEFAULT_SOURCE = "https://api.k-otp.dev/openapi/v1.json";
-/** Location of the generated spec inside an `api.k-otp.dev` checkout. */
-const CHECKOUT_SPEC_PATH = "pages/api/public/openapi/openapi.api.json";
 
 const root = path.resolve(import.meta.dir, "..");
 const target = path.join(root, "spec/openapi.json");
@@ -54,15 +51,8 @@ const load = async (source: string): Promise<string> => {
       `--from ${source}: cannot read ${resolved} (${error instanceof Error ? error.message : String(error)})`,
     ),
   );
-  const file = info.isDirectory()
-    ? path.join(resolved, CHECKOUT_SPEC_PATH)
-    : resolved;
-  if (!(await Bun.file(file).exists())) {
-    die(
-      `--from ${source}: ${file} not found (is ${resolved} an api.k-otp.dev checkout?)`,
-    );
-  }
-  return Bun.file(file).text();
+  if (!info.isFile()) die(`--from ${source}: ${resolved} is not a file`);
+  return Bun.file(resolved).text();
 };
 
 const source = readArg("--from") ?? DEFAULT_SOURCE;

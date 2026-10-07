@@ -28,7 +28,7 @@ bun run check
 | `bun run check:examples` | Typecheck, build and smoke-test every example against the built package, and check that each framework example's bundle contains only its own subpaths. |
 | `bun run e2e:examples [--only react] [--screenshots dir]` | Drives the UI flows of the React, Vue and Svelte examples in Chromium (Playwright) against their mock API; optionally takes light/dark desktop/mobile screenshots. Needs `bunx playwright install chromium` once. |
 | `bun run gen:types` | Regenerates `packages/sdk/src/core/generated/openapi.ts` from `spec/openapi.json`. |
-| `bun run sync:openapi [--from <api checkout \| file \| url>]` | Refreshes `spec/openapi.json`. |
+| `bun run sync:openapi [--from <file \| url>]` | Refreshes `spec/openapi.json`. |
 | `bun run check` | Everything above (except the generators). |
 
 ## Changing the API surface
@@ -40,8 +40,8 @@ bun run check
 4. Update `packages/sdk/README.md`, `docs/` (including `docs/reference/`)
    and add a changeset.
 
-Internal/admin endpoints of the K-OTP platform (billing, quota, provider
-operations) are out of scope for this public SDK.
+Only operations in the public OpenAPI document (`spec/openapi.json`) are in
+scope for this SDK.
 
 ## Conventions
 
