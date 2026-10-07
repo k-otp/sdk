@@ -1,5 +1,11 @@
 # @k-otp/sdk
 
+## 1.3.0 — 2026-10-07
+
+### Minor changes
+
+- [090911e](https://github.com/k-otp/sdk/commit/090911e4cf7abe8371a2ec9eac5bba1c960c6fd8) Add `@k-otp/sdk/kiota`, a server-only client built with official Kiota runtimes for all nine public API operations. It validates issue idempotency keys before HTTP, preserves native JSON responses and error details, disables automatic retries, and provides an opt-in single issue retry after HTTP 503. — Thanks @imjlk!
+
 ## 1.2.0 — 2026-10-05
 
 ### Minor changes
