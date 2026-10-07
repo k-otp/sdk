@@ -13,6 +13,8 @@ import {
   stage,
 } from "./common";
 import { identityIssues } from "./evidence";
+import { assessPreview, previewSourceHash } from "./preview-evidence";
+import { previewPackages } from "./preview-package";
 
 type ReportRow = {
   target: string;
@@ -124,6 +126,36 @@ for (const row of results) {
   validations.push(verdict);
 }
 const header = ["Target", "Input", ...config.stages];
+const previews: Record<string, unknown>[] = [];
+for (const target of config.targets.filter((item) => item.required)) {
+  const directory = path.join(outputRoot, `${target.target}-preview/reports`);
+  let errors = ["Missing preview package evidence"];
+  let candidate: Record<string, unknown> | null = null;
+  try {
+    candidate = await Bun.file(path.join(directory, "result.json")).json();
+    const wire = await Bun.file(path.join(directory, "wire-cases.json")).json();
+    const observations = await Bun.file(
+      path.join(directory, "consumer-observations.json"),
+    ).json();
+    if (candidate)
+      errors = assessPreview(
+        candidate as Parameters<typeof assessPreview>[0],
+        wire,
+        observations,
+        context,
+        await previewSourceHash(target.target),
+      ).errors;
+  } catch (error) {
+    errors = [`Missing or malformed preview evidence: ${String(error)}`];
+  }
+  previews.push({
+    target: target.target,
+    ...previewPackages[target.target],
+    ...candidate,
+    validation: { passed: errors.length === 0, errors },
+  });
+}
+const previewSection = `\n\n## Public preview packages\n\n${previews.map((row) => `- ${row.target}: ${(row.validation as { passed: boolean }).passed ? "passed" : "failed"} ${(row.previewPackage as { version?: string } | undefined)?.version ?? "missing"}${(row.validation as { errors: string[] }).errors.length ? ` — ${(row.validation as { errors: string[] }).errors.join("; ")}` : ""}`).join("\n")}\n`;
 const table = [
   header,
   header.map(() => "---"),
@@ -146,13 +178,18 @@ const markdown = `# Kiota PoC evidence\n\nAll eight SDK languages and the Kotlin
   .join("\n")}\n`;
 await mkdir(path.join(outputRoot, "aggregate"), { recursive: true });
 await json(path.join(outputRoot, "aggregate/results.json"), results);
-await Bun.write(path.join(outputRoot, "aggregate/results.md"), markdown);
+await json(path.join(outputRoot, "aggregate/preview-results.json"), previews);
+await Bun.write(
+  path.join(outputRoot, "aggregate/results.md"),
+  markdown + previewSection,
+);
 if (process.env.GITHUB_STEP_SUMMARY)
-  await Bun.write(process.env.GITHUB_STEP_SUMMARY, markdown);
+  await Bun.write(process.env.GITHUB_STEP_SUMMARY, markdown + previewSection);
 console.log(table);
 if (process.argv.includes("--gate")) {
   process.exitCode =
     validations.every((verdict) => verdict.validationPassed) &&
+    previews.every((row) => (row.validation as { passed: boolean }).passed) &&
     results.some((row) => row.target === "ExistingTypeScript") &&
     config.targets
       .filter((t) => t.required)

@@ -5,6 +5,11 @@ SDKs are unpublished fixtures outside the Bun/Sampo release workspace. See the
 [adoption report](ADOPTION.md) for the measured scope and
 remaining failures.
 
+Public preview wrapper packages and their usage guides are under
+[`preview/`](preview/README.md). They include client setup, all nine operations,
+normalized API errors and K-OTP idempotency/retry policy in the installed artifact.
+Internal build/CI evidence stays in this PoC directory.
+
 ## Run a target
 
 Run from the repository root with Bun 1.4.2 and the native toolchain installed.
@@ -23,6 +28,7 @@ bun run poc/kiota/scripts/harness.ts Java raw
 bun run poc/kiota/scripts/generate.ts Java overlay
 bun run poc/kiota/scripts/reproduce.ts Java overlay
 bun run poc/kiota/scripts/harness.ts Java overlay
+bun run poc/kiota/scripts/preview.ts Java
 
 bun run poc/kiota/scripts/report.ts
 ```
@@ -110,7 +116,7 @@ official numeric parser, retaining all numeric constraints. Dart's optional
 unconstrained error `data` uses `additionalProperties` to preserve the JSON tree
 through the official additional-data path.
 
-Ruby, Dart and TypeScript require the small `harness/<language>/usage.*`
+Ruby, Dart and TypeScript require the small `preview/<language>/` compatibility
 compatibility layers as well as the generated artifact and K-OTP retry policy.
 They repair enum wire values, dynamic JSON/boolean handling and null response
 objects through the official runtime. Ruby uses a narrowly guarded parser
@@ -137,6 +143,15 @@ For each target/variant, `.cache/kiota-poc/runs/<Target>-<variant>/` contains:
   `default-retry.json`: actual wire behavior; keys/OTP/phone numbers masked.
 - `reports/ci-verdict.json`: CI validation separate from SDK compatibility.
 - `packages/`, `repros/`: local artifacts and minimal regressions when applicable.
+
+`<Target>-preview/` contains the separately built preview package and a consumer
+that imports only its public client. `preview.ts` validates all 28 contracts,
+public `requestId`/`retryAfterMs`, package hashes and current source/run identity.
+It uses the corresponding clean overlay generation as input. All nine preview
+consumers are mandatory CI checks, including Kotlin's consumption of the Java JAR.
+Artifacts include a usage README and MIT license. Native pre-release versions
+and public entry points are listed in `preview/packages.json`; no registry publish
+or existing SDK version change is involved.
 
 CI uploads evidence even when a native stage fails, then writes JSON/Markdown
 and Job Summary from this run only. Missing or mismatched artifacts never

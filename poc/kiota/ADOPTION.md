@@ -2,6 +2,28 @@
 
 확인 기준: 2026-10-07, Asia/Seoul. 작업 브랜치: `poc/kiota-multilang`.
 
+이 파일은 개발 검증 기록이다. 사용자는 [`preview/README.md`](preview/README.md)의
+언어별 설치·사용법을 참고한다. 사용자 문서 `docs/`에서는 이 보고서를 제거했다.
+
+## 공개 wrapper와 로컬 preview 패키지
+
+`preview/`에는 8개 언어의 공개 서버 클라이언트와 Kotlin/JVM JAR 소비자가 있다.
+클라이언트 초기화·origin 제한·인증·9개 operation·멱등키 검증·자동 재시도 금지·
+명시적 503 재시도·JSON 응답·공통 오류 view가 설치한 패키지 안에서 동작한다.
+소비자는 fixture 관측만 수행하며 SDK 정책을 복사하거나 생성 모델을 직접 호출하지 않는다.
+
+로컬에서 9개 preview 모두 전체 SDK/wrapper build/load, artifact 설치와
+28/28 계약을 통과했다. 공개 `requestId`/`retryAfterMs`도 fixture와 비교한다.
+CLI/spec/fixture/run/commit 및 wrapper source hash가 다르면 이전 증거를 재사용할
+수 없다. CI는 기존 raw/overlay 검증에 이어 이 preview 소비자를 모두 필수로 실행한다.
+
+버전과 공개 entry point는 `preview/packages.json`에 있고 각 artifact에 사용자
+README와 MIT license를 포함했다. Ruby/Dart/TypeScript의 보완 계층은 preview
+package 소스가 기준이며 기존 PoC도 같은 소스를 소비한다. 생성 파일은 수정하지 않는다.
+패키지 이름은 로컬 fixture 좌표로 잠정적이며 외부 registry 발행은 하지 않았다.
+Preview는 서버 `sk_`와 네이티브 JSON view 범위다. 추가 runtime/OS, mobile/browser,
+typed envelope data 검증 및 정식 배포 체계는 후속 범위로 남는다.
+
 ## 도입 판단
 
 CSharp·PHP·Java·Go·Python·Ruby·Dart·Kiota TypeScript 8개 SDK 언어와 별도
@@ -267,10 +289,10 @@ union의 실제 값을 직접 읽고, ApiException을 catch하여 status/header/
 blocking I/O를 적절한 dispatcher에 배치하는 얇은 facade를 별도 평가한다.
 Android·Kotlin Multiplatform의 설치/네트워크/축소 도구는 미검증이다.
 
-PoC 소비자에는 secret-key/loopback client 구성, issue 멱등키 검증·header 일치,
+기존 PoC 소비자에는 secret-key/loopback client 구성, issue 멱등키 검증·header 일치,
 union 설정, 공통 오류 읽기, timeout 및 explicit retry 정책이 있다. 이 부분을
-정식 wrapper로 추출할 근거는 확인했지만 지금의 fixture runner를 제품 API로
-발행하지 않는다. generated model/transport를 수동 재구현하지 않았다.
+이 정책을 `preview/`의 설치 가능한 wrapper로 추출했다. fixture runner는 제품
+API로 발행하지 않는다. generated model/transport를 수동 재구현하지 않았다.
 
 현재 전체 consumer 파일의 물리적 줄 수는 C# 94, Java 106, Kotlin 108,
 PHP 107, Python 144, Go 246줄이다. 이 수치에는 9개 operation dispatch,
@@ -284,7 +306,7 @@ Go abstractions 1.9.3의 nil optional date query panic(1.11.1로 해결),
 원본/overlay 사이 enum query 소비자 타입 차이, 오류 data의 schema 완화다.
 Go 최소 fixture는 두 runtime 버전에서 panic/fix를 모두 실행한다.
 
-추가 3개 언어의 보완 계층은 `harness/<language>/usage.*`에 분리했다. 물리적
+추가 3개 언어의 보완 계층은 `preview/<language>/`의 compatibility 파일로 옮겼다. 물리적
 줄 수는 Ruby 65, Dart 82, TypeScript 52줄이며 fixture dispatch는 포함하지 않는다.
 패키지 단독이 아니라 이 계층과 사용 정책을 함께 적용한 profile을 검증했다.
 

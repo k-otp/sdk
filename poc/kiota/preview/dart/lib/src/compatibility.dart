@@ -1,9 +1,7 @@
 import 'dart:convert';
-import 'dart:typed_data';
-import 'package:microsoft_kiota_abstractions/microsoft_kiota_abstractions.dart';
 import 'package:microsoft_kiota_bundle/microsoft_kiota_bundle.dart';
 import 'package:microsoft_kiota_serialization_json/microsoft_kiota_serialization_json.dart';
-import 'lib/generated/balance/balance_get_response.dart';
+import '../generated/balance/balance_get_response.dart';
 
 class KotpJsonParseNodeFactory extends JsonParseNodeFactory {
   @override
@@ -12,8 +10,10 @@ class KotpJsonParseNodeFactory extends JsonParseNodeFactory {
     final mimeType = contentType.split(';').first.trim().toLowerCase();
     final node = super.getRootParseNode(mimeType, content);
     node.onAfterAssignFieldValues = (value) {
-      if (value is BalanceGetResponse && raw is Map &&
-          raw.containsKey('promoNextExpiry') && raw['promoNextExpiry'] == null) {
+      if (value is BalanceGetResponse &&
+          raw is Map &&
+          raw.containsKey('promoNextExpiry') &&
+          raw['promoNextExpiry'] == null) {
         value.promoNextExpiry = null;
       }
     };
@@ -24,11 +24,14 @@ class KotpJsonParseNodeFactory extends JsonParseNodeFactory {
 // Correct these generated enum names before the real request adapter runs.
 class KotpRequestAdapter extends DefaultRequestAdapter {
   KotpRequestAdapter({required super.authProvider, super.client})
-      : super(pNodeFactory: KotpJsonParseNodeFactory());
+    : super(pNodeFactory: KotpJsonParseNodeFactory());
 
   @override
-  Future<T?> send<T extends Parsable>(RequestInformation requestInfo,
-      ParsableFactory<T> factory, [Map<String, ParsableFactory<Parsable>>? errors]) {
+  Future<T?> send<T extends Parsable>(
+    RequestInformation requestInfo,
+    ParsableFactory<T> factory, [
+    Map<String, ParsableFactory<Parsable>>? errors,
+  ]) {
     const entryTypes = {
       'promoCredit': 'promo_credit',
       'promoExpire': 'promo_expire',
@@ -49,18 +52,25 @@ class KotpRequestAdapter extends DefaultRequestAdapter {
 }
 
 Object? readField(ApiException error, Object? Function(dynamic) reader) {
-  try { return reader(error); } on NoSuchMethodError { return null; }
+  try {
+    return reader(error);
+  } on NoSuchMethodError {
+    return null;
+  }
 }
 
 Object? jsonValue(Object? value) {
   if (value is UntypedObject) {
-    return value.properties.map((key, child) => MapEntry(key, jsonValue(child)));
+    return value.properties.map(
+      (key, child) => MapEntry(key, jsonValue(child)),
+    );
   }
   if (value is UntypedArray) return value.collection.map(jsonValue).toList();
   if (value is UntypedNull) return null;
   if (value is UntypedNode) return jsonValue(value.getValue());
   if (value is List) return value.map(jsonValue).toList();
-  if (value is Map) return value.map((key, child) => MapEntry(key, jsonValue(child)));
+  if (value is Map)
+    return value.map((key, child) => MapEntry(key, jsonValue(child)));
   if (value is Parsable) {
     final writer = JsonSerializationWriter();
     writer.writeObjectValue(null, value);
@@ -71,7 +81,8 @@ Object? jsonValue(Object? value) {
 
 Map<String, Object?> errorView(ApiException error) {
   final additional = error is AdditionalDataHolder
-      ? (error as AdditionalDataHolder).additionalData : <String, Object?>{};
+      ? (error as AdditionalDataHolder).additionalData
+      : <String, Object?>{};
   return {
     'defined': jsonValue(readField(error, (value) => value.defined)),
     'code': jsonValue(readField(error, (value) => value.code)),

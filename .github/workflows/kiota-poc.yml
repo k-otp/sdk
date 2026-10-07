@@ -104,6 +104,9 @@ jobs:
         run: bun run poc/kiota/scripts/reproduce.ts "${{ matrix.target }}" "${{ matrix.variant }}"
       - name: Require candidate contracts or assert the reviewed raw regression
         run: bun run poc/kiota/scripts/ci-target.ts "${{ matrix.target }}" "${{ matrix.variant }}"
+      - name: Install and validate the public preview wrapper package
+        if: matrix.variant == 'overlay' && matrix.target != 'HTTP'
+        run: bun run poc/kiota/scripts/preview.ts "${{ matrix.target }}"
       - name: Upload evidence (including failed stages)
         if: always()
         uses: actions/upload-artifact@v4
@@ -130,7 +133,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
       - run: bunx --no-install ttsc --noEmit -p poc/kiota/tsconfig.json
-      - run: bun test poc/kiota/overlays poc/kiota/mock poc/kiota/scripts/evidence.test.ts poc/kiota/scripts/ci-policy.test.ts
+      - run: bun test poc/kiota/overlays poc/kiota/mock poc/kiota/scripts/evidence.test.ts poc/kiota/scripts/ci-policy.test.ts poc/kiota/scripts/preview-evidence.test.ts
       - run: bun run check
 
   existing-sdk-comparison:

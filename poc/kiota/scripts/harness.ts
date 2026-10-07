@@ -12,12 +12,18 @@ import {
   sha256,
   stage,
 } from "./common";
+import {
+  consumerSource,
+  preparePreviewSdk,
+  previewPackages,
+} from "./preview-package";
 
 const name = process.argv[2];
 const variant = process.argv[3] ?? "raw";
 const target = config.targets.find((t) => t.target === name);
 if (!target?.harness) throw new Error(`No harness for ${name}`);
-const out = path.join(outputRoot, `${name}-${variant}`);
+const preview = process.env.POC_PROFILE === "preview";
+const out = path.join(outputRoot, `${name}-${preview ? "preview" : variant}`);
 const sdk = path.join(out, "sdk");
 const consumer = path.join(out, "consumer");
 const log = (label: string) => path.join(out, "logs", `${label}.txt`);
@@ -25,7 +31,9 @@ const resultFile = path.join(out, "reports/result.json");
 const result = await Bun.file(resultFile).json();
 const template = (language: string) =>
   path.join(root, "poc/kiota/harness", language);
-const version = `0.0.0-poc-${variant}`;
+const version = preview
+  ? (previewPackages[name ?? ""]?.version ?? "invalid")
+  : `0.0.0-poc-${variant}`;
 const env = { POC_TARGET_DIR: out };
 
 class Failure extends Error {
@@ -69,10 +77,13 @@ async function copyTemplate(
   await mkdir(destination, { recursive: true });
   for (const file of include)
     await cp(
-      path.join(template(language), file),
+      preview && destination === consumer && /\.(cs|go)$/.test(file)
+        ? consumerSource(language, file)
+        : path.join(template(language), file),
       path.join(destination, file),
       { recursive: true },
     );
+  if (destination === sdk) await preparePreviewSdk(language, sdk);
 }
 async function lock(language: string, names: string[]) {
   for (const file of names) {
@@ -291,6 +302,16 @@ try {
     );
     const language = name === "Kotlin" ? "kotlin-consumer" : "java-consumer";
     await cp(template(language), consumer, { recursive: true });
+    if (preview) {
+      const relative =
+        name === "Kotlin"
+          ? "src/main/kotlin/KotlinConsumer.kt"
+          : "src/main/java/WireConsumer.java";
+      await cp(
+        consumerSource(language, relative),
+        path.join(consumer, relative),
+      );
+    }
     if (variant === "raw") {
       const relative =
         name === "Kotlin"
@@ -412,10 +433,13 @@ try {
       "pip",
       "install",
       "--no-deps",
-      path.join(sdk, "dist/kotp_kiota_poc-0.0.0-py3-none-any.whl"),
+      path.join(
+        sdk,
+        `dist/kotp_kiota_poc-${preview ? version : "0.0.0"}-py3-none-any.whl`,
+      ),
     ]);
     await cp(
-      path.join(template("python"), "runner.py"),
+      consumerSource("python", "runner.py"),
       path.join(consumer, "runner.py"),
     );
     if (variant === "raw") {
@@ -491,7 +515,7 @@ try {
     );
     await json(path.join(consumer, "composer.json"), {
       name: "k-otp/kiota-poc-consumer",
-      require: { "k-otp/kiota-poc": "0.0.0" },
+      require: { "k-otp/kiota-poc": preview ? version : "0.0.0" },
       repositories: [{ type: "artifact", url: packages }],
       config: { "allow-plugins": false },
     });
@@ -502,7 +526,7 @@ try {
       consumer,
     );
     await cp(
-      path.join(template("php"), "runner.php"),
+      consumerSource("php", "runner.php"),
       path.join(consumer, "runner.php"),
     );
     result.packageConsumer = stage(
@@ -532,7 +556,7 @@ try {
     await execute("packageConsumer", "module-zip", [
       "python3",
       "-c",
-      `import pathlib,zipfile,json;root=pathlib.Path(${JSON.stringify(sdk)});mod=${JSON.stringify(module)};v=${JSON.stringify(moduleVersion)};d=pathlib.Path(${JSON.stringify(packages)})/mod/'@v';d.mkdir(parents=True,exist_ok=True);(d/(v+'.mod')).write_bytes((root/'go.mod').read_bytes());(d/(v+'.info')).write_text(json.dumps({'Version':v,'Time':'2026-10-07T00:00:00Z'}));(d/'list').write_text(v+'\\n');z=zipfile.ZipFile(d/(v+'.zip'),'w');[(z.write(f,mod+'@'+v+'/'+str(f.relative_to(root)))) for f in root.rglob('*') if f.is_file() and f.suffix in ['.go','.mod','.sum']];z.close()`,
+      `import pathlib,zipfile,json;root=pathlib.Path(${JSON.stringify(sdk)});mod=${JSON.stringify(module)};v=${JSON.stringify(moduleVersion)};d=pathlib.Path(${JSON.stringify(packages)})/mod/'@v';d.mkdir(parents=True,exist_ok=True);(d/(v+'.mod')).write_bytes((root/'go.mod').read_bytes());(d/(v+'.info')).write_text(json.dumps({'Version':v,'Time':'2026-10-07T00:00:00Z'}));(d/'list').write_text(v+'\\n');z=zipfile.ZipFile(d/(v+'.zip'),'w');[(z.write(f,mod+'@'+v+'/'+str(f.relative_to(root)))) for f in root.rglob('*') if f.is_file() and (f.suffix in ['.go','.mod','.sum'] or f.name in ['README.md','LICENSE'])];z.close()`,
     ]);
     await copyTemplate("go-consumer", consumer, [
       "go.mod",
@@ -598,9 +622,12 @@ try {
       "bun.lock",
       "tsconfig.json",
       "runner.ts",
-      "usage.ts",
       "usage.test.ts",
     ]);
+    await cp(
+      path.join(root, "poc/kiota/preview/typescript/compatibility.ts"),
+      path.join(sdk, "usage.ts"),
+    );
     await cp(path.join(out, "generated"), path.join(sdk, "generated"), {
       recursive: true,
     });
@@ -638,11 +665,11 @@ try {
       [
         "bun",
         "build",
-        "generated/kOtpApiClient.ts",
+        preview ? "preview/index.ts" : "generated/kOtpApiClient.ts",
         "--outdir",
         "dist",
         "--target",
-        "bun",
+        preview ? "node" : "bun",
         "--packages",
         "external",
       ],
@@ -650,11 +677,16 @@ try {
     );
     const manifestPath = path.join(sdk, "package.json");
     const manifest = await Bun.file(manifestPath).json();
-    manifest.files = ["dist", "generated/**/*.ts"];
+    manifest.files = [
+      "dist",
+      "generated/**/*.ts",
+      ...(preview ? ["preview/**/*.ts", "README.md", "LICENSE"] : []),
+    ];
+    if (preview) manifest.version = version;
     manifest.exports = {
       ".": {
-        types: "./generated/kOtpApiClient.ts",
-        default: "./dist/kOtpApiClient.js",
+        types: preview ? "./preview/index.ts" : "./generated/kOtpApiClient.ts",
+        default: preview ? "./dist/index.js" : "./dist/kOtpApiClient.js",
       },
       "./issue": "./generated/issue/index.ts",
       "./verify": "./generated/verify/index.ts",
@@ -669,7 +701,10 @@ try {
       ["bun", "pm", "pack", "--destination", packages],
       sdk,
     );
-    const archive = path.join(packages, "kotp-kiota-poc-typescript-0.0.0.tgz");
+    const archive = path.join(
+      packages,
+      `kotp-kiota-poc-typescript-${preview ? version : "0.0.0"}.tgz`,
+    );
     await json(path.join(consumer, "package.json"), {
       name: "kotp-kiota-typescript-consumer",
       private: true,
@@ -682,7 +717,7 @@ try {
       },
     });
     const runner = (
-      await Bun.file(path.join(template("typescript"), "runner.ts")).text()
+      await Bun.file(consumerSource("typescript", "runner.ts")).text()
     )
       .replace('"./generated/kOtpApiClient"', '"kotp-kiota-poc-typescript"')
       .replace('"./generated/issue"', '"kotp-kiota-poc-typescript/issue"')
@@ -695,7 +730,7 @@ try {
       ),
     );
     await cp(
-      path.join(template("typescript"), "usage.ts"),
+      path.join(root, "poc/kiota/preview/typescript/compatibility.ts"),
       path.join(consumer, "usage.ts"),
     );
     await cp(
@@ -725,7 +760,9 @@ try {
       [
         "bun",
         "-e",
-        "import {createKOtpApiClient} from 'kotp-kiota-poc-typescript';if(typeof createKOtpApiClient!=='function')throw new Error('missing packaged client')",
+        preview
+          ? "import {KotpClient} from 'kotp-kiota-poc-typescript';if(typeof KotpClient!=='function')throw new Error('missing packaged wrapper')"
+          : "import {createKOtpApiClient} from 'kotp-kiota-poc-typescript';if(typeof createKOtpApiClient!=='function')throw new Error('missing packaged client')",
       ],
       consumer,
     );
@@ -779,6 +816,19 @@ try {
       path.join(template("ruby"), "kotp_kiota_poc.gemspec"),
       path.join(sdk, "kotp_kiota_poc.gemspec"),
     );
+    if (preview) {
+      const file = path.join(sdk, "kotp_kiota_poc.gemspec");
+      await Bun.write(
+        file,
+        (await Bun.file(file).text())
+          .replace("spec.version = '0.0.0'", `spec.version = '${version}'`)
+          .replace(
+            "Dir['generated/**/*.rb']",
+            "Dir['generated/**/*.rb', 'preview/**/*', 'README.md', 'LICENSE']",
+          )
+          .replace("['generated']", "['generated', 'preview']"),
+      );
+    }
     await execute(
       "packageConsumer",
       "gem-build",
@@ -789,7 +839,10 @@ try {
         "build",
         "kotp_kiota_poc.gemspec",
         "--output",
-        path.join(packages, "kotp_kiota_poc-0.0.0.gem"),
+        path.join(
+          packages,
+          `kotp_kiota_poc-${preview ? version : "0.0.0"}.gem`,
+        ),
       ],
       sdk,
       rubyEnv,
@@ -803,7 +856,10 @@ try {
         "gem",
         "install",
         "--local",
-        path.join(packages, "kotp_kiota_poc-0.0.0.gem"),
+        path.join(
+          packages,
+          `kotp_kiota_poc-${preview ? version : "0.0.0"}.gem`,
+        ),
         "--install-dir",
         path.join(consumer, "gems"),
         "--ignore-dependencies",
@@ -828,14 +884,17 @@ try {
       ),
     };
     const rubySource = (
-      await Bun.file(path.join(template("ruby"), "runner.rb")).text()
+      await Bun.file(consumerSource("ruby", "runner.rb")).text()
     ).replace(
       "require_relative 'generated/k_otp_api_client'",
       "require 'k_otp_api_client'",
     );
     await Bun.write(path.join(consumer, "runner.rb"), rubySource);
     await cp(
-      path.join(template("ruby"), "usage.rb"),
+      path.join(
+        root,
+        "poc/kiota/preview/ruby/lib/kotp_kiota_preview/compatibility.rb",
+      ),
       path.join(consumer, "usage.rb"),
     );
     const rubyInput = await Bun.file(
@@ -940,7 +999,15 @@ try {
     await execute(
       "packageConsumer",
       "dart-archive",
-      ["tar", "-czf", archive, "lib", "pubspec.yaml", "pubspec.lock"],
+      [
+        "tar",
+        "-czf",
+        archive,
+        "lib",
+        "pubspec.yaml",
+        "pubspec.lock",
+        ...(preview ? ["README.md", "LICENSE"] : []),
+      ],
       sdk,
     );
     const installed = path.join(consumer, "installed-sdk");
@@ -957,7 +1024,7 @@ try {
       "name: kotp_dart_consumer\npublish_to: none\nenvironment:\n  sdk: '>=3.9.0 <4.0.0'\ndependencies:\n  kotp_kiota_poc:\n    path: installed-sdk\n  microsoft_kiota_bundle: 0.1.1\n",
     );
     let dartSource = (
-      await Bun.file(path.join(template("dart"), "runner.dart")).text()
+      await Bun.file(consumerSource("dart", "runner.dart")).text()
     ).replaceAll("'lib/generated/", "'package:kotp_kiota_poc/generated/");
     if (variant === "overlay") {
       dartSource =
@@ -977,8 +1044,10 @@ try {
     await Bun.write(
       path.join(consumer, "usage.dart"),
       (
-        await Bun.file(path.join(template("dart"), "usage.dart")).text()
-      ).replaceAll("'lib/generated/", "'package:kotp_kiota_poc/generated/"),
+        await Bun.file(
+          path.join(root, "poc/kiota/preview/dart/lib/src/compatibility.dart"),
+        ).text()
+      ).replaceAll("'../generated/", "'package:kotp_kiota_poc/generated/"),
     );
     await execute(
       "packageConsumer",
@@ -1001,7 +1070,11 @@ try {
       await Bun.write(
         path.join(consumer, "usage_test.dart"),
         (
-          await Bun.file(path.join(template("dart"), "usage_test.dart")).text()
+          await Bun.file(
+            preview
+              ? path.join(root, "poc/kiota/preview/dart/policy_test.dart")
+              : path.join(template("dart"), "usage_test.dart"),
+          ).text()
         ).replaceAll("'lib/generated/", "'package:kotp_kiota_poc/generated/"),
       );
       await execute(
@@ -1042,7 +1115,10 @@ try {
   await mkdir(packages, { recursive: true });
   for (const file of [
     path.join(sdk, `target/kiota-sdk-${version}.jar`),
-    path.join(sdk, "dist/kotp_kiota_poc-0.0.0-py3-none-any.whl"),
+    path.join(
+      sdk,
+      `dist/kotp_kiota_poc-${preview ? version : "0.0.0"}-py3-none-any.whl`,
+    ),
   ]) {
     if (await Bun.file(file).exists())
       await cp(file, path.join(packages, path.basename(file)));
