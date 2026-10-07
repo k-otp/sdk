@@ -3,6 +3,22 @@
 Install the local `dev.kotp:kotp-sdk:0.1.0` JAR and reference
 it as a Maven dependency. Java 17 bytecode is supplied.
 
+Download the JAR, POM, sources and Javadoc from the release, then install them:
+
+```sh
+mvn install:install-file -Dfile=kotp-sdk-0.1.0.jar -DpomFile=kotp-sdk-0.1.0.pom -Dsources=kotp-sdk-0.1.0-sources.jar -Djavadoc=kotp-sdk-0.1.0-javadoc.jar
+```
+
+Add this dependency to your application's POM:
+
+```xml
+<dependency>
+  <groupId>dev.kotp</groupId>
+  <artifactId>kotp-sdk</artifactId>
+  <version>0.1.0</version>
+</dependency>
+```
+
 ```java
 import dev.kotp.sdk.KotpClient;
 try (KotpClient client = new KotpClient(System.getenv("K_OTP_SECRET_KEY"))) {

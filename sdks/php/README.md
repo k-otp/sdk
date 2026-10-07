@@ -3,6 +3,13 @@
 Configure a Composer artifact repository pointing to the local ZIP directory,
 then require `k-otp/sdk:0.1.0`.
 
+```sh
+composer config repositories.kotp artifact ./packages
+composer require k-otp/sdk:0.1.0
+```
+
+Place the downloaded release ZIP in `./packages`.
+
 ```php
 use KOtp\KotpClient;
 $client = new KotpClient(getenv('K_OTP_SECRET_KEY'));

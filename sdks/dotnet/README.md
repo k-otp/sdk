@@ -3,6 +3,14 @@
 Add the release package directory as a NuGet source, then reference
 `KOtp.Sdk` version `0.1.0`.
 
+```sh
+dotnet nuget add source ./packages --name kotp-local
+dotnet add package KOtp.Sdk --version 0.1.0
+```
+
+Place the downloaded `.nupkg` in `./packages`. Keep nuget.org enabled for the
+official runtime dependencies.
+
 ```cs
 using KOtp;
 using var client = new KotpClient(Environment.GetEnvironmentVariable("K_OTP_SECRET_KEY")!);

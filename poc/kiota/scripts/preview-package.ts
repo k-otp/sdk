@@ -171,6 +171,10 @@ export async function preparePreviewSdk(language: string, sdk: string) {
         .replace("KOtp.Kiota.Poc", "KOtp.Sdk")
         .replace(
           "<PackageId>",
+          "<AssemblyName>KOtp.Sdk</AssemblyName><RootNamespace>KOtp</RootNamespace><PackageId>",
+        )
+        .replace(
+          "<PackageId>",
           `<Authors>K-OTP</Authors><Description>K-OTP server SDK</Description><PackageProjectUrl>https://k-otp.dev</PackageProjectUrl><RepositoryUrl>${metadata}</RepositoryUrl><PackageId>`,
         ),
     );
