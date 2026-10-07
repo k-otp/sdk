@@ -1,6 +1,6 @@
 {
   "name": "@k-otp/sdk",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Official K-OTP (Korean OTP API) SDK: issue and verify one-time passwords from browsers, SSR, edge and servers, with React, Vue and Svelte bindings, headless UI components with an optional theme, and a CDN bundle.",
   "keywords": [
     "k-otp",
