@@ -2,7 +2,7 @@
 
 This evaluates the vendored public `/v1` OpenAPI with Kiota 1.35.0. All native
 SDKs are unpublished fixtures outside the Bun/Sampo release workspace. See the
-[adoption report](../../docs/kiota-poc-results.md) for the measured scope and
+[adoption report](ADOPTION.md) for the measured scope and
 remaining failures.
 
 ## Run a target

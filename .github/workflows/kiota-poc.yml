@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [main, poc/kiota-multilang]
-    paths: ["spec/openapi.json", ".github/workflows/kiota-poc.yml", "poc/kiota/**", "docs/kiota-poc-results.md"]
+    paths: ["spec/openapi.json", ".github/workflows/kiota-poc.yml", "poc/kiota/**"]
   push:
     branches: [poc/kiota-multilang]
-    paths: ["spec/openapi.json", ".github/workflows/kiota-poc.yml", "poc/kiota/**", "docs/kiota-poc-results.md"]
+    paths: ["spec/openapi.json", ".github/workflows/kiota-poc.yml", "poc/kiota/**"]
 
 permissions:
   contents: read
