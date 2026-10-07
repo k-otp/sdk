@@ -73,7 +73,7 @@ setup-kiota v0.5.0은 commit
 
 입력은 저장소의 `spec/openapi.json`이며 운영 URL에서 갱신하지 않는다.
 OpenAPI 규격 버전은 **3.1.1**, 서비스 계약 버전은 **1.8.0**,
-SHA-256은 `f8e49375574f1e01fb566453707d1d382c4e5fe158648863200baf8b6353b84e`다.
+SHA-256은 `d0a122d0855be1bbd133b0649c4851e33d69b0c36c244a05b0b61ff16d4f91da`다.
 각 JSON에 commit/run/attempt/spec/fixture/input hash, 실제 도구·OS/architecture,
 action SHA, dependency lock hash, 단계별 상태, 경고·차단 요인·증거 경로를 남긴다.
 
