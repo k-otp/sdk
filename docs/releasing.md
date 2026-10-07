@@ -179,8 +179,10 @@ the existing npm version. Do not publish the raw or fixture-only packages.
 
 1. Change wrappers under `sdks/` and add a Sampo changeset when `/kiota` changes.
 2. Require the existing CI plus the complete Kiota SDK validation on the PR.
+   `kiota-poc.yml` is manual only: run `gh workflow run kiota-poc.yml --ref <branch>`.
 3. Merge, merge the Sampo release PR, and let `release.yml` publish npm via OIDC.
-4. Wait for the successful main Kiota validation at the final release commit.
+4. Dispatch `kiota-poc.yml` on main at the final release commit
+   (`gh workflow run kiota-poc.yml --ref main`) and wait for it to succeed.
 5. Dispatch `release-sdks.yml` on main with that validation run ID. It rejects
    stale, failed, PR or unrelated workflow evidence, validates all nine installed
    consumers and artifact hashes, then publishes `server-sdk-v0.1.0` with native

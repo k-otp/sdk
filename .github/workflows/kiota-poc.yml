@@ -1,13 +1,10 @@
 name: Kiota multi-language PoC
 
+# Manual only: the full multi-language matrix is too heavy to run on every push/PR.
+# Dispatch it on a branch before merging Kiota/SDK changes, and on main at the final
+# release commit before release-sdks.yml (which accepts a workflow_dispatch run on main).
 on:
   workflow_dispatch:
-  pull_request:
-    branches: [main, poc/kiota-multilang]
-    paths: ["spec/openapi.json", ".github/workflows/kiota-poc.yml", "poc/kiota/**", "sdks/**", "packages/sdk/**", "scripts/build-kiota.ts", "scripts/release-sdks.ts", "bun.lock", ".github/workflows/release-sdks.yml"]
-  push:
-    branches: [main, poc/kiota-multilang]
-    paths: ["spec/openapi.json", ".github/workflows/kiota-poc.yml", "poc/kiota/**", "sdks/**", "packages/sdk/**", "scripts/build-kiota.ts", "scripts/release-sdks.ts", "bun.lock", ".github/workflows/release-sdks.yml"]
 
 permissions:
   contents: read

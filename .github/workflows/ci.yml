@@ -1,10 +1,18 @@
 name: CI
 
+# Docs-only pushes/PRs are skipped. workflow_dispatch ignores path filters, so the
+# release workflow's `gh workflow run ci.yml --ref sampo/release` always runs.
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   push:
     branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   workflow_dispatch:
 
 permissions:
