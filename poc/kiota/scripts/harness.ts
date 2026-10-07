@@ -598,6 +598,8 @@ try {
       "bun.lock",
       "tsconfig.json",
       "runner.ts",
+      "usage.ts",
+      "usage.test.ts",
     ]);
     await cp(path.join(out, "generated"), path.join(sdk, "generated"), {
       recursive: true,
@@ -625,6 +627,12 @@ try {
       "ttsc checks every generated TypeScript input and consumer",
     );
     await execute(
+      "buildOrLoad",
+      "typescript-usage-tests",
+      ["bun", "test", "usage.test.ts"],
+      sdk,
+    );
+    await execute(
       "packageConsumer",
       "typescript-build",
       [
@@ -644,9 +652,13 @@ try {
     const manifest = await Bun.file(manifestPath).json();
     manifest.files = ["dist", "generated/**/*.ts"];
     manifest.exports = {
-      ".": "./dist/kOtpApiClient.js",
+      ".": {
+        types: "./generated/kOtpApiClient.ts",
+        default: "./dist/kOtpApiClient.js",
+      },
       "./issue": "./generated/issue/index.ts",
       "./verify": "./generated/verify/index.ts",
+      "./generated/*": "./generated/*/index.ts",
     };
     await json(manifestPath, manifest);
     const packages = path.join(out, "packages");
@@ -675,7 +687,17 @@ try {
       .replace('"./generated/kOtpApiClient"', '"kotp-kiota-poc-typescript"')
       .replace('"./generated/issue"', '"kotp-kiota-poc-typescript/issue"')
       .replace('"./generated/verify"', '"kotp-kiota-poc-typescript/verify"');
-    await Bun.write(path.join(consumer, "runner.ts"), runner);
+    await Bun.write(
+      path.join(consumer, "runner.ts"),
+      runner.replaceAll(
+        '"./generated/',
+        '"kotp-kiota-poc-typescript/generated/',
+      ),
+    );
+    await cp(
+      path.join(template("typescript"), "usage.ts"),
+      path.join(consumer, "usage.ts"),
+    );
     await cp(
       path.join(template("typescript"), "tsconfig.json"),
       path.join(consumer, "tsconfig.json"),
@@ -684,6 +706,17 @@ try {
       "packageConsumer",
       "typescript-consumer-install",
       ["bun", "install"],
+      consumer,
+    );
+    await execute(
+      "packageConsumer",
+      "typescript-consumer-typecheck",
+      [
+        path.join(consumer, "node_modules/.bin/ttsc"),
+        "--noEmit",
+        "-p",
+        "tsconfig.json",
+      ],
       consumer,
     );
     await execute(
@@ -713,6 +746,7 @@ try {
       BUNDLE_FROZEN: "true",
       BUNDLE_PATH: path.join(out, "ruby-dependencies"),
     };
+    await rm(rubyEnv.BUNDLE_PATH, { recursive: true, force: true });
     await execute(
       "buildOrLoad",
       "install",
@@ -800,6 +834,40 @@ try {
       "require 'k_otp_api_client'",
     );
     await Bun.write(path.join(consumer, "runner.rb"), rubySource);
+    await cp(
+      path.join(template("ruby"), "usage.rb"),
+      path.join(consumer, "usage.rb"),
+    );
+    const rubyInput = await Bun.file(
+      path.join(
+        root,
+        variant === "overlay"
+          ? path.relative(root, path.join(out, "reports/openapi-overlay.json"))
+          : config.spec,
+      ),
+    ).json();
+    const enumWireValues: Record<string, string> = {};
+    function enumValues(node: unknown) {
+      if (node === null || typeof node !== "object") return;
+      const values = (node as { enum?: unknown }).enum;
+      if (Array.isArray(values)) {
+        for (const value of values) {
+          if (typeof value !== "string") continue;
+          const key = value[0]?.toUpperCase() + value.slice(1);
+          if (enumWireValues[key] && enumWireValues[key] !== value)
+            throw new Failure(
+              "wireContract",
+              "blocked",
+              `Ambiguous Ruby enum wire name ${key}`,
+            );
+          enumWireValues[key] = value;
+        }
+      }
+      for (const child of Object.values(node)) enumValues(child);
+    }
+    enumValues(rubyInput);
+    await json(path.join(consumer, "enum-wire-values.json"), enumWireValues);
+    await json(path.join(out, "reports/enum-wire-values.json"), enumWireValues);
     await execute(
       "packageConsumer",
       "gem-load",
@@ -808,6 +876,17 @@ try {
         "-e",
         "require 'k_otp_api_client';puts KOtpSdkGenerated::KOtpApiClient.name",
       ],
+      consumer,
+      gemEnv,
+    );
+    await cp(
+      path.join(template("ruby"), "usage_test.rb"),
+      path.join(consumer, "usage_test.rb"),
+    );
+    await execute(
+      "packageConsumer",
+      "ruby-usage-tests",
+      [ruby, "usage_test.rb"],
       consumer,
       gemEnv,
     );
@@ -895,6 +974,12 @@ try {
           );
     }
     await Bun.write(path.join(consumer, "runner.dart"), dartSource);
+    await Bun.write(
+      path.join(consumer, "usage.dart"),
+      (
+        await Bun.file(path.join(template("dart"), "usage.dart")).text()
+      ).replaceAll("'lib/generated/", "'package:kotp_kiota_poc/generated/"),
+    );
     await execute(
       "packageConsumer",
       "dart-consumer-install",
@@ -912,6 +997,20 @@ try {
       "Local archive extracted into a separate Pub consumer; kernel compilation references packaged SDK files",
     );
     await runWire([dart, "run", "runner.dart"]);
+    if (variant === "overlay") {
+      await Bun.write(
+        path.join(consumer, "usage_test.dart"),
+        (
+          await Bun.file(path.join(template("dart"), "usage_test.dart")).text()
+        ).replaceAll("'lib/generated/", "'package:kotp_kiota_poc/generated/"),
+      );
+      await execute(
+        "wireContract",
+        "dart-usage-tests",
+        [dart, "run", "usage_test.dart"],
+        consumer,
+      );
+    }
   } else if (name === "HTTP") {
     result.buildOrLoad = stage(
       "not_applicable",

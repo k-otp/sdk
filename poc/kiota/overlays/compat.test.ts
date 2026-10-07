@@ -85,4 +85,50 @@ describe("reviewed generation overlay", () => {
       config.specSha256,
     );
   });
+  test("Ruby numeric annotations retain numeric constraints and every union", () => {
+    const { spec, changes } = compatibilityOverlay(original, "Ruby");
+    for (const { before, after } of changes.filter((c) =>
+      c.reason.startsWith("Ruby-specific"),
+    )) {
+      if (!object(before) || !object(after))
+        throw new Error("Invalid numeric hint");
+      const { format, ...rest } = after;
+      expect(format).toBe("float");
+      expect(rest).toEqual(before);
+    }
+    expect(
+      (spec.paths as typeof original.paths)["/issue"].post.requestBody.content[
+        "application/json"
+      ].schema.properties.webOtp,
+    ).toEqual(
+      original.paths["/issue"].post.requestBody.content["application/json"]
+        .schema.properties.webOtp,
+    );
+  });
+  test("Dart unconstrained optional error data remains allowed through the open object", () => {
+    const projected = compatibilityOverlay(original, "Dart").spec;
+    const regular = compatibilityOverlay(original).spec;
+    if (
+      !object(projected.components) ||
+      !object(projected.components.schemas) ||
+      !object(regular.components) ||
+      !object(regular.components.schemas)
+    )
+      throw new Error("Missing schemas");
+    const error = projected.components.schemas.KotpErrorEnvelope;
+    const other = regular.components.schemas.KotpErrorEnvelope;
+    if (
+      !object(error) ||
+      !object(error.properties) ||
+      !object(other) ||
+      !object(other.properties)
+    )
+      throw new Error("Missing errors");
+    expect(error.required).toEqual(other.required);
+    expect(error.additionalProperties).toBe(true);
+    const { data, ...named } = other.properties;
+    expect(data).toEqual({});
+    expect(error.properties).toEqual(named);
+    expect((error.required as Json[]).includes("data")).toBe(false);
+  });
 });

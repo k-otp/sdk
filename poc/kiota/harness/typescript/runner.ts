@@ -1,15 +1,55 @@
 import {
   AnonymousAuthenticationProvider,
+  type Parsable,
   type RequestConfiguration,
+  type SerializationWriter,
 } from "@microsoft/kiota-abstractions";
 import { DefaultRequestAdapter } from "@microsoft/kiota-bundle";
 import {
   CustomFetchHandler,
   HttpClient,
 } from "@microsoft/kiota-http-fetchlibrary";
-import type { IssuePostRequestBody } from "./generated/issue";
+import { JsonSerializationWriter } from "@microsoft/kiota-serialization-json";
+import { serializeBalanceGetResponse } from "./generated/balance";
+import { serializeCreditLedgerGetResponse } from "./generated/creditLedger";
+import {
+  createIssuePostRequestBodyFromDiscriminatorValue,
+  serializeIssuePostResponse,
+} from "./generated/issue";
+import { serializeIssuesGetResponse } from "./generated/issues";
+import { serializeWithIssueGetResponse } from "./generated/issues/item";
 import { createKOtpApiClient } from "./generated/kOtpApiClient";
-import type { VerifyPostRequestBody } from "./generated/verify";
+import { serializeStatusGetResponse } from "./generated/status";
+import { serializeTemplatesGetResponse } from "./generated/templates";
+import { serializeWithTemplateGetResponse } from "./generated/templates/item";
+import {
+  createVerifyPostRequestBodyFromDiscriminatorValue,
+  serializeVerifyPostResponse,
+} from "./generated/verify";
+import { jsonValue, KotpJsonParseNodeFactory, model } from "./usage";
+
+type Serializer = (
+  writer: SerializationWriter,
+  value: Parsable | undefined | null,
+) => void;
+const serializers: Record<string, Serializer> = {
+  issue: serializeIssuePostResponse,
+  verify: serializeVerifyPostResponse,
+  status: serializeStatusGetResponse,
+  issues: serializeIssuesGetResponse,
+  issueDetail: serializeWithIssueGetResponse,
+  creditLedger: serializeCreditLedgerGetResponse,
+  balance: serializeBalanceGetResponse,
+  templates: serializeTemplatesGetResponse,
+  templateDetail: serializeWithTemplateGetResponse,
+};
+function serialize(value: Parsable | undefined, operation: string) {
+  const writer = new JsonSerializationWriter();
+  const serializer = serializers[operation];
+  if (!serializer) throw new TypeError("Unknown generated response serializer");
+  writer.writeObjectValue(undefined, value ?? null, serializer);
+  return JSON.parse(new TextDecoder().decode(writer.getSerializedContent()));
+}
 
 type TestCase = {
   id: string;
@@ -29,6 +69,7 @@ type ApiError = {
   code?: string;
   status?: number;
   message?: string;
+  messageEscaped?: string;
   data?: unknown;
 };
 const fixturePath = process.env.POC_FIXTURE;
@@ -59,7 +100,7 @@ for (const test of fixture.cases) {
   };
   const adapter = new DefaultRequestAdapter(
     new AnonymousAuthenticationProvider(),
-    undefined,
+    new KotpJsonParseNodeFactory(),
     undefined,
     test.defaultRetryProbe
       ? new HttpClient(guardedFetch)
@@ -76,7 +117,10 @@ for (const test of fixture.cases) {
         const key = String(test.request.idempotencyKey ?? "").trim();
         if (!/^[!-~]{1,128}$/.test(key))
           throw new TypeError("Invalid idempotency key before HTTP");
-        const body = { ...test.request } as IssuePostRequestBody;
+        const body = model(
+          { ...test.request, idempotencyKey: key },
+          createIssuePostRequestBodyFromDiscriminatorValue,
+        );
         config.headers = {
           ...config.headers,
           "Idempotency-Key": key,
@@ -86,7 +130,10 @@ for (const test of fixture.cases) {
       }
       case "verify":
         return client.verify.post(
-          test.request as VerifyPostRequestBody,
+          model(
+            test.request,
+            createVerifyPostRequestBodyFromDiscriminatorValue,
+          ),
           config,
         );
       case "status":
@@ -113,10 +160,10 @@ for (const test of fixture.cases) {
   const observation: Record<string, unknown> = { id: test.id };
   try {
     try {
-      observation.response = await call();
+      observation.response = serialize(await call(), test.operation);
     } catch (error) {
       if (test.explicitRetry && (error as ApiError).responseStatusCode === 503)
-        observation.response = await call();
+        observation.response = serialize(await call(), test.operation);
       else throw error;
     }
   } catch (cause) {
@@ -134,8 +181,8 @@ for (const test of fixture.cases) {
         defined: error.defined,
         code: error.code,
         status: error.status,
-        message: error.message,
-        data: error.data ?? error.additionalData?.data,
+        message: error.messageEscaped ?? error.message,
+        data: jsonValue(error.data ?? error.additionalData?.data),
       };
       observation.status = error.responseStatusCode;
       observation.headers =

@@ -102,8 +102,8 @@ jobs:
       - name: Confirm minimal schema/runtime regressions and fixes
         if: matrix.target == 'Java' || matrix.target == 'Go'
         run: bun run poc/kiota/scripts/reproduce.ts "${{ matrix.target }}" "${{ matrix.variant }}"
-      - name: Build, run HTTP fixtures and install package consumers
-        run: bun run poc/kiota/scripts/harness.ts "${{ matrix.target }}" "${{ matrix.variant }}"
+      - name: Require candidate contracts or assert the reviewed raw regression
+        run: bun run poc/kiota/scripts/ci-target.ts "${{ matrix.target }}" "${{ matrix.variant }}"
       - name: Upload evidence (including failed stages)
         if: always()
         uses: actions/upload-artifact@v4
@@ -130,7 +130,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
       - run: bunx --no-install ttsc --noEmit -p poc/kiota/tsconfig.json
-      - run: bun test poc/kiota/overlays poc/kiota/mock poc/kiota/scripts/evidence.test.ts
+      - run: bun test poc/kiota/overlays poc/kiota/mock poc/kiota/scripts/evidence.test.ts poc/kiota/scripts/ci-policy.test.ts
       - run: bun run check
 
   existing-sdk-comparison:
@@ -143,8 +143,8 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
-      - name: Preserve actual public error-view differences
-        run: bun run poc/kiota/scripts/compare-existing.ts
+      - name: Assert the exact public error-view comparison
+        run: bun run poc/kiota/scripts/ci-target.ts ExistingTypeScript raw
       - name: Upload comparison evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -155,7 +155,7 @@ jobs:
           retention-days: 14
 
   report:
-    name: Evidence report and required overlay candidate gate
+    name: Evidence report and all SDK candidate gate
     needs: [matrix, investigate, existing-sdk, existing-sdk-comparison]
     if: always()
     runs-on: ubuntu-24.04

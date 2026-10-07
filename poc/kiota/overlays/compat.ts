@@ -11,7 +11,7 @@ export function object(value: Json | undefined): value is ObjectValue {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-export function compatibilityOverlay(input: ObjectValue) {
+export function compatibilityOverlay(input: ObjectValue, language?: string) {
   const spec = structuredClone(input);
   const changes: {
     pointer: string;
@@ -35,6 +35,17 @@ export function compatibilityOverlay(input: ObjectValue) {
       return;
     }
     if (!object(node)) return;
+    if (language === "Ruby" && node.type === "number" && !node.format) {
+      const before = structuredClone(node);
+      node.format = "float";
+      changes.push({
+        pointer,
+        reason:
+          "Ruby-specific number format hint: select the native 64-bit Ruby Float reader/writer instead of the unsupported Double object factory; retain type and numeric constraints",
+        before,
+        after: structuredClone(node),
+      });
+    }
     const alternatives = node.oneOf;
     if (
       Array.isArray(alternatives) &&
@@ -105,6 +116,23 @@ export function compatibilityOverlay(input: ObjectValue) {
     required: ["defined", "code", "status", "message"],
     additionalProperties: true,
   };
+  if (language === "Ruby") {
+    (errorEnvelope.properties as ObjectValue).status = {
+      type: "number",
+      format: "float",
+    };
+  }
+  if (language === "Dart") {
+    const before = structuredClone(errorEnvelope);
+    delete (errorEnvelope.properties as ObjectValue).data;
+    changes.push({
+      pointer: "/components/schemas/KotpErrorEnvelope/properties/data",
+      reason:
+        "Dart-specific equivalent open-object projection: optional unconstrained data remains permitted through AdditionalData, avoiding coercion of numeric-looking strings and broken UntypedObject serialization",
+      before,
+      after: structuredClone(errorEnvelope),
+    });
+  }
   spec.components.schemas.KotpErrorEnvelope = errorEnvelope;
   for (const [url, methods] of Object.entries(spec.paths)) {
     if (!object(methods)) continue;

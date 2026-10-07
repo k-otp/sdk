@@ -7,7 +7,7 @@ Gem::Specification.new do |spec|
   spec.files = Dir['generated/**/*.rb']
   spec.require_paths = ['generated']
   spec.required_ruby_version = '>= 3.3.0'
-  spec.add_runtime_dependency 'microsoft_kiota_abstractions', '= 0.20.0'
-  spec.add_runtime_dependency 'microsoft_kiota_faraday', '= 0.20.0'
-  spec.add_runtime_dependency 'microsoft_kiota_serialization_json', '= 0.20.0'
+  spec.add_runtime_dependency 'microsoft_kiota_abstractions', '= 0.24.0'
+  spec.add_runtime_dependency 'microsoft_kiota_faraday', '= 0.24.0'
+  spec.add_runtime_dependency 'microsoft_kiota_serialization_json', '= 0.24.0'
 end

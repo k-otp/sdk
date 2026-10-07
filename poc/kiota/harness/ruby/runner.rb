@@ -5,13 +5,34 @@ require 'microsoft_kiota_abstractions'
 require 'microsoft_kiota_serialization_json'
 require 'microsoft_kiota_faraday'
 require_relative 'generated/k_otp_api_client'
+require_relative 'usage'
+
+class LoopbackGuard < Faraday::Middleware
+  def initialize(app, allowed)
+    super(app)
+    @allowed = allowed
+  end
+  def call(env)
+    unless env.url.hostname == '127.0.0.1' && env.url.port == @allowed.port
+      raise IOError, 'Unexpected external network destination'
+    end
+    @app.call(env)
+  end
+end
+
+def error_view(error)
+  value = %w[defined code status message].to_h { |key| [key, error.respond_to?(key) ? error.public_send(key) : nil] }
+  # The generator routes unconstrained data through the official AdditionalData holder.
+  value['data'] = error.additional_data['data'] if error.respond_to?(:additional_data)
+  value
+end
 
 def model(value, type)
   MicrosoftKiotaSerializationJson::JsonParseNode.new(value).get_object_value(type.method(:create_from_discriminator_value))
 end
 def serialize(value)
   return nil unless value.respond_to?(:serialize)
-  writer = MicrosoftKiotaSerializationJson::JsonSerializationWriter.new
+  writer = KotpJsonWriter.new
   writer.write_object_value(nil, value)
   JSON.parse(writer.get_serialized_content)
 end
@@ -63,15 +84,29 @@ raise ArgumentError unless base.hostname == '127.0.0.1' && key.start_with?('sk_'
 observations = []
 fixture['cases'].each do |test|
   http = Faraday.new(headers: {'Authorization' => 'Bearer ' + key}) do |builder|
+    builder.use LoopbackGuard, base
     builder.options.timeout = (test['timeoutMs'] || 10000) / 1000.0
     builder.adapter Faraday.default_adapter
   end
-  adapter = MicrosoftKiotaFaraday::FaradayRequestAdapter.new(MicrosoftKiotaAbstractions::AnonymousAuthenticationProvider.new, nil, nil, http)
+  adapter = MicrosoftKiotaFaraday::FaradayRequestAdapter.new(MicrosoftKiotaAbstractions::AnonymousAuthenticationProvider.new, nil, KotpJsonWriterFactory.new, http)
   adapter.set_base_url(base.to_s);client = KOtpSdkGenerated::KOtpApiClient.new(adapter)
   observation = {'id' => test['id']}
   begin
-    value = call(client, test)
+    value = begin
+      call(client, test)
+    rescue MicrosoftKiotaAbstractions::ApiError => error
+      if test['explicitRetry'] && error.response_status_code == 503
+        call(client, test)
+      else
+        raise
+      end
+    end
     observation['response'] = serialize(value)
+  rescue MicrosoftKiotaAbstractions::ApiError => error
+    observation['status'] = error.response_status_code
+    observation['headers'] = error.response_headers
+    observation['response'] = error_view(error)
+    observation['exception'] = error.class.name
   rescue ArgumentError => error
     observation['outcome'] = 'configuration_error';observation['exception'] = error.class.name
   rescue StandardError => error

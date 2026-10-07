@@ -76,7 +76,7 @@
       "namespace": "KOtpSdkGenerated",
       "extension": ".rb",
       "harness": "ruby",
-      "required": false
+      "required": true
     },
     {
       "target": "Dart",
@@ -84,7 +84,7 @@
       "namespace": "kotp_sdk_generated",
       "extension": ".dart",
       "harness": "dart",
-      "required": false
+      "required": true
     },
     {
       "target": "TypeScript",
@@ -92,7 +92,7 @@
       "namespace": "KOtpSdkGenerated",
       "extension": ".ts",
       "harness": "typescript",
-      "required": false
+      "required": true
     },
     {
       "target": "HTTP",

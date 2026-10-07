@@ -30,7 +30,7 @@ const specText = await spec.text();
 const specObject = JSON.parse(specText);
 let inputSpecPath = specPath;
 if (variant === "overlay") {
-  const overlay = compatibilityOverlay(specObject);
+  const overlay = compatibilityOverlay(specObject, target.language);
   inputSpecPath = path.join(reports, "openapi-overlay.json");
   await json(inputSpecPath, overlay.spec);
   await json(path.join(reports, "overlay-changes.json"), overlay.changes);

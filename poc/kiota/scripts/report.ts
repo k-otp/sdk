@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { assess, type ResultRow, type WireEvidence } from "./ci-policy";
 import {
   command,
   config,
@@ -103,6 +104,25 @@ if (await Bun.file(comparisonFile).exists()) {
   if (!identityIssues(comparison, context, "ExistingTypeScript", "raw").length)
     results.push(comparison);
 }
+const validations = [];
+for (const row of results) {
+  const out = path.join(
+    outputRoot,
+    `${row.target}-${row.inputVariant}`,
+    "reports",
+  );
+  const wireFile = Bun.file(path.join(out, "wire-cases.json"));
+  const httpFile = Bun.file(path.join(out, "http-examples.json"));
+  const verdict = assess(
+    row as ResultRow,
+    (await wireFile.exists())
+      ? ((await wireFile.json()) as WireEvidence)
+      : null,
+    (await httpFile.exists()) ? await httpFile.json() : null,
+  );
+  row.ciValidation = verdict;
+  validations.push(verdict);
+}
 const header = ["Target", "Input", ...config.stages];
 const table = [
   header,
@@ -115,9 +135,14 @@ const table = [
 ]
   .map((row) => `| ${row.join(" | ")} |`)
   .join("\n");
-const markdown = `# Kiota PoC evidence\n\nRequired gate evaluates overlay candidates only. Raw and experimental failures remain failed jobs; this summary is not an all-language support claim.\n\n${table}\n\nStage success only covers that stage. Missing artifacts never reuse prior runs.\n\n${results
+const markdown = `# Kiota PoC evidence\n\nAll eight SDK languages and the Kotlin/JVM overlay consumer must pass actual contracts. CI also asserts exact reviewed raw/HTTP/comparison regressions; their SDK compatibility stages remain failed.\n\n${table}\n\nStage success only covers that stage. Missing artifacts never reuse prior runs.\n\n${results
   .filter((r) => r.blockers.length)
   .map((r) => `- ${r.target}/${r.inputVariant}: ${r.blockers.join("; ")}`)
+  .join("\n")}\n\n## CI validation\n\n${results
+  .map((row) => {
+    const verdict = row.ciValidation as ReturnType<typeof assess>;
+    return `- ${row.target}/${row.inputVariant}: ${verdict.validationPassed ? "passed" : "failed"} (${verdict.mode})${verdict.errors.length ? ` — ${verdict.errors.join("; ")}` : ""}`;
+  })
   .join("\n")}\n`;
 await mkdir(path.join(outputRoot, "aggregate"), { recursive: true });
 await json(path.join(outputRoot, "aggregate/results.json"), results);
@@ -126,21 +151,24 @@ if (process.env.GITHUB_STEP_SUMMARY)
   await Bun.write(process.env.GITHUB_STEP_SUMMARY, markdown);
 console.log(table);
 if (process.argv.includes("--gate")) {
-  process.exitCode = config.targets
-    .filter((t) => t.required)
-    .every((t) => {
-      const r = results.find(
-        (r) => r.target === t.target && r.inputVariant === "overlay",
-      );
-      return [
-        "generation",
-        "buildOrLoad",
-        "wireContract",
-        "packageConsumer",
-        "reproducibility",
-        ...(t.target === "Kotlin" ? ["kotlinInterop"] : []),
-      ].every((key) => r?.[key as Stage].status === "passed");
-    })
-    ? 0
-    : 1;
+  process.exitCode =
+    validations.every((verdict) => verdict.validationPassed) &&
+    results.some((row) => row.target === "ExistingTypeScript") &&
+    config.targets
+      .filter((t) => t.required)
+      .every((t) => {
+        const r = results.find(
+          (r) => r.target === t.target && r.inputVariant === "overlay",
+        );
+        return [
+          "generation",
+          "buildOrLoad",
+          "wireContract",
+          "packageConsumer",
+          "reproducibility",
+          ...(t.target === "Kotlin" ? ["kotlinInterop"] : []),
+        ].every((key) => r?.[key as Stage].status === "passed");
+      })
+      ? 0
+      : 1;
 }

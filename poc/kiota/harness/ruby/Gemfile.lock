@@ -8,17 +8,17 @@ GEM
     faraday-net_http (3.4.4)
       net-http (~> 0.5)
     iso8601 (0.13.0)
-    json (2.21.2)
+    json (3.0.2)
     logger (1.7.0)
-    microsoft_kiota_abstractions (0.20.0)
+    microsoft_kiota_abstractions (0.24.0)
       iso8601 (~> 0.13.0)
       stduritemplate (>= 0.0.39, < 2.1.0)
-    microsoft_kiota_faraday (0.20.0)
+    microsoft_kiota_faraday (0.24.0)
       faraday (~> 2.7, >= 2.7.2)
-      microsoft_kiota_abstractions (= 0.20.0)
-    microsoft_kiota_serialization_json (0.20.0)
-      json (>= 2.6.3, < 2.22.0)
-      microsoft_kiota_abstractions (= 0.20.0)
+      microsoft_kiota_abstractions (= 0.24.0)
+    microsoft_kiota_serialization_json (0.24.0)
+      json (>= 2.6.3, < 3.1.0)
+      microsoft_kiota_abstractions (= 0.24.0)
       uuidtools (>= 2.2, < 3.1)
     net-http (0.9.1)
       uri (>= 0.11.1)
@@ -31,9 +31,9 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  microsoft_kiota_abstractions (= 0.20.0)
-  microsoft_kiota_faraday (= 0.20.0)
-  microsoft_kiota_serialization_json (= 0.20.0)
+  microsoft_kiota_abstractions (= 0.24.0)
+  microsoft_kiota_faraday (= 0.24.0)
+  microsoft_kiota_serialization_json (= 0.24.0)
 
 RUBY VERSION
    ruby 3.3.6p108

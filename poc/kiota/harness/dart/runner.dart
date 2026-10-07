@@ -13,6 +13,7 @@ import 'lib/generated/issue/issue_post_request_body.dart';
 import 'lib/generated/issue/issue_post_request_body_web_otp.dart';
 import 'lib/generated/models/issue_web_otp_options.dart';
 import 'lib/generated/verify/verify_post_request_body.dart';
+import 'usage.dart';
 
 class GuardClient extends http.BaseClient {
   GuardClient(this.allowed,this.key);
@@ -59,7 +60,7 @@ Future<void> main()async {
   if(base.host!='127.0.0.1'||!key.startsWith('sk_'))throw ArgumentError('Secret key and loopback URL required');
   final observations=<Map<String,dynamic>>[];
   for(final input in fixture['cases']) {
-    final test=Map<String,dynamic>.from(input);final httpClient=GuardClient(base,key);final adapter=DefaultRequestAdapter(authProvider:AnonymousAuthenticationProvider(),client:httpClient)..baseUrl=base.toString();final client=KOtpApiClient(adapter);
+    final test=Map<String,dynamic>.from(input);final httpClient=GuardClient(base,key);final adapter=KotpRequestAdapter(authProvider:AnonymousAuthenticationProvider(),client:httpClient)..baseUrl=base.toString();final client=KOtpApiClient(adapter);
     final observation=<String,dynamic>{'id':test['id']};
     try {
       Future<Parsable?> attempt()async{try{return await call(client,test);}on ApiException catch(error){if(test['explicitRetry']==true&&error.statusCode==503)return call(client,test);rethrow;}}
@@ -68,7 +69,7 @@ Future<void> main()async {
     on ArgumentError catch(error){observation['outcome']='configuration_error';observation['diagnostic']=error.message;}
     on ApiException catch(error){
       observation['status']=error.statusCode;observation['headers']=error.responseHeaders;observation['exception']=error.runtimeType.toString();
-      try{observation['response']=serialize(error);}catch(serializationError){observation['diagnostic']='Parsed error serialization failed: $serializationError';}
+      observation['response']=errorView(error);
     }
     catch(error){observation['outcome']='unexpected_exception';observation['diagnostic']=error.toString();}
     finally{httpClient.close();}
