@@ -7,8 +7,9 @@
 CSharp·PHP·Java·Go·Python·Ruby·Dart·Kiota TypeScript 8개 SDK 언어와 별도
 Kotlin/JVM 소비자는 **공식 runtime, 생성 전용 overlay와 K-OTP 소비 정책을
 적용한 채택 후보**다. Ruby·Dart·TypeScript에는 아래의 작은 보완 계층도 필요하다.
-현재 로컬에서 모두 전체 생성 코드 빌드/로드, 28/28 계약, 독립 패키지 소비와
-깨끗한 재생성을 통과했다. 후속 Actions 실행으로 같은 범위를 확인한다.
+로컬과 Ubuntu 24.04 Actions에서 모두 전체 생성 코드 빌드/로드, 28/28 계약,
+독립 패키지 소비와 깨끗한 재생성을 통과했다. 전체 PoC workflow와 기존 SDK CI도
+성공했다. 아래 실행의 artifact로 각 단계를 확인했다.
 원본 OpenAPI만으로 생성한 SDK는 오류 모델 및 일부 상수/union 처리가
 불완전해 그대로 배포할 수 없다. Swift는 고정 CLI 미지원이다.
 HTTP 출력은 SDK가 아닌 요청 예제이며 현재 본문 검사가 실패한다.
@@ -26,10 +27,14 @@ Kiota의 upstream maturity, 모든 API 입력의 호환성, 운영 지원 보장
 | [전체 HTTP 검증 37511514629](https://github.com/k-otp/sdk/actions/runs/37511514629) | `e963550dd90b0e90d675993f5d74a9ca30404c21` | 핵심 6개 overlay: 전체 빌드·28/28 계약·패키지 소비·재생성 통과; 기존 SDK 회귀 통과 |
 | [패키징/최소 재현 보강 37514447594](https://github.com/k-otp/sdk/actions/runs/37514447594) | `500e0e6ee5d73ac70b7c752b30a6f596a54d1151` | 추가 언어 패키지 소비, Java/Go 최소 재현, 증거 identity 검사, 기존 SDK 공통 fixture 비교 |
 | [수정 전 PR 37515801223](https://github.com/k-otp/sdk/actions/runs/37515801223) | `ffda3fb092f9b8a0795ccbb759a4fd936ba656b2` | 핵심 6개 overlay 통과; Ruby/Dart/TypeScript overlay 실패와 raw 실패를 기록. 전체 workflow 실패 |
+| [8개 언어 + Kotlin/JVM 37552678500](https://github.com/k-otp/sdk/actions/runs/37552678500) | PR head `2b90b80a7883147de98a5b5b6c76022530d69dd5` | 모든 9개 overlay profile 28/28, 전체 build/load·package·재생성, raw/HTTP/기존 SDK 비교의 정확한 음성 회귀, 최종 gate 통과. 전체 workflow 성공 |
+| [동일 커밋 push 37552674854](https://github.com/k-otp/sdk/actions/runs/37552674854) | `2b90b80a7883147de98a5b5b6c76022530d69dd5` | PR 실행과 별도로 전체 PoC workflow 성공 |
+| [기존 SDK CI 37552678538](https://github.com/k-otp/sdk/actions/runs/37552678538) | PR head `2b90b80a7883147de98a5b5b6c76022530d69dd5` | 기존 SDK·framework/Node 호환성·examples/e2e 회귀 통과 |
 
-후속 보완의 아래 단계 표는 핵심 언어의 위 Actions 증거와 수정한 추가 3개 언어의
-현재 로컬 재실행 JSON을 구분하여 반영했다. 최신 Actions 확정 결과는 후속 실행
-완료 후 기록한다. 각 실행의
+아래 단계 표는 완료된 `37552678500`의 aggregate JSON 22개 행과 일치한다.
+PR 실행의 실제 checkout/`sourceCommit`은 merge commit
+`2c88648fa029256d6c6a2a3f993c4304c6f1535d`이며 위 표의 PR head와 구분한다.
+각 실행의
 `kiota-evidence-report` artifact에 `results.json`/`results.md`가 있고, 언어별
 `kiota-<Target>-<variant>` artifact에 원본 생성 코드·명령·관측·패키지가 있다.
 Actions artifact 보관은 14일이므로 장기 검토 시 해당 실행의 증거를 보관해야 한다.
