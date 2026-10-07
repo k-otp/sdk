@@ -72,7 +72,7 @@ for (const field of [
 result.blockers = [];
 result.previewPackage = {
   ...previewPackages[target],
-  channel: "local-preview",
+  channel: "release",
   profile: "preview",
   sourceHash: await previewSourceHash(target),
 };

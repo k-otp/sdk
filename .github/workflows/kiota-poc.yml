@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [main, poc/kiota-multilang]
-    paths: ["spec/openapi.json", ".github/workflows/kiota-poc.yml", "poc/kiota/**"]
+    paths: ["spec/openapi.json", ".github/workflows/kiota-poc.yml", "poc/kiota/**", "sdks/**", "packages/sdk/**", "scripts/build-kiota.ts", "scripts/release-sdks.ts", "bun.lock", ".github/workflows/release-sdks.yml"]
   push:
-    branches: [poc/kiota-multilang]
-    paths: ["spec/openapi.json", ".github/workflows/kiota-poc.yml", "poc/kiota/**"]
+    branches: [main, poc/kiota-multilang]
+    paths: ["spec/openapi.json", ".github/workflows/kiota-poc.yml", "poc/kiota/**", "sdks/**", "packages/sdk/**", "scripts/build-kiota.ts", "scripts/release-sdks.ts", "bun.lock", ".github/workflows/release-sdks.yml"]
 
 permissions:
   contents: read
@@ -104,7 +104,7 @@ jobs:
         run: bun run poc/kiota/scripts/reproduce.ts "${{ matrix.target }}" "${{ matrix.variant }}"
       - name: Require candidate contracts or assert the reviewed raw regression
         run: bun run poc/kiota/scripts/ci-target.ts "${{ matrix.target }}" "${{ matrix.variant }}"
-      - name: Install and validate the public preview wrapper package
+      - name: Install and validate the public SDK package
         if: matrix.variant == 'overlay' && matrix.target != 'HTTP'
         run: bun run poc/kiota/scripts/preview.ts "${{ matrix.target }}"
       - name: Upload evidence (including failed stages)
@@ -134,6 +134,9 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bunx --no-install ttsc --noEmit -p poc/kiota/tsconfig.json
       - run: bun test poc/kiota/overlays poc/kiota/mock poc/kiota/scripts/evidence.test.ts poc/kiota/scripts/ci-policy.test.ts poc/kiota/scripts/preview-evidence.test.ts
+      - uses: microsoft/setup-kiota@111eb592b2b3b2602ba9e0d979d4a4509cd59bb5
+        with:
+          version: v1.35.0
       - run: bun run check
 
   existing-sdk-comparison:

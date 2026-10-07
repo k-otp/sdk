@@ -1,4 +1,4 @@
-module github.com/k-otp/sdk/poc/kiota/generated
+module github.com/k-otp/sdk/sdks/go
 
 go 1.25.0
 

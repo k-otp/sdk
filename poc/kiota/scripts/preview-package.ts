@@ -1,19 +1,30 @@
 import { cp, mkdir } from "node:fs/promises";
 import path from "node:path";
-import packages from "../preview/packages.json";
+import npmPackage from "../../../packages/sdk/package.json";
+import packages from "../../../sdks/packages.json";
 import { json, root } from "./common";
 
 export const previewPackages: Record<
   string,
-  { version: string; entry: string }
-> = packages.targets;
-export const previewRoot = path.join(root, "poc/kiota/preview");
+  { version: string; entry: string; package: string }
+> = Object.fromEntries(
+  Object.entries(packages.targets).map(([target, value]) => [
+    target,
+    {
+      ...value,
+      version:
+        value.version === "workspace" ? npmPackage.version : value.version,
+    },
+  ]),
+);
+export const previewRoot = path.join(root, "sdks");
 export function consumerSource(language: string, filename: string) {
   if (process.env.POC_PROFILE !== "preview")
     return path.join(root, "poc/kiota/harness", language, filename);
   const extension = path.extname(filename);
   return path.join(
-    previewRoot,
+    root,
+    "poc/kiota/consumers",
     language.replace(/-consumer$/, ""),
     `consumer${extension}`,
   );
@@ -50,10 +61,12 @@ export async function preparePreviewSdk(language: string, sdk: string) {
         ),
     );
   } else if (language === "java") {
-    await mkdir(path.join(sdk, "preview"), { recursive: true });
+    await mkdir(path.join(sdk, "src/main/java/dev/kotp/sdk"), {
+      recursive: true,
+    });
     await cp(
       path.join(source, "KotpClient.java"),
-      path.join(sdk, "preview/KotpClient.java"),
+      path.join(sdk, "src/main/java/dev/kotp/sdk/KotpClient.java"),
     );
     const file = path.join(sdk, "pom.xml");
     await Bun.write(
@@ -61,19 +74,17 @@ export async function preparePreviewSdk(language: string, sdk: string) {
       (await Bun.file(file).text())
         .replace(
           "<sourceDirectory>generated</sourceDirectory>",
-          "<sourceDirectory>.</sourceDirectory><resources><resource><directory>.</directory><includes><include>README.md</include><include>LICENSE</include></includes></resource></resources>",
+          "<sourceDirectory>src/main/java</sourceDirectory><resources><resource><directory>.</directory><includes><include>README.md</include><include>LICENSE</include></includes></resource></resources>",
         )
         .replace(
           "<artifactId>maven-compiler-plugin</artifactId><version>3.13.0</version>",
-          "<artifactId>maven-compiler-plugin</artifactId><version>3.13.0</version><configuration><includes><include>generated/**/*.java</include><include>preview/**/*.java</include></includes></configuration>",
+          "<artifactId>maven-compiler-plugin</artifactId><version>3.13.0</version>",
         ),
     );
   } else if (language === "python") {
-    await cp(
-      path.join(source, "kotp_kiota_preview"),
-      path.join(sdk, "kotp_kiota_preview"),
-      { recursive: true },
-    );
+    await cp(path.join(source, "kotp_sdk"), path.join(sdk, "kotp_sdk"), {
+      recursive: true,
+    });
     const file = path.join(sdk, "pyproject.toml");
     await Bun.write(
       file,
@@ -88,7 +99,7 @@ export async function preparePreviewSdk(language: string, sdk: string) {
         )
         .replace(
           '["kotp_sdk_generated*"]',
-          '["kotp_sdk_generated*", "kotp_kiota_preview*"]',
+          '["kotp_sdk_generated*", "kotp_sdk*"]',
         ),
     );
   } else if (language === "php") {
@@ -101,13 +112,11 @@ export async function preparePreviewSdk(language: string, sdk: string) {
     const manifest = await Bun.file(file).json();
     manifest.version = previewPackages.PHP?.version;
     manifest.description = "K-OTP server client preview";
-    manifest.autoload["psr-4"]["KOtp\\Preview\\"] = "preview/";
+    manifest.autoload["psr-4"]["KOtp\\"] = "preview/";
     manifest.autoload.files = ["preview/KotpClient.php"];
     await json(file, manifest);
   } else if (language === "go") {
-    await cp(path.join(source, "preview"), path.join(sdk, "preview"), {
-      recursive: true,
-    });
+    await cp(path.join(source, "client.go"), path.join(sdk, "client.go"));
     for (const file of ["go.mod", "go.sum"])
       await cp(path.join(source, file), path.join(sdk, file));
   } else if (language === "ruby") {
@@ -133,7 +142,7 @@ export async function preparePreviewSdk(language: string, sdk: string) {
     }
     enumValues(input);
     await json(
-      path.join(sdk, "preview/kotp_kiota_preview/enum-wire-values.json"),
+      path.join(sdk, "preview/kotp_sdk/enum-wire-values.json"),
       aliases,
     );
   } else if (language === "dart") {
@@ -149,6 +158,70 @@ export async function preparePreviewSdk(language: string, sdk: string) {
           "description: Unpublished generated client build and consumer fixture.",
           "description: K-OTP server client preview.",
         ),
+    );
+  }
+  // Only package manifests and our wrapper sources are adapted here. Kiota
+  // generated sources are copied byte-for-byte from their generation output.
+  const metadata = "https://github.com/k-otp/sdk";
+  if (language === "dotnet") {
+    const file = path.join(sdk, "SDK.csproj");
+    await Bun.write(
+      file,
+      (await Bun.file(file).text())
+        .replace("KOtp.Kiota.Poc", "KOtp.Sdk")
+        .replace(
+          "<PackageId>",
+          `<Authors>K-OTP</Authors><Description>K-OTP server SDK</Description><PackageProjectUrl>https://k-otp.dev</PackageProjectUrl><RepositoryUrl>${metadata}</RepositoryUrl><PackageId>`,
+        ),
+    );
+  } else if (language === "java") {
+    const file = path.join(sdk, "pom.xml");
+    await Bun.write(
+      file,
+      (await Bun.file(file).text())
+        .replaceAll("dev.kotp.poc", "dev.kotp")
+        .replaceAll("kiota-sdk", "kotp-sdk")
+        .replace(
+          "<build>",
+          `<name>K-OTP SDK</name><description>K-OTP server SDK for Java and Kotlin/JVM</description><url>https://k-otp.dev</url><licenses><license><name>MIT</name><url>https://opensource.org/licenses/MIT</url></license></licenses><scm><url>${metadata}</url><connection>scm:git:${metadata}.git</connection></scm><developers><developer><id>k-otp</id><name>K-OTP</name></developer></developers><build>`,
+        ),
+    );
+  } else if (language === "python") {
+    const file = path.join(sdk, "pyproject.toml");
+    await Bun.write(
+      file,
+      (await Bun.file(file).text())
+        .replace('name = "kotp-kiota-poc"', 'name = "kotp-sdk"')
+        .replace(
+          'description = "K-OTP server client preview"',
+          'description = "K-OTP server SDK"',
+        )
+        .replace('requires-python = ">=3.11"', 'requires-python = ">=3.13"') +
+        `\n[project.urls]\nHomepage = "https://k-otp.dev"\nRepository = "${metadata}"\n`,
+    );
+    await Bun.write(path.join(sdk, "kotp_sdk/py.typed"), "");
+  } else if (language === "php") {
+    const file = path.join(sdk, "composer.json");
+    const manifest = await Bun.file(file).json();
+    Object.assign(manifest, {
+      name: "k-otp/sdk",
+      description: "K-OTP server SDK",
+      homepage: "https://k-otp.dev",
+      support: { source: metadata, issues: `${metadata}/issues` },
+    });
+    await json(file, manifest);
+  } else if (language === "dart") {
+    const file = path.join(sdk, "pubspec.yaml");
+    await Bun.write(
+      file,
+      (await Bun.file(file).text())
+        .replace("name: kotp_kiota_poc", "name: kotp_sdk")
+        .replace(
+          "description: K-OTP server client preview.",
+          "description: K-OTP server SDK for Dart.",
+        )
+        .replace("publish_to: none\n", "") +
+        `\nhomepage: https://k-otp.dev\nrepository: ${metadata}\n`,
     );
   }
 }

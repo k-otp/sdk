@@ -123,3 +123,9 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md).
 ## License
 
 [MIT](./LICENSE) © 2026 1990Company
+
+## Other server languages
+
+[Server SDK installation guides](sdks/README.md) cover C#, Java, Kotlin/JVM,
+PHP, Go, Python, Ruby and Dart. TypeScript also provides an official Kiota
+client through [`@k-otp/sdk/kiota`](sdks/typescript/README.md).

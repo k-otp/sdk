@@ -3,7 +3,7 @@ module example.invalid/kotp-kiota-consumer
 go 1.25.0
 
 require (
-	github.com/k-otp/sdk/poc/kiota/generated v0.0.0-poc-overlay
+	github.com/k-otp/sdk/sdks/go v0.0.0-poc-overlay
 	github.com/microsoft/kiota-abstractions-go v1.11.1
 	github.com/microsoft/kiota-bundle-go v1.4.3
 	github.com/microsoft/kiota-serialization-json-go v1.1.2

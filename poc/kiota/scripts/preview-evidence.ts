@@ -24,6 +24,14 @@ export async function previewSourceHash(target: string) {
       manifest[path.relative(previewRoot, file)] = sha256(
         await Bun.file(file).bytes(),
       );
+  for (const file of await files(
+    path.join(
+      root,
+      "poc/kiota/consumers",
+      language === "kotlin-consumer" ? "kotlin" : language,
+    ),
+  ))
+    manifest[path.relative(root, file)] = sha256(await Bun.file(file).bytes());
   manifest["packages.json"] = sha256(
     await Bun.file(path.join(previewRoot, "packages.json")).bytes(),
   );
@@ -75,7 +83,7 @@ export function assessPreview(
   if (!expected) errors.push("Unknown preview package");
   for (const [key, value] of Object.entries({
     ...expected,
-    channel: "local-preview",
+    channel: "release",
     profile: "preview",
     sourceHash,
   }))

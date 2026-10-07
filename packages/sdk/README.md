@@ -327,3 +327,11 @@ the public API and shares the package version. See the
 ## License
 
 MIT
+
+## Kiota server client
+
+`@k-otp/sdk/kiota` provides `KotpClient` using official Kiota request builders
+and runtimes. It supports all nine server operations, requires an `sk_` key,
+and returns native JSON values. See the [TypeScript guide](../../sdks/typescript/README.md)
+for installation, errors and retry options. The browser export rejects client
+construction so server credentials remain on the server.

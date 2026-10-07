@@ -132,6 +132,20 @@
         "default": "./dist/server.cjs"
       }
     },
+    "./kiota": {
+      "browser": {
+        "types": "./dist/kiota.d.ts",
+        "default": "./dist/kiota.browser.js"
+      },
+      "import": {
+        "types": "./dist/kiota.d.ts",
+        "default": "./dist/kiota.js"
+      },
+      "require": {
+        "types": "./dist/kiota.d.cts",
+        "default": "./dist/kiota.cjs"
+      }
+    },
     "./react": {
       "import": {
         "types": "./dist/react.d.ts",
@@ -209,7 +223,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && tsdown",
+    "build": "rm -rf dist && tsdown && bun run ../../scripts/build-kiota.ts",
     "typecheck": "ttsc --noEmit -p tsconfig.json && ttsc --noEmit -p tsconfig.test.json",
     "test": "bun test",
     "clean": "rm -rf dist",
@@ -218,7 +232,14 @@
   "dependencies": {
     "@orpc/client": "catalog:",
     "@orpc/contract": "catalog:",
-    "@orpc/openapi-client": "catalog:"
+    "@orpc/openapi-client": "catalog:",
+    "@microsoft/kiota-abstractions": "1.0.0-preview.109",
+    "@microsoft/kiota-bundle": "1.0.0-preview.106",
+    "@microsoft/kiota-http-fetchlibrary": "1.0.0-preview.109",
+    "@microsoft/kiota-serialization-json": "1.0.0-preview.109",
+    "@microsoft/kiota-serialization-form": "1.0.0-preview.109",
+    "@microsoft/kiota-serialization-multipart": "1.0.0-preview.109",
+    "@microsoft/kiota-serialization-text": "1.0.0-preview.109"
   },
   "peerDependencies": {
     "react": ">=18",

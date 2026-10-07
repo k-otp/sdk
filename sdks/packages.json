@@ -1,0 +1,51 @@
+{
+  "channel": "release",
+  "version": "0.1.0",
+  "targets": {
+    "CSharp": {
+      "version": "0.1.0",
+      "entry": "KOtp.KotpClient",
+      "package": "KOtp.Sdk"
+    },
+    "Java": {
+      "version": "0.1.0",
+      "entry": "dev.kotp.sdk.KotpClient",
+      "package": "dev.kotp:kotp-sdk"
+    },
+    "Kotlin": {
+      "version": "0.1.0",
+      "entry": "dev.kotp.sdk.KotpClient (Java JAR)",
+      "package": "dev.kotp:kotp-sdk"
+    },
+    "PHP": {
+      "version": "0.1.0",
+      "entry": "KOtp\\KotpClient",
+      "package": "k-otp/sdk"
+    },
+    "Go": {
+      "version": "0.1.0",
+      "entry": "github.com/k-otp/sdk/sdks/go",
+      "package": "github.com/k-otp/sdk/sdks/go"
+    },
+    "Python": {
+      "version": "0.1.0",
+      "entry": "kotp_sdk.KotpClient",
+      "package": "kotp-sdk"
+    },
+    "Ruby": {
+      "version": "0.1.0",
+      "entry": "KOtp::Client",
+      "package": "kotp_sdk"
+    },
+    "Dart": {
+      "version": "0.1.0",
+      "entry": "package:kotp_sdk/kotp_sdk.dart",
+      "package": "kotp_sdk"
+    },
+    "TypeScript": {
+      "version": "workspace",
+      "entry": "@k-otp/sdk/kiota: KotpClient",
+      "package": "@k-otp/sdk"
+    }
+  }
+}

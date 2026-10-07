@@ -219,7 +219,9 @@ try {
     const project = path.join(consumer, "Consumer.csproj");
     await Bun.write(
       project,
-      (await Bun.file(project).text()).replaceAll("0.0.0-poc-overlay", version),
+      (await Bun.file(project).text())
+        .replaceAll("0.0.0-poc-overlay", version)
+        .replaceAll("KOtp.Kiota.Poc", preview ? "KOtp.Sdk" : "KOtp.Kiota.Poc"),
     );
     await execute(
       "packageConsumer",
@@ -256,9 +258,16 @@ try {
     await tool("java", ["java", "-version"]);
     await tool("maven", [mvn, "--version"]);
     await copyTemplate("java", sdk, ["pom.xml"]);
-    await cp(path.join(out, "generated"), path.join(sdk, "generated"), {
-      recursive: true,
-    });
+    await cp(
+      path.join(out, "generated"),
+      path.join(
+        sdk,
+        preview ? "src/main/java/dev/kotp/sdk/generated" : "generated",
+      ),
+      {
+        recursive: true,
+      },
+    );
     const pom = path.join(sdk, "pom.xml");
     await Bun.write(
       pom,
@@ -273,6 +282,19 @@ try {
       [mvn, "-B", "package", "-DskipTests"],
       sdk,
     );
+    if (preview)
+      await execute(
+        "packageConsumer",
+        "java-sources",
+        [
+          mvn,
+          "-B",
+          "org.apache.maven.plugins:maven-source-plugin:3.3.1:jar-no-fork",
+          "org.apache.maven.plugins:maven-javadoc-plugin:3.11.2:jar",
+          "-Ddoclint=none",
+        ],
+        sdk,
+      );
     await execute(
       "buildOrLoad",
       "dependencies",
@@ -332,12 +354,16 @@ try {
       );
     }
     const consumerPom = path.join(consumer, "pom.xml");
-    const consumerText = await Bun.file(consumerPom).text();
+    let consumerText = await Bun.file(consumerPom).text();
+    if (preview)
+      consumerText = consumerText
+        .replaceAll("dev.kotp.poc", "dev.kotp")
+        .replaceAll("kiota-sdk", "kotp-sdk");
     await Bun.write(
       consumerPom,
       consumerText.replace(
-        "<artifactId>kiota-sdk</artifactId><version>0.0.0-poc</version>",
-        `<artifactId>kiota-sdk</artifactId><version>${version}</version>`,
+        `<artifactId>${preview ? "kotp-sdk" : "kiota-sdk"}</artifactId><version>0.0.0-poc</version>`,
+        `<artifactId>${preview ? "kotp-sdk" : "kiota-sdk"}</artifactId><version>${version}</version>`,
       ),
     );
     await execute(
@@ -408,7 +434,13 @@ try {
     await execute(
       "packageConsumer",
       "wheel",
-      [interpreter, "-m", "build", "--wheel", "--no-isolation"],
+      [
+        interpreter,
+        "-m",
+        "build",
+        ...(preview ? [] : ["--wheel"]),
+        "--no-isolation",
+      ],
       sdk,
     );
     await execute("packageConsumer", "consumer-venv", [
@@ -435,7 +467,7 @@ try {
       "--no-deps",
       path.join(
         sdk,
-        `dist/kotp_kiota_poc-${preview ? version : "0.0.0"}-py3-none-any.whl`,
+        `dist/${preview ? "kotp_sdk" : "kotp_kiota_poc"}-${preview ? version : "0.0.0"}-py3-none-any.whl`,
       ),
     ]);
     await cp(
@@ -515,7 +547,11 @@ try {
     );
     await json(path.join(consumer, "composer.json"), {
       name: "k-otp/kiota-poc-consumer",
-      require: { "k-otp/kiota-poc": preview ? version : "0.0.0" },
+      require: {
+        [preview ? "k-otp/sdk" : "k-otp/kiota-poc"]: preview
+          ? version
+          : "0.0.0",
+      },
       repositories: [{ type: "artifact", url: packages }],
       config: { "allow-plugins": false },
     });
@@ -538,7 +574,9 @@ try {
     const go = process.env.GO_BIN ?? "go";
     await tool("go", [go, "version"]);
     await lock("go", ["go.mod", "go.sum"]);
-    await cp(path.join(out, "generated"), sdk, { recursive: true });
+    await cp(path.join(out, "generated"), path.join(sdk, "generated"), {
+      recursive: true,
+    });
     await copyTemplate("go", sdk, ["go.mod", "go.sum"]);
     await execute(
       "buildOrLoad",
@@ -550,7 +588,7 @@ try {
       "passed",
       `${result.generatedSourceFiles} generated Go files built as all packages`,
     );
-    const module = "github.com/k-otp/sdk/poc/kiota/generated";
+    const module = "github.com/k-otp/sdk/sdks/go";
     const moduleVersion = `v${version}`;
     const packages = path.join(out, "packages");
     await execute("packageConsumer", "module-zip", [
@@ -625,7 +663,7 @@ try {
       "usage.test.ts",
     ]);
     await cp(
-      path.join(root, "poc/kiota/preview/typescript/compatibility.ts"),
+      path.join(root, "sdks/typescript/compatibility.ts"),
       path.join(sdk, "usage.ts"),
     );
     await cp(path.join(out, "generated"), path.join(sdk, "generated"), {
@@ -659,118 +697,222 @@ try {
       ["bun", "test", "usage.test.ts"],
       sdk,
     );
-    await execute(
-      "packageConsumer",
-      "typescript-build",
-      [
-        "bun",
-        "build",
-        preview ? "preview/index.ts" : "generated/kOtpApiClient.ts",
-        "--outdir",
+    if (preview) {
+      await execute(
+        "buildOrLoad",
+        "workspace-install",
+        ["bun", "install", "--frozen-lockfile"],
+        root,
+      );
+      await execute(
+        "packageConsumer",
+        "workspace-build",
+        ["bun", "run", "build"],
+        root,
+      );
+      const packages = path.join(out, "packages");
+      await mkdir(packages, { recursive: true });
+      await execute(
+        "packageConsumer",
+        "npm-pack",
+        ["bun", "pm", "pack", "--destination", packages],
+        path.join(root, "packages/sdk"),
+      );
+      const archive = path.join(packages, `k-otp-sdk-${version}.tgz`);
+      await json(path.join(consumer, "package.json"), {
+        name: "kotp-kiota-typescript-consumer",
+        private: true,
+        type: "module",
+        dependencies: { "@k-otp/sdk": `file:${archive}` },
+        devDependencies: {
+          ttsc: "0.30.4",
+          typescript: "7.0.2",
+          "@types/bun": "1.4.2",
+        },
+      });
+      await cp(
+        consumerSource("typescript", "runner.ts"),
+        path.join(consumer, "runner.ts"),
+      );
+      await cp(
+        path.join(template("typescript"), "tsconfig.json"),
+        path.join(consumer, "tsconfig.json"),
+      );
+      await execute(
+        "packageConsumer",
+        "consumer-install",
+        ["bun", "install"],
+        consumer,
+      );
+      await execute(
+        "packageConsumer",
+        "consumer-typecheck",
+        [
+          path.join(consumer, "node_modules/.bin/ttsc"),
+          "--noEmit",
+          "-p",
+          "tsconfig.json",
+        ],
+        consumer,
+      );
+      await execute(
+        "packageConsumer",
+        "consumer-import",
+        [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import {KotpClient} from '@k-otp/sdk/kiota'; if(typeof KotpClient!=='function') throw new Error('missing packaged client')",
+        ],
+        consumer,
+      );
+      await execute(
+        "packageConsumer",
+        "consumer-cjs",
+        [
+          "node",
+          "-e",
+          "const {KotpClient}=require('@k-otp/sdk/kiota'); if(typeof KotpClient!=='function') throw new Error('missing packaged client')",
+        ],
+        consumer,
+      );
+      await execute(
+        "packageConsumer",
+        "consumer-runner",
+        [
+          "bun",
+          "build",
+          "runner.ts",
+          "--target",
+          "node",
+          "--packages",
+          "external",
+          "--outfile",
+          "runner.mjs",
+        ],
+        consumer,
+      );
+      result.packageConsumer = stage(
+        "passed",
+        "Installed @k-otp/sdk tarball; TypeScript public declarations and Node ESM/CJS imports checked",
+      );
+      await runWire(["node", "runner.mjs"]);
+    } else {
+      await execute(
+        "packageConsumer",
+        "typescript-build",
+        [
+          "bun",
+          "build",
+          preview ? "preview/index.ts" : "generated/kOtpApiClient.ts",
+          "--outdir",
+          "dist",
+          "--target",
+          preview ? "node" : "bun",
+          "--packages",
+          "external",
+        ],
+        sdk,
+      );
+      const manifestPath = path.join(sdk, "package.json");
+      const manifest = await Bun.file(manifestPath).json();
+      manifest.files = [
         "dist",
-        "--target",
-        preview ? "node" : "bun",
-        "--packages",
-        "external",
-      ],
-      sdk,
-    );
-    const manifestPath = path.join(sdk, "package.json");
-    const manifest = await Bun.file(manifestPath).json();
-    manifest.files = [
-      "dist",
-      "generated/**/*.ts",
-      ...(preview ? ["preview/**/*.ts", "README.md", "LICENSE"] : []),
-    ];
-    if (preview) manifest.version = version;
-    manifest.exports = {
-      ".": {
-        types: preview ? "./preview/index.ts" : "./generated/kOtpApiClient.ts",
-        default: preview ? "./dist/index.js" : "./dist/kOtpApiClient.js",
-      },
-      "./issue": "./generated/issue/index.ts",
-      "./verify": "./generated/verify/index.ts",
-      "./generated/*": "./generated/*/index.ts",
-    };
-    await json(manifestPath, manifest);
-    const packages = path.join(out, "packages");
-    await mkdir(packages, { recursive: true });
-    await execute(
-      "packageConsumer",
-      "typescript-pack",
-      ["bun", "pm", "pack", "--destination", packages],
-      sdk,
-    );
-    const archive = path.join(
-      packages,
-      `kotp-kiota-poc-typescript-${preview ? version : "0.0.0"}.tgz`,
-    );
-    await json(path.join(consumer, "package.json"), {
-      name: "kotp-kiota-typescript-consumer",
-      private: true,
-      type: "module",
-      dependencies: { "kotp-kiota-poc-typescript": `file:${archive}` },
-      devDependencies: {
-        ttsc: "0.30.4",
-        typescript: "7.0.2",
-        "@types/bun": "1.4.2",
-      },
-    });
-    const runner = (
-      await Bun.file(consumerSource("typescript", "runner.ts")).text()
-    )
-      .replace('"./generated/kOtpApiClient"', '"kotp-kiota-poc-typescript"')
-      .replace('"./generated/issue"', '"kotp-kiota-poc-typescript/issue"')
-      .replace('"./generated/verify"', '"kotp-kiota-poc-typescript/verify"');
-    await Bun.write(
-      path.join(consumer, "runner.ts"),
-      runner.replaceAll(
-        '"./generated/',
-        '"kotp-kiota-poc-typescript/generated/',
-      ),
-    );
-    await cp(
-      path.join(root, "poc/kiota/preview/typescript/compatibility.ts"),
-      path.join(consumer, "usage.ts"),
-    );
-    await cp(
-      path.join(template("typescript"), "tsconfig.json"),
-      path.join(consumer, "tsconfig.json"),
-    );
-    await execute(
-      "packageConsumer",
-      "typescript-consumer-install",
-      ["bun", "install"],
-      consumer,
-    );
-    await execute(
-      "packageConsumer",
-      "typescript-consumer-typecheck",
-      [
-        path.join(consumer, "node_modules/.bin/ttsc"),
-        "--noEmit",
-        "-p",
-        "tsconfig.json",
-      ],
-      consumer,
-    );
-    await execute(
-      "packageConsumer",
-      "typescript-consumer-import",
-      [
-        "bun",
-        "-e",
-        preview
-          ? "import {KotpClient} from 'kotp-kiota-poc-typescript';if(typeof KotpClient!=='function')throw new Error('missing packaged wrapper')"
-          : "import {createKOtpApiClient} from 'kotp-kiota-poc-typescript';if(typeof createKOtpApiClient!=='function')throw new Error('missing packaged client')",
-      ],
-      consumer,
-    );
-    result.packageConsumer = stage(
-      "passed",
-      "Built client packed as a local tarball and loaded from an independent Bun consumer",
-    );
-    await runWire(["bun", "runner.ts"]);
+        "generated/**/*.ts",
+        ...(preview ? ["preview/**/*.ts", "README.md", "LICENSE"] : []),
+      ];
+      if (preview) manifest.version = version;
+      manifest.exports = {
+        ".": {
+          types: preview
+            ? "./preview/index.ts"
+            : "./generated/kOtpApiClient.ts",
+          default: preview ? "./dist/index.js" : "./dist/kOtpApiClient.js",
+        },
+        "./issue": "./generated/issue/index.ts",
+        "./verify": "./generated/verify/index.ts",
+        "./generated/*": "./generated/*/index.ts",
+      };
+      await json(manifestPath, manifest);
+      const packages = path.join(out, "packages");
+      await mkdir(packages, { recursive: true });
+      await execute(
+        "packageConsumer",
+        "typescript-pack",
+        ["bun", "pm", "pack", "--destination", packages],
+        sdk,
+      );
+      const archive = path.join(
+        packages,
+        `kotp-kiota-poc-typescript-${preview ? version : "0.0.0"}.tgz`,
+      );
+      await json(path.join(consumer, "package.json"), {
+        name: "kotp-kiota-typescript-consumer",
+        private: true,
+        type: "module",
+        dependencies: { "kotp-kiota-poc-typescript": `file:${archive}` },
+        devDependencies: {
+          ttsc: "0.30.4",
+          typescript: "7.0.2",
+          "@types/bun": "1.4.2",
+        },
+      });
+      const runner = (
+        await Bun.file(consumerSource("typescript", "runner.ts")).text()
+      )
+        .replace('"./generated/kOtpApiClient"', '"kotp-kiota-poc-typescript"')
+        .replace('"./generated/issue"', '"kotp-kiota-poc-typescript/issue"')
+        .replace('"./generated/verify"', '"kotp-kiota-poc-typescript/verify"');
+      await Bun.write(
+        path.join(consumer, "runner.ts"),
+        runner.replaceAll(
+          '"./generated/',
+          '"kotp-kiota-poc-typescript/generated/',
+        ),
+      );
+      await cp(
+        path.join(root, "sdks/typescript/compatibility.ts"),
+        path.join(consumer, "usage.ts"),
+      );
+      await cp(
+        path.join(template("typescript"), "tsconfig.json"),
+        path.join(consumer, "tsconfig.json"),
+      );
+      await execute(
+        "packageConsumer",
+        "typescript-consumer-install",
+        ["bun", "install"],
+        consumer,
+      );
+      await execute(
+        "packageConsumer",
+        "typescript-consumer-typecheck",
+        [
+          path.join(consumer, "node_modules/.bin/ttsc"),
+          "--noEmit",
+          "-p",
+          "tsconfig.json",
+        ],
+        consumer,
+      );
+      await execute(
+        "packageConsumer",
+        "typescript-consumer-import",
+        [
+          "bun",
+          "-e",
+          preview
+            ? "import {KotpClient} from 'kotp-kiota-poc-typescript';if(typeof KotpClient!=='function')throw new Error('missing packaged wrapper')"
+            : "import {createKOtpApiClient} from 'kotp-kiota-poc-typescript';if(typeof createKOtpApiClient!=='function')throw new Error('missing packaged client')",
+        ],
+        consumer,
+      );
+      result.packageConsumer = stage(
+        "passed",
+        "Built client packed as a local tarball and loaded from an independent Bun consumer",
+      );
+      await runWire(["bun", "runner.ts"]);
+    }
   } else if (name === "Ruby") {
     const ruby = process.env.RUBY_BIN ?? "ruby";
     await tool("ruby", [ruby, "--version"]);
@@ -826,7 +968,17 @@ try {
             "Dir['generated/**/*.rb']",
             "Dir['generated/**/*.rb', 'preview/**/*', 'README.md', 'LICENSE']",
           )
-          .replace("['generated']", "['generated', 'preview']"),
+          .replace("['generated']", "['generated', 'preview']")
+          .replace("spec.name = 'kotp_kiota_poc'", "spec.name = 'kotp_sdk'")
+          .replace(
+            "Unpublished K-OTP Kiota generated SDK fixture",
+            "K-OTP server SDK",
+          )
+          .replace("K-OTP PoC", "K-OTP")
+          .replace(
+            "spec.license",
+            "spec.homepage = 'https://k-otp.dev'\n  spec.metadata = { 'source_code_uri' => 'https://github.com/k-otp/sdk' }\n  spec.license",
+          ),
       );
     }
     await execute(
@@ -841,7 +993,7 @@ try {
         "--output",
         path.join(
           packages,
-          `kotp_kiota_poc-${preview ? version : "0.0.0"}.gem`,
+          `${preview ? "kotp_sdk" : "kotp_kiota_poc"}-${preview ? version : "0.0.0"}.gem`,
         ),
       ],
       sdk,
@@ -858,7 +1010,7 @@ try {
         "--local",
         path.join(
           packages,
-          `kotp_kiota_poc-${preview ? version : "0.0.0"}.gem`,
+          `${preview ? "kotp_sdk" : "kotp_kiota_poc"}-${preview ? version : "0.0.0"}.gem`,
         ),
         "--install-dir",
         path.join(consumer, "gems"),
@@ -891,10 +1043,7 @@ try {
     );
     await Bun.write(path.join(consumer, "runner.rb"), rubySource);
     await cp(
-      path.join(
-        root,
-        "poc/kiota/preview/ruby/lib/kotp_kiota_preview/compatibility.rb",
-      ),
+      path.join(root, "sdks/ruby/lib/kotp_sdk/compatibility.rb"),
       path.join(consumer, "usage.rb"),
     );
     const rubyInput = await Bun.file(
@@ -995,7 +1144,12 @@ try {
     );
     const packages = path.join(out, "packages");
     await mkdir(packages, { recursive: true });
-    const archive = path.join(packages, "kotp-kiota-poc-dart.tar.gz");
+    const archive = path.join(
+      packages,
+      preview
+        ? `kotp-sdk-dart-${version}.tar.gz`
+        : "kotp-kiota-poc-dart.tar.gz",
+    );
     await execute(
       "packageConsumer",
       "dart-archive",
@@ -1021,12 +1175,15 @@ try {
     ]);
     await Bun.write(
       path.join(consumer, "pubspec.yaml"),
-      "name: kotp_dart_consumer\npublish_to: none\nenvironment:\n  sdk: '>=3.9.0 <4.0.0'\ndependencies:\n  kotp_kiota_poc:\n    path: installed-sdk\n  microsoft_kiota_bundle: 0.1.1\n",
+      `name: kotp_dart_consumer\npublish_to: none\nenvironment:\n  sdk: '>=3.9.0 <4.0.0'\ndependencies:\n  ${preview ? "kotp_sdk" : "kotp_kiota_poc"}:\n    path: installed-sdk\n  microsoft_kiota_bundle: 0.1.1\n`,
     );
     let dartSource = (
       await Bun.file(consumerSource("dart", "runner.dart")).text()
-    ).replaceAll("'lib/generated/", "'package:kotp_kiota_poc/generated/");
-    if (variant === "overlay") {
+    ).replaceAll(
+      "'lib/generated/",
+      `'package:${preview ? "kotp_sdk" : "kotp_kiota_poc"}/generated/`,
+    );
+    if (variant === "overlay" && !preview) {
       dartSource =
         "import 'package:kotp_kiota_poc/generated/issues/get_verification_status_query_parameter_type.dart';\n" +
         "import 'package:kotp_kiota_poc/generated/creditLedger/get_entry_type_query_parameter_type.dart';\n" +
@@ -1045,9 +1202,12 @@ try {
       path.join(consumer, "usage.dart"),
       (
         await Bun.file(
-          path.join(root, "poc/kiota/preview/dart/lib/src/compatibility.dart"),
+          path.join(root, "sdks/dart/lib/src/compatibility.dart"),
         ).text()
-      ).replaceAll("'../generated/", "'package:kotp_kiota_poc/generated/"),
+      ).replaceAll(
+        "'../generated/",
+        `'package:${preview ? "kotp_sdk" : "kotp_kiota_poc"}/generated/`,
+      ),
     );
     await execute(
       "packageConsumer",
@@ -1072,10 +1232,13 @@ try {
         (
           await Bun.file(
             preview
-              ? path.join(root, "poc/kiota/preview/dart/policy_test.dart")
+              ? path.join(root, "poc/kiota/consumers/dart/policy_test.dart")
               : path.join(template("dart"), "usage_test.dart"),
           ).text()
-        ).replaceAll("'lib/generated/", "'package:kotp_kiota_poc/generated/"),
+        ).replaceAll(
+          "'lib/generated/",
+          `'package:${preview ? "kotp_sdk" : "kotp_kiota_poc"}/generated/`,
+        ),
       );
       await execute(
         "wireContract",
@@ -1114,15 +1277,43 @@ try {
   const packages = path.join(out, "packages");
   await mkdir(packages, { recursive: true });
   for (const file of [
-    path.join(sdk, `target/kiota-sdk-${version}.jar`),
     path.join(
       sdk,
-      `dist/kotp_kiota_poc-${preview ? version : "0.0.0"}-py3-none-any.whl`,
+      `target/${preview ? "kotp-sdk" : "kiota-sdk"}-${version}.jar`,
+    ),
+    path.join(
+      sdk,
+      `dist/${preview ? "kotp_sdk" : "kotp_kiota_poc"}-${preview ? version : "0.0.0"}-py3-none-any.whl`,
     ),
   ]) {
     if (await Bun.file(file).exists())
       await cp(file, path.join(packages, path.basename(file)));
   }
+  if (preview && (name === "Java" || name === "Kotlin")) {
+    await cp(
+      path.join(sdk, "pom.xml"),
+      path.join(packages, `kotp-sdk-${version}.pom`),
+    );
+    for (const suffix of ["sources", "javadoc"])
+      if (
+        await Bun.file(
+          path.join(sdk, `target/kotp-sdk-${version}-${suffix}.jar`),
+        ).exists()
+      )
+        await cp(
+          path.join(sdk, `target/kotp-sdk-${version}-${suffix}.jar`),
+          path.join(packages, `kotp-sdk-${version}-${suffix}.jar`),
+        );
+  }
+  if (
+    preview &&
+    name === "Python" &&
+    (await Bun.file(path.join(sdk, `dist/kotp_sdk-${version}.tar.gz`)).exists())
+  )
+    await cp(
+      path.join(sdk, `dist/kotp_sdk-${version}.tar.gz`),
+      path.join(packages, `kotp_sdk-${version}.tar.gz`),
+    );
   result.fixtureSha256 = sha256(
     await Bun.file(path.join(root, "poc/kiota/fixtures/contract.json")).bytes(),
   );

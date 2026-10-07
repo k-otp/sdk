@@ -6,7 +6,7 @@ SDKs are unpublished fixtures outside the Bun/Sampo release workspace. See the
 remaining failures.
 
 Public preview wrapper packages and their usage guides are under
-[`preview/`](preview/README.md). They include client setup, all nine operations,
+[`preview/`](../../sdks/README.md). They include client setup, all nine operations,
 normalized API errors and K-OTP idempotency/retry policy in the installed artifact.
 Internal build/CI evidence stays in this PoC directory.
 
@@ -150,7 +150,7 @@ public `requestId`/`retryAfterMs`, package hashes and current source/run identit
 It uses the corresponding clean overlay generation as input. All nine preview
 consumers are mandatory CI checks, including Kotlin's consumption of the Java JAR.
 Artifacts include a usage README and MIT license. Native pre-release versions
-and public entry points are listed in `preview/packages.json`; no registry publish
+and public entry points are listed in `../../sdks/packages.json`; no registry publish
 or existing SDK version change is involved.
 
 CI uploads evidence even when a native stage fails, then writes JSON/Markdown

@@ -51,6 +51,11 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
+      - name: Setup pinned Kiota
+        uses: microsoft/setup-kiota@111eb592b2b3b2602ba9e0d979d4a4509cd59bb5 # v0.5.0
+        with:
+          version: v1.35.0
+
       - name: Publish check
         id: publish_check
         env:

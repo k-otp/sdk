@@ -27,7 +27,7 @@ function sample() {
     reproducibility: stage("passed"),
     previewPackage: {
       ...previewPackages.Java,
-      channel: "local-preview",
+      channel: "release",
       profile: "preview",
       sourceHash: "source",
     },

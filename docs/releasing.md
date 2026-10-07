@@ -170,3 +170,33 @@ SAMPO_RELEASE_BRANCH=main sampo release --dry-run  # planned version bump
 ./scripts/release-lockfile.sh                      # fix a drifted sampo/release lockfile (pushes)
 bun run check                                      # full local gate
 ```
+
+## Native server SDKs
+
+`sdks/packages.json` owns the native coordinates and independent version
+(currently 0.1.0). npm remains one Sampo package; its `/kiota` subpath shares
+the existing npm version. Do not publish the raw or fixture-only packages.
+
+1. Change wrappers under `sdks/` and add a Sampo changeset when `/kiota` changes.
+2. Require the existing CI plus the complete Kiota SDK validation on the PR.
+3. Merge, merge the Sampo release PR, and let `release.yml` publish npm via OIDC.
+4. Wait for the successful main Kiota validation at the final release commit.
+5. Dispatch `release-sdks.yml` on main with that validation run ID. It rejects
+   stale, failed, PR or unrelated workflow evidence, validates all nine installed
+   consumers and artifact hashes, then publishes `server-sdk-v0.1.0` with native
+   packages, checksums and validation records. It never re-builds release assets.
+
+Go needs committed source for module discovery. The release workflow adds the
+exact verified module ZIP contents to a separate snapshot commit under
+`sdks/go` and tags it `sdks/go/v0.1.0`. The main branch keeps generated code in
+`.cache`. Go proxy installation must be verified after publishing the tag.
+The release is created as a draft, uploaded completely, and then published.
+An existing published release is never overwritten.
+
+NuGet, Maven Central, PyPI, RubyGems, pub.dev and Packagist need publisher
+accounts/namespace ownership configured before registry upload. GitHub release
+assets are installable meanwhile; language guides use this route. Maven assets
+include the real POM, sources and Javadoc; signing and Central credentials are
+configured with the publisher account. Packagist additionally needs a repository
+with composer.json at its root, so it needs a separately configured distribution
+repository before it can be submitted.

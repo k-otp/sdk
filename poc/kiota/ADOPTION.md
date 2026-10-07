@@ -1,8 +1,11 @@
+> 정식 패키지 준비는 `sdks/`로 이전했다. 이 문서는 PoC 시점의 조사와 검증 기록이다.
+> 설치/사용법은 [서버 SDK 가이드](../../sdks/README.md), 배포 절차는 [릴리스 문서](../../docs/releasing.md)를 참조한다.
+
 # K-OTP Kiota 다국어 SDK PoC 결과와 릴리스 후속안
 
 확인 기준: 2026-10-07, Asia/Seoul. 작업 브랜치: `poc/kiota-multilang`.
 
-이 파일은 개발 검증 기록이다. 사용자는 [`preview/README.md`](preview/README.md)의
+이 파일은 개발 검증 기록이다. 사용자는 [`../../sdks/README.md`](preview/README.md)의
 언어별 설치·사용법을 참고한다. 사용자 문서 `docs/`에서는 이 보고서를 제거했다.
 
 ## 공개 wrapper와 로컬 preview 패키지
@@ -17,7 +20,7 @@
 CLI/spec/fixture/run/commit 및 wrapper source hash가 다르면 이전 증거를 재사용할
 수 없다. CI는 기존 raw/overlay 검증에 이어 이 preview 소비자를 모두 필수로 실행한다.
 
-버전과 공개 entry point는 `preview/packages.json`에 있고 각 artifact에 사용자
+버전과 공개 entry point는 `../../sdks/packages.json`에 있고 각 artifact에 사용자
 README와 MIT license를 포함했다. Ruby/Dart/TypeScript의 보완 계층은 preview
 package 소스가 기준이며 기존 PoC도 같은 소스를 소비한다. 생성 파일은 수정하지 않는다.
 패키지 이름은 로컬 fixture 좌표로 잠정적이며 외부 registry 발행은 하지 않았다.
