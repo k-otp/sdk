@@ -20,6 +20,12 @@ Public, MIT-licensed SDK for the K-OTP Korean OTP API (`https://api.k-otp.dev/v1
   - `src/headless` -> `@k-otp/sdk/headless` (public, SemVer-covered): the
     `createOtpOperation` / `createOtpFlow` controllers. Put shared adapter
     behavior there, never in one adapter, so the adapters stay identical.
+  - `src/testing` -> `@k-otp/sdk/testing` (public, SemVer-covered):
+    `createMockTransport()`, an in-memory simulator of the API test mode
+    (`pk_test_`/`sk_test_`) for users' unit tests. The test-mode constants
+    and helpers (`isTestKey`, `TEST_PHONE_NUMBERS`, `TEST_OTP_CODE`, ...)
+    live in `src/core/test-mode.ts` and are exported from core; keep the
+    scenario table and timings equal to the API's.
   - `src/server` -> `@k-otp/sdk/server`: all public `/v1` operations with
     `sk_` keys only (any key not starting with `sk_` is a `TypeError`).
     Under the `browser` export condition it resolves to

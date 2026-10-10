@@ -26,6 +26,7 @@
       "@k-otp/sdk/core": ["./packages/sdk/src/core/index.ts"],
       "@k-otp/sdk/headless": ["./packages/sdk/src/headless/index.ts"],
       "@k-otp/sdk/contract": ["./packages/sdk/src/core/contract.ts"],
+      "@k-otp/sdk/testing": ["./packages/sdk/src/testing/index.ts"],
       "@k-otp/sdk/server": ["./packages/sdk/src/server/index.ts"],
       "@k-otp/sdk/kiota": ["./packages/sdk/src/kiota/index.d.ts"],
       "@k-otp/sdk/react": ["./packages/sdk/src/react/index.ts"],

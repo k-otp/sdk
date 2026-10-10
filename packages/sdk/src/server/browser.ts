@@ -19,6 +19,11 @@ export {
   DEFAULT_BASE_URL,
   DEFAULT_TIMEOUT_MS,
   OTP_API_ERROR_CODES,
+  TEST_KEY_PREFIXES,
+  TEST_NUMBER_ERROR_CODES,
+  TEST_OTP_CODE,
+  TEST_PHONE_NUMBERS,
+  TEST_SCENARIOS,
 } from "../core";
 
 type Stub = (...args: unknown[]) => never;
@@ -36,6 +41,11 @@ export const paginate: Stub = serverOnly("paginate");
 export const paginatePages: Stub = serverOnly("paginatePages");
 export const createIdempotencyKey: Stub = serverOnly("createIdempotencyKey");
 export const isOtpApiError: Stub = serverOnly("isOtpApiError");
+export const isTestKey: Stub = serverOnly("isTestKey");
+export const getTestNumberErrorCode: Stub = serverOnly(
+  "getTestNumberErrorCode",
+);
+export const matchTestPhoneNumber: Stub = serverOnly("matchTestPhoneNumber");
 export const normalizeIdempotencyKey: Stub = serverOnly(
   "normalizeIdempotencyKey",
 );

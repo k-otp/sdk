@@ -58,6 +58,7 @@ const EXPECTED_EXPORTS = [
   "./core",
   "./headless",
   "./contract",
+  "./testing",
   "./server",
   "./kiota",
   "./react",

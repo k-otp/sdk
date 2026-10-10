@@ -122,6 +122,38 @@ for (const [label, mod] of [
   console.log(`ok - ${label}`);
 }
 
+// `@k-otp/sdk/testing`: the in-memory test-mode simulator drives both clients
+// (ESM and CJS) without any network, with the test-mode constants of core.
+for (const [label, testing, core, server] of [
+  ["testing esm", await import("@k-otp/sdk/testing"), esmCore, esmServer],
+  ["testing cjs", require("@k-otp/sdk/testing"), cjsCore, cjsServer],
+]) {
+  assert.equal(testing.TEST_OTP_CODE, core.TEST_OTP_CODE, label);
+  assert.equal(core.isTestKey("pk_test_smoke"), true, label);
+  const mock = testing.createMockTransport({ now: () => 0 });
+  const client = core.createOtpClient({
+    apiKey: "pk_test_smoke",
+    fetch: mock.fetch,
+  });
+  const issued = await client.issue({
+    phoneNumber: core.TEST_PHONE_NUMBERS.success,
+    purpose: "smoke",
+    idempotencyKey: "smoke-test-1",
+  });
+  assert.equal(issued.mode, "test", label);
+  const verified = await client.verify({
+    issueId: issued.issueId,
+    code: core.TEST_OTP_CODE,
+  });
+  assert.equal(verified.verified, true, label);
+  const admin = server.createOtpServerClient({
+    apiKey: "sk_test_smoke",
+    fetch: mock.fetch,
+  });
+  assert.equal((await admin.getBalance()).walletScope, "test", label);
+  console.log(`ok - ${label}`);
+}
+
 /** Browser-like globals for the IIFE bundles. */
 const browserGlobals = {
   fetch,

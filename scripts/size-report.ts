@@ -3,7 +3,7 @@
  * Reports (and enforces budgets for) the cost of every `@k-otp/sdk` subpath,
  * measured from the built `dist/` (minified, min+gzip):
  *
- * - `@k-otp/sdk` (= `/core`), `/headless`, `/ui`: every public runtime
+ * - `@k-otp/sdk` (= `/core`), `/headless`, `/testing`, `/ui`: every public runtime
  *   export (`export *`, so new exports are measured automatically),
  *   dependencies included. This is the worst case; apps that import less
  *   ship less.
@@ -22,7 +22,7 @@
  * Tree-shaking: while bundling a subpath, every import is recorded. A subpath
  * must never load another framework, another framework's subpaths, or the
  * server client (e.g. `@k-otp/sdk/ui/react` must not pull Vue, Svelte or
- * `server.js`), and the non-UI subpaths (core, headless, server and the
+ * `server.js`), and the non-UI subpaths (core, headless, testing, server and the
  * `react`/`vue`/`svelte` hooks) must not load any UI code (`src/ui`).
  *
  * Run `bun run build` first.
@@ -73,6 +73,8 @@ const BUDGETS = {
   theme: 4 * 1024,
   // Server client with every public /v1 operation (Node target).
   server: 14 * 1024,
+  // Test-mode helpers and the in-memory API simulator (createMockTransport).
+  testing: 6 * 1024,
   kiota: 100 * 1024,
 } as const;
 
@@ -371,6 +373,9 @@ try {
   await whole("@k-otp/sdk/headless", "headless.js", BUDGETS.headless, {
     noUi: true,
   });
+  await whole("@k-otp/sdk/testing", "testing.js", BUDGETS.testing, {
+    noUi: true,
+  });
   rows.push([
     "@k-otp/sdk/k-otp.iife.min.js (CDN)",
     Buffer.from(
@@ -512,7 +517,7 @@ if (isolation.length) {
   console.log(`\nTree-shaking check failed:\n- ${isolation.join("\n- ")}`);
 } else {
   console.log(
-    "\nTree-shaking: no subpath loads another framework, another framework's subpaths or the server client, core, headless, server and the react/vue/svelte hooks load no UI code, and browser bundles get the server stub.",
+    "\nTree-shaking: no subpath loads another framework, another framework's subpaths or the server client, core, headless, testing, server and the react/vue/svelte hooks load no UI code, and browser bundles get the server stub.",
   );
 }
 // exitCode (not exit()) lets piped stdout flush first.

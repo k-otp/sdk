@@ -78,6 +78,16 @@
         "default": "./dist/contract.cjs"
       }
     },
+    "./testing": {
+      "import": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      },
+      "require": {
+        "types": "./dist/testing.d.cts",
+        "default": "./dist/testing.cjs"
+      }
+    },
     "./server": {
       "workerd": {
         "import": {

@@ -17,6 +17,7 @@ runtimes and servers. One package, with a subpath per use:
 | `@k-otp/sdk/ui/theme.css` | Optional default theme for the UI components | | [theme](../../docs/ui.md#theme) |
 | `@k-otp/sdk/ui` | The framework-agnostic UI model (phone, code input, form state machine, messages, WebOTP) | | [ui](../../docs/reference/ui.md#k-otpsdkui) |
 | `@k-otp/sdk/contract` | The oRPC contract and generated OpenAPI types, for custom oRPC clients | | [below](#advanced-entry-points) |
+| `@k-otp/sdk/testing` | `createMockTransport()`: an in-memory test-mode API for unit tests (no network) | `pk_test_` / `sk_test_` | [below](#test-mode) |
 | `@k-otp/sdk/k-otp.iife.min.js` | `<script>` bundle exposing `window.KOtp` (also `k-otp.iife.js`) | `pk_` | [below](#cdn--static-sites) |
 
 - Zero framework code in the core, side-effect free (only the optional theme
@@ -175,7 +176,8 @@ class OtpApiError extends Error {
   status: number;          // HTTP status, 0 when no response was received
   requestId?: string;      // X-Request-Id (else request-id / cf-ray), when readable
   data?: unknown;          // e.g. { code: "INSUFFICIENT_CREDIT" } for 402,
-                           // { limit, policy, retryAfterMs } for 429
+                           // { limit, policy, retryAfterMs } for 429,
+                           // { code: "TEST_NUMBER_REQUIRED" } for some 400s
   retryAfterMs?: number;   // data.retryAfterMs, else Retry-After (429, some 503s)
   retryable: boolean;      // TOO_MANY_REQUESTS, INTERNAL_SERVER_ERROR, SERVICE_UNAVAILABLE, TIMEOUT, NETWORK_ERROR
 }
@@ -189,6 +191,44 @@ Codes: `BAD_REQUEST`, `UNAUTHORIZED`, `PAYMENT_REQUIRED`, `FORBIDDEN`,
 SDK (the ESM and CommonJS builds loaded side by side, the CDN bundle and an
 npm install): every `OtpApiError` carries a shared `Symbol.for` brand, which
 `instanceof` and `isOtpApiError(error)` check.
+
+### Test mode
+
+`pk_test_`/`sk_test_` keys (API 1.9.0+) never send a message and never use
+credits. They only accept test phone numbers (Korean `010-0000-00xx`, UK
+`+44 7700 9000xx`, US `+1 NXX 555-01xx`); the last two digits pick a
+deterministic scenario, and every test issue verifies with `000000` (except
+scenario `05`). Results carry `mode: "live" | "test"` (`OtpApiMode`).
+
+| Export | |
+| --- | --- |
+| `isTestKey(key)` | `true` for `pk_test_...` / `sk_test_...` |
+| `TEST_PHONE_NUMBERS` | One Korean test number per scenario: `success` (`010-0000-0000`), `delivery_failed`, `slow_delivery`, `ambiguous`, `expired`, `mismatch`, `rate_limited`, `insufficient_credit`, `trial_daily_limit`, `service_unavailable`, `alimtalk_failover` (`010-0000-0010`) |
+| `TEST_OTP_CODE` | `"000000"` |
+| `TEST_SCENARIOS`, `OtpTestScenario` | The scenarios in suffix order (`00`-`10`) |
+| `matchTestPhoneNumber(phoneNumber)` | `{ region, canonical, suffix, scenario }` for a test number in any spelling, else `undefined` |
+| `getTestNumberErrorCode(error)` | `"TEST_NUMBER_REQUIRED"` (test key, real number) or `"TEST_NUMBER_IN_LIVE_MODE"` (live key, test number) from a 400's `data.code`, else `undefined` |
+
+`@k-otp/sdk/testing` adds `createMockTransport()`, an in-memory simulator of
+the same scenarios for unit tests (pass its `fetch` to any client; `advance(ms)`
+walks the delivery timeline), plus `TEST_MODE_TIMINGS` and
+`TEST_MODE_SIMULATED_BALANCE`:
+
+```ts
+import { createOtpClient, TEST_OTP_CODE, TEST_PHONE_NUMBERS } from "@k-otp/sdk";
+import { createMockTransport } from "@k-otp/sdk/testing";
+
+const mock = createMockTransport();
+const otp = createOtpClient({ apiKey: "pk_test_unit", fetch: mock.fetch });
+const { issueId } = await otp.issue({
+  phoneNumber: TEST_PHONE_NUMBERS.success,
+  purpose: "signup",
+  idempotencyKey: "unit-1",
+});
+await otp.verify({ issueId, code: TEST_OTP_CODE }); // verified: true
+```
+
+See the [test mode guide](../../docs/test-mode.md).
 
 ### Telemetry
 

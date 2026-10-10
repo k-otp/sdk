@@ -10,6 +10,7 @@ export {
   OtpApiError,
   type OtpApiErrorCode,
   type OtpApiErrorOptions,
+  type OtpBadRequestData,
   type OtpPaymentRequiredData,
   type OtpRateLimitedData,
   otpErrorCodeFromStatus,
@@ -20,6 +21,21 @@ export {
   IDEMPOTENCY_KEY_MAX_LENGTH,
   normalizeIdempotencyKey,
 } from "./idempotency";
+export {
+  getTestNumberErrorCode,
+  isTestKey,
+  matchTestPhoneNumber,
+  type OtpApiMode,
+  type OtpTestNumberErrorCode,
+  type OtpTestPhoneNumber,
+  type OtpTestPhoneRegion,
+  type OtpTestScenario,
+  TEST_KEY_PREFIXES,
+  TEST_NUMBER_ERROR_CODES,
+  TEST_OTP_CODE,
+  TEST_PHONE_NUMBERS,
+  TEST_SCENARIOS,
+} from "./test-mode";
 export {
   DEFAULT_BASE_URL,
   DEFAULT_TIMEOUT_MS,

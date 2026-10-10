@@ -20,6 +20,7 @@ const entries = {
   core: "src/core/index.ts",
   headless: "src/headless/index.ts",
   contract: "src/core/contract.ts",
+  testing: "src/testing/index.ts",
   server: "src/server/index.ts",
   react: "src/react/index.ts",
   vue: "src/vue/index.ts",

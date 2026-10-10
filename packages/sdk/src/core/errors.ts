@@ -39,12 +39,28 @@ export type OtpPaymentRequiredData = {
 };
 
 /**
- * `data` of a 429 TOO_MANY_REQUESTS error from `issue`/`verify`: the generated
- * wire type, open to rules and policies a newer API version may add. The wait
- * is also normalized into {@link OtpApiError.retryAfterMs}.
+ * `data` of a 400 BAD_REQUEST error, when the API names the cause. From API
+ * 1.9.0 `issue` sets `code` to `TEST_NUMBER_REQUIRED` (a `pk_test_`/`sk_test_`
+ * key with a real phone number) or `TEST_NUMBER_IN_LIVE_MODE` (a live key
+ * with a test phone number); see `getTestNumberErrorCode`. Other 400 errors
+ * have no `data`.
+ */
+export type OtpBadRequestData = {
+  code: "TEST_NUMBER_REQUIRED" | "TEST_NUMBER_IN_LIVE_MODE" | (string & {});
+};
+
+/**
+ * `data` of a 429 TOO_MANY_REQUESTS error: the generated wire type, open to
+ * rules and policies a newer API version may add. The wait is also
+ * normalized into {@link OtpApiError.retryAfterMs}.
  */
 export type OtpRateLimitedData = {
-  /** Rule that rejected the request (`perKey`, `perIp`, `perPhone`). */
+  /**
+   * Rule that rejected the request: `perKey`, `perIp`, `perPhone`, or for
+   * test-mode keys (API 1.9.0+) `perKeyDaily` (daily cap per key and
+   * operation), `perOrgDaily` (daily test issue budget of the organization)
+   * or `testModeDaily` (platform-wide daily test issue budget).
+   */
   limit: OtpRateLimitErrorData["limit"] | (string & {});
   /** `key` (the key's own policy) or `platform` (default or ceiling). */
   policy: OtpRateLimitErrorData["policy"] | (string & {});
@@ -90,8 +106,9 @@ export class OtpApiError extends Error {
   /** Server request id (`x-request-id` / `request-id` / `cf-ray`), if exposed. */
   readonly requestId: string | undefined;
   /**
-   * Error payload, e.g. {@link OtpPaymentRequiredData} for 402 or
-   * {@link OtpRateLimitedData} for 429.
+   * Error payload, e.g. {@link OtpBadRequestData} for some 400 errors,
+   * {@link OtpPaymentRequiredData} for 402 or {@link OtpRateLimitedData} for
+   * 429.
    */
   readonly data: unknown;
   /**
