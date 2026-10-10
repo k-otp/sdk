@@ -26,9 +26,9 @@ Public, MIT-licensed SDK for the K-OTP Korean OTP API (`https://api.k-otp.dev/v1
     and helpers (`isTestKey`, `TEST_PHONE_NUMBERS`, `TEST_OTP_CODE`, ...)
     live in `src/core/test-mode.ts` and are exported from core. The scenario
     table, number patterns, timings, fixed code, simulated balance and error
-    messages mirror the API repository's
-    `packages/shared/src/modules/otp/test-mode.ts` (and its simulator model)
-    by hand: there is no shared fixture, so when that module changes, update
+    messages mirror the K-OTP API's test-mode behaviour (published in the
+    OpenAPI document and the test-mode guide) by hand: there is no shared
+    fixture, so when the API's test mode changes, update
     `src/core/test-mode.ts`, `src/testing/mock-transport.ts`,
     `test/test-mode.test.ts` and `docs/test-mode.md` in the same change.
   - `src/server` -> `@k-otp/sdk/server`: all public `/v1` operations with
