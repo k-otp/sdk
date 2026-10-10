@@ -176,9 +176,15 @@ mock.reset();  // between tests
   `pk_test_` keys may only issue and verify (403 otherwise). A live key gets
   400 `TEST_NUMBER_IN_LIVE_MODE` for a test number and 401 for anything else:
   live delivery is never simulated.
+- Idempotency fingerprints use resolved values like the API: a retry that
+  spells out a default (`channel: "alimtalk"`, `expiresInSec: 180`,
+  `maxAttempts: 5`, the default `templateId`) replays instead of 409.
 - Not simulated: `Origin` checks, rate limits and daily budgets (scenario
   `06` still answers 429), template variables (any `templateId` is accepted;
-  `listTemplates` returns one mock template).
+  `listTemplates` returns only the default template `otp_default_kr`).
+- The scenario table, test number ranges and timings mirror the API's test
+  mode and are updated together with it: an SDK release that matches a new
+  API contract version also updates the mock.
 - It also exports `TEST_MODE_TIMINGS`, `TEST_MODE_SIMULATED_BALANCE` and the
   test-mode constants of `@k-otp/sdk`.
 

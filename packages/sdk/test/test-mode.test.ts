@@ -427,4 +427,97 @@ describe("createMockTransport", () => {
     mock.reset();
     expect(mock.issues()).toEqual([]);
   });
+
+  test("the default clock reads Date.now on every call (fake timers drive it)", async () => {
+    // Created before Date.now is replaced, like a mock built in a module scope.
+    const mock = createMockTransport();
+    const server = createOtpServerClient({
+      apiKey: "sk_test_unit",
+      fetch: mock.fetch,
+    });
+    const realNow = Date.now;
+    let fakeNow = START;
+    Date.now = () => fakeNow;
+    try {
+      const issued = await server.issue({
+        phoneNumber: TEST_PHONE_NUMBERS.success,
+        purpose: "login",
+        idempotencyKey: "fake-timers",
+      });
+      expect(issued.queuedAt).toBe(new Date(START).toISOString());
+      fakeNow += TEST_MODE_TIMINGS.deliveredAfterMs;
+      expect(
+        (await server.getStatus({ issueId: issued.issueId })).deliveryStatus,
+      ).toBe("delivered");
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
+  test("an explicit default on a retry replays (resolved-value fingerprint)", async () => {
+    const { server } = setup();
+    const input = {
+      phoneNumber: TEST_PHONE_NUMBERS.success,
+      purpose: "login",
+      idempotencyKey: "defaults",
+    };
+    const first = await server.issue(input);
+    const spelledOut = await server.issue({
+      ...input,
+      channel: "alimtalk",
+      expiresInSec: 180,
+      maxAttempts: 5,
+      templateId: "otp_default_kr",
+      smsFallback: true,
+    });
+    expect(spelledOut).toEqual(first);
+    // A different resolved value is still a conflict.
+    const conflict = await rejection(
+      server.issue({ ...input, maxAttempts: 3 }),
+    );
+    expect(conflict.code).toBe("CONFLICT");
+    const sms = await rejection(server.issue({ ...input, channel: "sms" }));
+    expect(sms.code).toBe("CONFLICT");
+  });
+
+  test("the default template is the API's otp_default_kr", async () => {
+    const { server, issue } = setup();
+    const templates = await server.listTemplates();
+    expect(templates.defaultTemplateId).toBe("otp_default_kr");
+    expect(templates.templates.map((template) => template.templateId)).toEqual([
+      "otp_default_kr",
+    ]);
+    const issued = await issue("success");
+    expect(
+      (await server.getStatus({ issueId: issued.issueId })).templateId,
+    ).toBe("otp_default_kr");
+    expect(
+      (await server.getIssue({ issueId: issued.issueId })).templateId,
+    ).toBe("otp_default_kr");
+  });
+
+  test("only the 429 envelope is defined, like the API", async () => {
+    const { mock } = setup();
+    const post = (phoneNumber: string) =>
+      mock.fetch("https://api.k-otp.dev/v1/issue", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer sk_test_unit",
+          "content-type": "application/json",
+          "idempotency-key": `envelope-${phoneNumber}`,
+        },
+        body: JSON.stringify({ phoneNumber, purpose: "login" }),
+      });
+    const limited = await post(TEST_PHONE_NUMBERS.rate_limited);
+    expect(limited.status).toBe(429);
+    expect((await limited.json()).defined).toBe(true);
+    for (const phoneNumber of [
+      TEST_PHONE_NUMBERS.insufficient_credit,
+      "010-1234-5678",
+    ]) {
+      const response = await post(phoneNumber);
+      expect([402, 400]).toContain(response.status);
+      expect((await response.json()).defined).toBe(false);
+    }
+  });
 });

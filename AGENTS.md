@@ -24,8 +24,13 @@ Public, MIT-licensed SDK for the K-OTP Korean OTP API (`https://api.k-otp.dev/v1
     `createMockTransport()`, an in-memory simulator of the API test mode
     (`pk_test_`/`sk_test_`) for users' unit tests. The test-mode constants
     and helpers (`isTestKey`, `TEST_PHONE_NUMBERS`, `TEST_OTP_CODE`, ...)
-    live in `src/core/test-mode.ts` and are exported from core; keep the
-    scenario table and timings equal to the API's.
+    live in `src/core/test-mode.ts` and are exported from core. The scenario
+    table, number patterns, timings, fixed code, simulated balance and error
+    messages mirror the API repository's
+    `packages/shared/src/modules/otp/test-mode.ts` (and its simulator model)
+    by hand: there is no shared fixture, so when that module changes, update
+    `src/core/test-mode.ts`, `src/testing/mock-transport.ts`,
+    `test/test-mode.test.ts` and `docs/test-mode.md` in the same change.
   - `src/server` -> `@k-otp/sdk/server`: all public `/v1` operations with
     `sk_` keys only (any key not starting with `sk_` is a `TypeError`).
     Under the `browser` export condition it resolves to

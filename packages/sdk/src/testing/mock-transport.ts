@@ -137,12 +137,13 @@ type StoredIssue = {
 type Json = Record<string, unknown>;
 
 const MODE: OtpApiMode = "test";
-const DEFAULT_TEMPLATE_ID = "default";
+/** The API's default template id (used when `issue` omits `templateId`). */
+const DEFAULT_TEMPLATE_ID = "otp_default_kr";
 const DEFAULT_TEMPLATE = {
   templateId: DEFAULT_TEMPLATE_ID,
-  name: "Default (mock)",
-  channelSupport: ["alimtalk", "sms"] as OtpChannel[],
-  body: "Your verification code is #{code}.",
+  name: "기본 인증",
+  channelSupport: ["sms", "alimtalk"] as OtpChannel[],
+  body: "[K-OTP] 인증번호는 #{code}입니다. 3분 내에 입력해주세요.",
 };
 
 const iso = (ms: number): string => new Date(ms).toISOString();
@@ -428,7 +429,9 @@ const webOtpResult = (
 export const createMockTransport = (
   options: MockTransportOptions = {},
 ): MockTransport => {
-  const clock = options.now ?? Date.now;
+  // Read `Date.now` on every call (not a captured reference), so fake timers
+  // that replace it drive the simulation too.
+  const clock = options.now ?? (() => Date.now());
   const appId = options.appId ?? "app_mock";
   let offsetMs = 0;
   let sequence = 0;
@@ -581,11 +584,18 @@ export const createMockTransport = (
         ? body.templateId.trim()
         : DEFAULT_TEMPLATE_ID;
     const { idempotencyKey: _key, ...payload } = body;
+    // Like the API, the fingerprint uses resolved values: spelling out a
+    // default (`channel: "alimtalk"`, `expiresInSec: 180`, `maxAttempts: 5`,
+    // the default `templateId`) on a retry is the same request.
     const fingerprint = stable({
       ...payload,
       phoneNumber: match.canonical,
       purpose,
-      // Like the API: only an explicit `false` on AlimTalk is fingerprinted.
+      channel,
+      expiresInSec,
+      maxAttempts,
+      templateId,
+      // Only an explicit `false` on AlimTalk is fingerprinted.
       smsFallback: channel === "alimtalk" && !smsFallback ? false : undefined,
     });
     const claim = claims.get(idempotencyKey);
@@ -882,7 +892,8 @@ export const createMockTransport = (
       return reply(
         error.status,
         {
-          defined: error.data !== undefined,
+          // The API marks only its rate-limit errors as defined.
+          defined: error.status === 429,
           code: error.code,
           status: error.status,
           message: error.message,
