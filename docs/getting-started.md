@@ -33,6 +33,11 @@ UX rules for the "send code / enter code" screen:
   and every request must come from an `Origin` that exactly matches one of the
   key's allowed origins (for example `https://www.example.com`; no wildcards,
   and `http://localhost:5173` must be listed explicitly for local development).
+- **Test keys (`pk_test_`, `sk_test_`)** for development and CI (API 1.9.0+):
+  same rules, but nothing is sent and no credit is used. They only accept test
+  phone numbers such as `TEST_PHONE_NUMBERS.success` (`010-0000-0000`), the
+  code is always `000000`, and `pk_test_` keys also accept `localhost` and
+  `127.0.0.1` origins on any port. See [test mode](./test-mode.md).
 
 See [security](./security.md).
 

@@ -169,8 +169,8 @@ const wallet = await otp.getBalance();
 wallet.balance;        // credits left in the wallet shared by all apps
 wallet.currency;       // "CREDIT"
 wallet.appId;          // the app of the key you called with (not the wallet owner)
-wallet.walletScope;    // "organization" (shared) | "app" (legacy per-app wallet)
-wallet.walletId;       // "org:<organizationId>" | "app:<appId>"
+wallet.walletScope;    // "organization" (shared) | "app" (legacy per-app wallet) | "test"
+wallet.walletId;       // "org:<organizationId>" | "app:<appId>" | "test:<appId>"
 wallet.organizationId; // set when walletScope is "organization"
 ```
 
@@ -189,6 +189,10 @@ wallet.organizationId; // set when walletScope is "organization"
   `walletScope` as `"app"`.
 - `PAYMENT_REQUIRED` (402) on `issue` now means the organization wallet is out
   of credit. No new error codes were added.
+- With an `sk_test_` key (API 1.9.0+) the real wallet is never read:
+  `getBalance()` returns a fixed simulated balance (`walletScope: "test"`,
+  `walletId: "test:<appId>"`, `balance: 1000000`, `mode: "test"`) and
+  `listCreditLedger()` an empty page. See [test mode](../test-mode.md).
 
 ### Errors
 
@@ -196,7 +200,11 @@ Rejections are `OtpApiError` with the same codes, `status`, `requestId`,
 `data` and `retryAfterMs` as the core client. `issue` and `verify` are rate-limited
 per API key: an exceeded limit rejects with `TOO_MANY_REQUESTS` (429,
 retryable), `retryAfterMs` and `data: { limit, policy, retryAfterMs }`
-(`OtpRateLimitedData`). See
+(`OtpRateLimitedData`). Test keys are also limited per day on every
+operation (`perKeyDaily`) and by daily test issue budgets (`perOrgDaily`,
+`testModeDaily`). A test key with a real phone number, or a live key with a
+test number, rejects with `BAD_REQUEST` and `data.code`
+(`getTestNumberErrorCode`). See
 [errors and retries](../errors-and-retries.md).
 
 ## Runtime notes

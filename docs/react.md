@@ -82,10 +82,15 @@ available as state (`data`, `error`, `isLoading`, `status`).
 
 ## Testing
 
-Pass a client with a custom `fetch` to the provider (or `client` to a hook):
+Pass a client with a custom `fetch` to the provider (or `client` to a hook).
+`createMockTransport()` from `@k-otp/sdk/testing` is a ready-made one: the
+API's test mode in memory, with the test phone numbers and the fixed code
+`000000` ([test mode](./test-mode.md)):
 
 ```tsx
-const client = createOtpClient({ apiKey: "pk_test", fetch: myMockFetch });
+import { createMockTransport } from "@k-otp/sdk/testing";
+
+const client = createOtpClient({ apiKey: "pk_test_unit", fetch: createMockTransport().fetch });
 render(<OtpProvider client={client}><Screen /></OtpProvider>);
 ```
 

@@ -18,6 +18,9 @@ variables, Workers secrets, a secret manager).
   exist.
   These guards catch mistakes; they are not a substitute for keeping keys
   out of client bundles.
+- The same applies to `sk_test_` keys: they cannot send messages or spend
+  credits, but they read and create your app's test data and count against
+  its daily test budgets. Keep them in CI secrets.
 - Rotate a key immediately if it was ever exposed.
 
 ## `pk_` public keys and the Origin allowlist
@@ -29,7 +32,10 @@ variables, Workers secrets, a secret manager).
   the key's `allowedOrigins`: scheme, host and port (`https://example.com` does
   not match `https://www.example.com` or `http://example.com`). There are no
   wildcards; list each deployment origin (and `http://localhost:<port>` for
-  local development, preferably on a separate key).
+  local development, preferably on a separate key). Test-mode `pk_test_` keys
+  (API 1.9.0+) additionally accept `http(s)://localhost` and
+  `http(s)://127.0.0.1` on any port, so a test key needs no local origin
+  entry; they never send messages (see [test mode](./test-mode.md)).
 - A request without a matching `Origin` is rejected with `403 FORBIDDEN`. That
   is also why a `pk_` key does not work from a server or `curl` unless it
   sends a matching `Origin`.

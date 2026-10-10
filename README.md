@@ -19,6 +19,7 @@ subpath per use:
 | [`@k-otp/sdk/ui`](./docs/reference/ui.md#k-otpsdkui) | The framework-agnostic UI model: phone canonicalization, code input, form state machine, messages, WebOTP. |
 | [`@k-otp/sdk/headless`](./packages/sdk/README.md#headless-flow-k-otpsdkheadless) | The framework-agnostic issue -> verify flow the adapters are built on. |
 | [`@k-otp/sdk/contract`](./packages/sdk/README.md#advanced-entry-points) | The oRPC contract and generated OpenAPI types. |
+| [`@k-otp/sdk/testing`](./docs/test-mode.md#unit-tests-without-the-network-k-otpsdktesting) | `createMockTransport()`: an in-memory test-mode API for your unit tests (no network). |
 | [`@k-otp/sdk/k-otp.iife.min.js`](./packages/sdk/README.md#cdn--static-sites) | `<script>` bundle (`window.KOtp`) for static sites, via jsDelivr or unpkg. |
 
 The framework subpaths are thin layers over the core (about 1 kB gzip each)
@@ -68,6 +69,28 @@ Static site:
 </script>
 ```
 
+## Test mode
+
+`pk_test_`/`sk_test_` keys (API 1.9.0+) never send a message and never use
+credits. They only accept test phone numbers, whose last two digits pick a
+deterministic scenario (delivered, failed, expired, 429, 402, 503, ...), and
+every test issue verifies with `000000`:
+
+```ts
+import { createOtpClient, TEST_OTP_CODE, TEST_PHONE_NUMBERS } from "@k-otp/sdk";
+
+const otp = createOtpClient({ apiKey: "pk_test_..." });
+const { issueId, mode } = await otp.issue({
+  phoneNumber: TEST_PHONE_NUMBERS.success, // "010-0000-0000"
+  purpose: "signup",
+  idempotencyKey: crypto.randomUUID(),
+}); // mode: "test"
+await otp.verify({ issueId, code: TEST_OTP_CODE }); // verified: true
+```
+
+For unit tests, `createMockTransport()` from `@k-otp/sdk/testing` simulates
+the same scenarios in memory. See the [test mode guide](./docs/test-mode.md).
+
 ## UI components
 
 A complete, accessible phone verification form in one line (React shown; Vue
@@ -90,6 +113,7 @@ and keyboard navigation, focus follows the flow, and every part exposes
 ## Documentation
 
 - [Getting started](./docs/getting-started.md)
+- [Test mode: `pk_test_`/`sk_test_` keys, test phone numbers, `createMockTransport()`](./docs/test-mode.md)
 - [Issue -> verify UX (cooldown, resend, retries, 402/429)](./docs/issue-verify-ux.md)
 - Framework guides: [React](./docs/react.md), [Vue](./docs/vue.md), [Svelte](./docs/svelte.md)
 - [UI components and theme](./docs/ui.md) (한국어 포함)

@@ -19,6 +19,7 @@ npm 패키지는 [`@k-otp/sdk`](./packages/sdk) 하나이며, 용도별 서브�
 | [`@k-otp/sdk/ui`](./docs/reference/ui.md#k-otpsdkui) | 프레임워크 무관 UI 모델: 번호 정규화, 인증번호 입력, 폼 상태 머신, 메시지, WebOTP. |
 | [`@k-otp/sdk/headless`](./packages/sdk/README.md#headless-flow-k-otpsdkheadless) | 어댑터들이 공유하는 프레임워크 무관 발급 -> 검증 플로우. |
 | [`@k-otp/sdk/contract`](./packages/sdk/README.md#advanced-entry-points) | oRPC 계약과 생성된 OpenAPI 타입. |
+| [`@k-otp/sdk/testing`](./docs/test-mode.md#unit-tests-without-the-network-k-otpsdktesting) | `createMockTransport()`: 단위 테스트용 메모리 내 테스트 모드 API(네트워크 없음). |
 | [`@k-otp/sdk/k-otp.iife.min.js`](./packages/sdk/README.md#cdn--static-sites) | 정적 사이트용 `<script>` 번들(`window.KOtp`), jsDelivr 또는 unpkg. |
 
 프레임워크 서브패스는 코어 위의 얇은 계층(각각 gzip 약 1 kB)이며 동작과 정규화된 `OtpApiError`가 모두
@@ -72,6 +73,32 @@ import "@k-otp/sdk/ui/theme.css"; // 선택: 기본 테마
 완전히 헤드리스하게 조합할 수 있습니다. [UI 가이드](./docs/ui.md#ui-컴포넌트-한국어)를
 참고하세요.
 
+## 테스트 모드
+
+`pk_test_`/`sk_test_` 테스트 키(API 1.9.0+)는 메시지를 실제로 보내지 않고 크레딧도 쓰지 않습니다.
+테스트 번호만 받으며(한국 `010-0000-00xx`, 영국 `+44 7700 9000xx`, 미국 `+1 NXX 555-01xx`), 마지막 두
+자리가 결정적인 시나리오를 고릅니다(`00` 성공, `01` 전달 실패, `04` 만료, `06` 429, `07` 402, `09` 503 등).
+만들어진 테스트 발급은 모두 고정 코드 `000000`(`TEST_OTP_CODE`)으로 검증됩니다(`05` 제외). 응답에는
+`mode: "test"`가 붙고, 테스트 키에 실제 번호를 보내면 400 `TEST_NUMBER_REQUIRED`, live 키에 테스트 번호를
+보내면 400 `TEST_NUMBER_IN_LIVE_MODE`(`error.data.code`, `getTestNumberErrorCode(error)`)입니다.
+
+```ts
+import { createOtpClient, isTestKey, TEST_OTP_CODE, TEST_PHONE_NUMBERS } from "@k-otp/sdk";
+
+isTestKey("pk_test_..."); // true
+const otp = createOtpClient({ apiKey: "pk_test_..." });
+const { issueId } = await otp.issue({
+  phoneNumber: TEST_PHONE_NUMBERS.success, // "010-0000-0000"
+  purpose: "signup",
+  idempotencyKey: crypto.randomUUID(),
+});
+await otp.verify({ issueId, code: TEST_OTP_CODE }); // verified: true
+```
+
+`pk_test_` 키는 허용 origin 외에 `http(s)://localhost`, `http(s)://127.0.0.1`(모든 포트)도 받습니다.
+앱의 단위 테스트에는 `@k-otp/sdk/testing`의 `createMockTransport()`가 같은 시나리오를 네트워크 없이
+메모리에서 흉내 냅니다. 자세한 내용은 [테스트 모드 가이드](./docs/test-mode.md)(영어)를 참고하세요.
+
 ## 핵심 규칙
 
 - **`sk_` 비밀 키는 절대 브라우저/앱에 포함하지 마세요.** `@k-otp/sdk`는 브라우저에서 `sk_` 키를,
@@ -100,12 +127,14 @@ import "@k-otp/sdk/ui/theme.css"; // 선택: 기본 테마
 - `issue`/`verify`는 API 키별 레이트 리밋이 적용됩니다(API 1.3.1). 초과하면 재시도 가능한
   `TOO_MANY_REQUESTS`(429)로 거절되며, `retryAfterMs`(본문 `data.retryAfterMs`, 없으면
   `Retry-After` 헤더)만큼 기다린 뒤 같은 멱등키로 재시도하세요. `data.limit`(`perKey`, `perIp`,
-  `perPhone`)과 `data.policy`(`key`: 키 자체 정책, `platform`: 플랫폼 기본값 또는 상한)로 어떤
-  제한인지 알 수 있습니다. 거절된 요청은 한도나 검증 시도 횟수를 소모하지 않습니다.
+  `perPhone`, 테스트 키는 `perKeyDaily`, `perOrgDaily`, `testModeDaily`도)과 `data.policy`
+  (`key`: 키 자체 정책, `platform`: 플랫폼 기본값 또는 상한)로 어떤 제한인지 알 수 있습니다.
+  거절된 요청은 한도나 검증 시도 횟수를 소모하지 않습니다.
 
 ## 문서
 
 - [시작하기](./docs/getting-started.md)
+- [테스트 모드: `pk_test_`/`sk_test_` 키, 테스트 번호, `createMockTransport()`](./docs/test-mode.md)
 - [발급 -> 검증 UX(쿨다운, 재발송, 재시도, 402/429)](./docs/issue-verify-ux.md)
 - 프레임워크 가이드: [React](./docs/react.md), [Vue](./docs/vue.md), [Svelte](./docs/svelte.md)
 - [UI 컴포넌트와 테마](./docs/ui.md#ui-컴포넌트-한국어) (한국어 섹션 포함)

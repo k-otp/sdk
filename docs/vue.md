@@ -72,9 +72,14 @@ for API errors, so `@click="send(...)"` is safe.
 
 ## Testing
 
+`createMockTransport()` from `@k-otp/sdk/testing` simulates the API's test
+mode in memory (test phone numbers, fixed code `000000`; see
+[test mode](./test-mode.md)):
+
 ```ts
+const { fetch } = createMockTransport();
 const app = createApp({});
-app.use(createOtpPlugin(createOtpClient({ apiKey: "pk_test", fetch: myMockFetch })));
+app.use(createOtpPlugin(createOtpClient({ apiKey: "pk_test_unit", fetch })));
 const otp = app.runWithContext(() => effectScope().run(() => useOtp()));
 ```
 

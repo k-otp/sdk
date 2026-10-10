@@ -86,10 +86,13 @@ only runs while the store has subscribers.
 
 ## Testing
 
-Stores can be tested without a DOM:
+Stores can be tested without a DOM. `createMockTransport()` from
+`@k-otp/sdk/testing` simulates the API's test mode in memory (test phone
+numbers, fixed code `000000`; see [test mode](./test-mode.md)):
 
 ```ts
-const otp = createOtpStores(createOtpClient({ apiKey: "pk_test", fetch: myMockFetch }));
+const { fetch } = createMockTransport();
+const otp = createOtpStores(createOtpClient({ apiKey: "pk_test_unit", fetch }));
 await otp.issue.run(input);
 expect(get(otp.issue).status).toBe("success");
 ```

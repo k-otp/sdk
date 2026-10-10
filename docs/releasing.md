@@ -1,7 +1,7 @@
 # Releasing
 
 The repository publishes one npm package, **`@k-otp/sdk`** (`packages/sdk`).
-Its subpaths (`/core`, `/headless`, `/contract`, `/server`, `/react`, `/vue`,
+Its subpaths (`/core`, `/headless`, `/contract`, `/testing`, `/server`, `/react`, `/vue`,
 `/svelte`, `/ui`, `/ui/react`, `/ui/vue`, `/ui/svelte`, `/ui/theme.css`, the
 IIFE bundle) are not separate packages and share its version.
 [Sampo](https://github.com/bruits/sampo) is the single source of version

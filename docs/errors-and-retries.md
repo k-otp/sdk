@@ -10,20 +10,20 @@ All SDK methods reject with `OtpApiError`:
 | `status` | HTTP status, or `0` when no HTTP response was received (timeout, network, abort). |
 | `message` | Server message, or a descriptive client message. |
 | `requestId` | `X-Request-Id` response header (sent on every API response, exposed to allowed browser origins), else `request-id` / `cf-ray`. Include it in support requests. |
-| `data` | Error payload. For 402: `{ code: "INSUFFICIENT_CREDIT" \| "OVERDRAFT_LIMIT_EXCEEDED" }`. For 429: `{ limit: "perKey" \| "perIp" \| "perPhone", policy: "key" \| "platform", retryAfterMs }` (`OtpRateLimitedData`). |
+| `data` | Error payload. For a test-mode 400: `{ code: "TEST_NUMBER_REQUIRED" \| "TEST_NUMBER_IN_LIVE_MODE" }` (`OtpBadRequestData`). For 402: `{ code: "INSUFFICIENT_CREDIT" \| "OVERDRAFT_LIMIT_EXCEEDED" \| "TRIAL_DAILY_LIMIT_EXCEEDED", resetAt? }`. For 429: `{ limit: "perKey" \| "perIp" \| "perPhone" \| "perKeyDaily" \| "perOrgDaily" \| "testModeDaily", policy: "key" \| "platform", retryAfterMs }` (`OtpRateLimitedData`). |
 | `retryAfterMs` | Wait before retrying, in ms: the body's `data.retryAfterMs` (exact), else the `Retry-After` header (seconds or HTTP date), else `data.retryAfter` (seconds). Set on every 429 and on 503 when the server sends a wait. |
 | `retryable` | `true` for the codes marked below. |
 | `cause` | The underlying error (e.g. the fetch `TypeError`). |
 
 | Code | HTTP | Retryable | Typical cause |
 | --- | --- | --- | --- |
-| `BAD_REQUEST` | 400 | no | Invalid input, missing/invalid idempotency key (also raised client-side before any request), header/body key mismatch. |
+| `BAD_REQUEST` | 400 | no | Invalid input, missing/invalid idempotency key (also raised client-side before any request), header/body key mismatch. A test key with a real number (`data.code: "TEST_NUMBER_REQUIRED"`) or a live key with a test number (`"TEST_NUMBER_IN_LIVE_MODE"`); see [test mode](./test-mode.md#errors-specific-to-test-mode). |
 | `UNAUTHORIZED` | 401 | no | Missing, malformed, revoked or unknown key. |
 | `PAYMENT_REQUIRED` | 402 | no | Not enough credit in your wallet (`data.code`; from API 1.4.0 the wallet is shared by every app of your organization). Top up, then issue again. |
 | `FORBIDDEN` | 403 | no | Missing scope, `pk_` key on a server-only operation, or `Origin` not in the key's allowlist. |
 | `NOT_FOUND` | 404 | no | Unknown issue/template for this app. |
 | `CONFLICT` | 409 | no | Idempotency key reused with a different payload, or the replayed issue was since replaced. |
-| `TOO_MANY_REQUESTS` | 429 | yes | A rate limit of the API key on `issue`/`verify` (see [rate limits](#rate-limits-429)); honor `retryAfterMs`. |
+| `TOO_MANY_REQUESTS` | 429 | yes | A rate limit of the API key on `issue`/`verify`, or for test keys also on reads and the daily test budgets (see [rate limits](#rate-limits-429)); honor `retryAfterMs`. |
 | `INTERNAL_SERVER_ERROR` | 500, other 5xx | yes | Unexpected server error. |
 | `SERVICE_UNAVAILABLE` | 502, 503, 504 | yes | Dependency or gateway unavailable, or an earlier attempt with the same idempotency key is still being resolved. |
 | `TIMEOUT` | 0 (or 408) | yes | No response within `timeoutMs`. |
@@ -116,7 +116,8 @@ import { isOtpApiError, type OtpRateLimitedData } from "@k-otp/sdk";
 
 if (isOtpApiError(error) && error.code === "TOO_MANY_REQUESTS") {
   const data = error.data as OtpRateLimitedData | undefined;
-  data?.limit;        // "perKey" (issue and verify), "perIp" / "perPhone" (issue only)
+  data?.limit;        // "perKey" (issue and verify), "perIp" / "perPhone" (issue only),
+                      // test keys: "perKeyDaily", "perOrgDaily" / "testModeDaily" (issue only)
   data?.policy;       // "key" (your key's own policy) or "platform" (default or ceiling)
   error.retryAfterMs; // data.retryAfterMs (exact ms), else Retry-After
 }
@@ -131,6 +132,11 @@ if (isOtpApiError(error) && error.code === "TOO_MANY_REQUESTS") {
 - Repeated `policy: "key"` rejections on legitimate traffic mean the key's
   own limits are too tight; `policy: "platform"` means a platform default
   or ceiling applied.
+- Test keys (`pk_test_`/`sk_test_`) use a fixed platform policy instead:
+  `perKey` 120/minute and `perKeyDaily` 5,000/day per operation (issue,
+  verify and reads), plus daily test issue budgets per organization
+  (`perOrgDaily`) and platform-wide (`testModeDaily`) that reset at 00:00 UTC.
+  See [test mode](./test-mode.md#limits).
 - The flow helpers turn the wait into a cooldown: on `send` the resend
   cooldown (`cooldownRemainingMs`), on `verify` a separate verify cooldown
   (`verifyCooldownRemainingMs`, `canVerify: false`). See
