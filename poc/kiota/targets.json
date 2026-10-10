@@ -3,7 +3,7 @@
   "kiotaBuild": "1.35.0+114aa7ee609262d892fd9ceb02b2d9f7ecb84190",
   "actionCommit": "111eb592b2b3b2602ba9e0d979d4a4509cd59bb5",
   "spec": "spec/openapi.json",
-  "specSha256": "d0a122d0855be1bbd133b0649c4851e33d69b0c36c244a05b0b61ff16d4f91da",
+  "specSha256": "534cc399e6edf2748c3da15b504caed5f1e08b361abf1300416c3bddeb341340",
   "className": "KOtpApiClient",
   "stages": [
     "generation",

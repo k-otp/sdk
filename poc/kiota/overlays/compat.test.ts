@@ -29,7 +29,7 @@ describe("reviewed generation overlay", () => {
       ].schema.properties.promoNextExpiry,
     );
     expect(changes.filter((c) => c.reason.startsWith("Relaxed"))).toHaveLength(
-      60,
+      65,
     );
   });
   test("constant enum transformation has exactly the same permitted values", () => {

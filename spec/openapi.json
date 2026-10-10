@@ -1,8 +1,8 @@
 {
   "info": {
     "title": "k-otp API",
-    "version": "1.8.0",
-    "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`.\n\n**Rate limits.** `POST /issue` and `POST /verify` enforce the API key's rate-limit policy, a platform default for `pk_` keys and a platform ceiling.\nAn exceeded limit returns 429 `TOO_MANY_REQUESTS` with a `Retry-After` header (seconds) and `data.retryAfterMs`.\n\n**Request id.** Every response carries `X-Request-Id` (also exposed to allowed browser origins via CORS).\nA request `X-Request-Id` matching `^[A-Za-z0-9._:-]{8,128}$` is echoed; otherwise the API generates one.\nQuote it when contacting support."
+    "version": "1.9.0",
+    "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Test mode.** `pk_test_`/`sk_test_` keys use the same security schemes; the prefix selects test mode. Test keys never send a message and never use\ncredits: they only accept test phone numbers, simulate delivery from a fixed scenario table (see `POST /issue`), and their data never mixes with live data.\nResponses of issue, verify, status, issues and balance carry `mode` (`live` or `test`).\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`.\n\n**Rate limits.** `POST /issue` and `POST /verify` enforce the API key's rate-limit policy, a platform default for `pk_` keys and a platform ceiling.\nAn exceeded limit returns 429 `TOO_MANY_REQUESTS` with a `Retry-After` header (seconds) and `data.retryAfterMs`.\n\n**Request id.** Every response carries `X-Request-Id` (also exposed to allowed browser origins via CORS).\nA request `X-Request-Id` matching `^[A-Za-z0-9._:-]{8,128}$` is echoed; otherwise the API generates one.\nQuote it when contacting support."
   },
   "servers": [
     {
@@ -31,13 +31,13 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "pk_...",
-        "description": "Public key (`pk_` prefix, credential type `public_token`) for browser clients: `Authorization: Bearer pk_...`. Only `POST /issue` and `POST /verify` accept it. Every request must carry an `Origin` header that exactly matches one of the key's `allowedOrigins` (no wildcards); a missing or unlisted `Origin` is rejected with 403. A public key may only hold `otp:issue`, `otp:verify`; keys with any other scope (including `*`) are rejected at authentication."
+        "description": "Public key (`pk_` prefix, credential type `public_token`) for browser clients: `Authorization: Bearer pk_...`. Only `POST /issue` and `POST /verify` accept it. Every request must carry an `Origin` header that exactly matches one of the key's `allowedOrigins` (no wildcards); a missing or unlisted `Origin` is rejected with 403. A test-mode public key (`pk_test_`) also accepts `http(s)://localhost` and `http(s)://127.0.0.1` on any port. A public key may only hold `otp:issue`, `otp:verify`; keys with any other scope (including `*`) are rejected at authentication."
       },
       "secretKey": {
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "sk_...",
-        "description": "Secret key (`sk_` prefix, credential type `secret_token`) for server-side use only: `Authorization: Bearer sk_...`. Never embed it in browser or mobile clients. Each operation lists the scope it requires in `x-required-scopes`; `x-accepted-scopes` lists other scopes that also satisfy it (`*` grants every scope)."
+        "description": "Secret key (`sk_` prefix, credential type `secret_token`) for server-side use only: `Authorization: Bearer sk_...`. Never embed it in browser or mobile clients. A `sk_test_` key is its test-mode variant (see the test mode note in the API description). Each operation lists the scope it requires in `x-required-scopes`; `x-accepted-scopes` lists other scopes that also satisfy it (`*` grants every scope)."
       }
     },
     "schemas": {
@@ -46,7 +46,7 @@
         "properties": {
           "phoneNumber": {
             "type": "string",
-            "description": "Recipient mobile number (at most 32 characters after trimming, with at least\none digit). Handled in canonical form: a Korean mobile number in any spelling\n(`010-1234-5678`, `+82 10 1234 5678`) is `01012345678`; other numbers are\ntheir digits only (`+1 415-555-0100` is `14155550100`). Stored only as a\nhash and never returned by any endpoint.",
+            "description": "Recipient mobile number (at most 32 characters after trimming, with at least\none digit). Handled in canonical form: a Korean mobile number in any spelling\n(`010-1234-5678`, `+82 10 1234 5678`) is `01012345678`; other numbers are\ntheir digits only (`+1 415-555-2671` is `14155552671`). Stored only as a\nhash and never returned by any endpoint.",
             "example": "01012345678"
           },
           "purpose": {
@@ -178,6 +178,17 @@
           "webOtp": {
             "$ref": "#/components/schemas/IssueWebOtpResult",
             "description": "Present only when the request set `webOtp`."
+          },
+          "mode": {
+            "oneOf": [
+              {
+                "const": "live"
+              },
+              {
+                "const": "test"
+              }
+            ],
+            "description": "Mode of the API key that made the request: `live`, or `test` for a\n`pk_test_`/`sk_test_` key (simulated, no message sent, no credit used)."
           }
         },
         "required": [
@@ -234,10 +245,19 @@
                 "const": "perKey"
               },
               {
+                "const": "perKeyDaily"
+              },
+              {
+                "const": "perOrgDaily"
+              },
+              {
                 "const": "perPhone"
+              },
+              {
+                "const": "testModeDaily"
               }
             ],
-            "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only) or `perPhone` (per\nrecipient number, issue only)."
+            "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only), `perPhone` (per\nrecipient number, issue only), or for test-mode keys: `perKeyDaily`\n(daily cap per key and operation), `perOrgDaily` (daily test issue budget\nof the organization) or `testModeDaily` (platform-wide daily test issue\nbudget)."
           },
           "policy": {
             "oneOf": [
@@ -355,6 +375,17 @@
           "verifiedAt": {
             "type": "string",
             "description": "When the issue was verified (RFC 3339), if it has been."
+          },
+          "mode": {
+            "oneOf": [
+              {
+                "const": "live"
+              },
+              {
+                "const": "test"
+              }
+            ],
+            "description": "Mode of the API key that made the request: `live`, or `test` for a\n`pk_test_`/`sk_test_` key (simulated, no message sent, no credit used)."
           }
         },
         "required": [
@@ -494,6 +525,17 @@
           "updatedAt": {
             "type": "string",
             "description": "RFC 3339 timestamp."
+          },
+          "mode": {
+            "oneOf": [
+              {
+                "const": "live"
+              },
+              {
+                "const": "test"
+              }
+            ],
+            "description": "Mode of the API key that made the request: `live`, or `test` for a\n`pk_test_`/`sk_test_` key (simulated, no message sent, no credit used)."
           }
         },
         "required": [
@@ -729,6 +771,17 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "mode": {
+            "oneOf": [
+              {
+                "const": "live"
+              },
+              {
+                "const": "test"
+              }
+            ],
+            "description": "Mode of the API key that made the request. Test-mode keys list only\nsimulated test issues (never charged: `billingStatus` `released`,\n`debitedAmount` 0); live keys never see them."
           }
         },
         "required": [
@@ -967,11 +1020,11 @@
           },
           "walletId": {
             "type": "string",
-            "description": "`org:<organizationId>` for the organization wallet; `app:<appId>` for a legacy per-app wallet."
+            "description": "`org:<organizationId>` for the organization wallet; `app:<appId>` for a legacy\nper-app wallet; `test:<appId>` for the simulated wallet of a test-mode key."
           },
           "walletScope": {
             "$ref": "#/components/schemas/WalletScope",
-            "description": "`organization` when the balance is shared by every app of the organization."
+            "description": "`organization` when the balance is shared by every app of the organization;\n`test` for the simulated wallet of a test-mode key."
           },
           "organizationId": {
             "type": "string",
@@ -1004,6 +1057,17 @@
               }
             ],
             "description": "The promotional credits that expire first, or `null` when there are none."
+          },
+          "mode": {
+            "oneOf": [
+              {
+                "const": "live"
+              },
+              {
+                "const": "test"
+              }
+            ],
+            "description": "Mode of the API key that made the request. A `test` key gets a fixed\nsimulated balance (`walletScope: 'test'`, `walletId: 'test:<appId>'`) that\nnever changes; the real wallet is never read."
           }
         },
         "required": [
@@ -1025,9 +1089,12 @@
           },
           {
             "const": "organization"
+          },
+          {
+            "const": "test"
           }
         ],
-        "description": "`organization`: the organization credit wallet (`org:<organizationId>`) shared\nby every app of the organization. `app`: the legacy per-app wallet, which is\nbeing retired."
+        "description": "`organization`: the organization credit wallet (`org:<organizationId>`) shared\nby every app of the organization. `app`: the legacy per-app wallet, which is\nbeing retired. `test`: the simulated wallet of a test-mode key (`GET /v1/balance` only)."
       },
       "PromoExpiry": {
         "type": "object",
@@ -1265,7 +1332,7 @@
       "post": {
         "operationId": "otp.issue",
         "summary": "Issue OTP and queue outbound delivery",
-        "description": "Generates a 6-digit OTP, applies quota admission, records the issue, and queues delivery by KakaoTalk AlimTalk with an automatic SMS fallback when AlimTalk delivery fails. The plaintext code is never returned; only `issueId`, expiry, and attempt metadata are.\n\n**SMS fallback.** The SMS fallback is on by default (omitted or `smsFallback: true`): when AlimTalk delivery fails, the same OTP text is sent by SMS at no extra charge. Set `smsFallback: false` for AlimTalk only: a failed AlimTalk delivery is then not re-sent by SMS, and the price stays the AlimTalk price. It has no effect on SMS delivery (`channel: 'sms'` or an SMS-only template) and is then not part of the idempotency fingerprint. On AlimTalk delivery an explicit `false` is part of the fingerprint (omitted and `true` are the same request).\n\n**Idempotency.** An idempotency key is required, either in the `Idempotency-Key` header or the body `idempotencyKey` field (both must match when both are sent). A retry with the same key and payload returns the original response without re-sending or re-debiting. When the outcome of the first attempt is unknown (timeout, 503), retry only with the same key.\n\n**Replacement.** Issuing again for the same phone number and purpose (with a new key) marks the previous `issued` OTP as `replaced`. Phone numbers are compared in canonical form: a Korean mobile number is the same number in any spelling (`010-1234-5678`, `01012345678`, `+82 10 1234 5678`); other numbers are compared by their digits only (`+1 415-555-0100` = `14155550100`).\n\n**WebOTP.** With `webOtp` the SMS fallback ends with `@<host> #<code>` so Android Chrome can auto-fill the code on that origin when it arrives by SMS. `true` binds the request `Origin` header (any key type that sends one); `{ origin }` names it (server `sk_` calls; a `pk_` key may only name its own `Origin`). The origin must be `https` without a path or port and must be listed in the key's `allowedOrigins`; a key without `allowedOrigins` cannot use WebOTP (`http://localhost` and unlisted origins are accepted only in local development). It uses a compact template and never changes the message type or price: when the compact SMS with the line would exceed 90 bytes (line breaks counted as 2), the normal text is sent without it. The KakaoTalk message never carries the line, so the response `webOtp` reports `fallback_only` (or `skipped` with a `reason`; `channel_alimtalk` with `smsFallback: false`).\n\n**Billing.** Credit is reserved at admission and finalized asynchronously after send processing; the response does not include balance or debit amounts. The charged amount is decided server-side per delivery channel (the SMS fallback is included in the AlimTalk price); the deprecated `cost` field is ignored for billing for every key type. Quota rejection returns 402 with `data.code`.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.\n\n**Rate limits.** The key's `perKey`, `perIp` and `perPhone` rules are enforced after validation. For `pk_` keys the platform default covers `perKey`/`perIp` the key does not set and its `perPhone` default always applies; `perKey`/`perIp` never exceed the platform ceiling. An exceeded rule returns 429 with `Retry-After` and `data.retryAfterMs`.",
+        "description": "Generates a 6-digit OTP, applies quota admission, records the issue, and queues delivery by KakaoTalk AlimTalk with an automatic SMS fallback when AlimTalk delivery fails. The plaintext code is never returned; only `issueId`, expiry, and attempt metadata are.\n\n**SMS fallback.** The SMS fallback is on by default (omitted or `smsFallback: true`): when AlimTalk delivery fails, the same OTP text is sent by SMS at no extra charge. Set `smsFallback: false` for AlimTalk only: a failed AlimTalk delivery is then not re-sent by SMS, and the price stays the AlimTalk price. It has no effect on SMS delivery (`channel: 'sms'` or an SMS-only template) and is then not part of the idempotency fingerprint. On AlimTalk delivery an explicit `false` is part of the fingerprint (omitted and `true` are the same request).\n\n**Idempotency.** An idempotency key is required, either in the `Idempotency-Key` header or the body `idempotencyKey` field (both must match when both are sent). A retry with the same key and payload returns the original response without re-sending or re-debiting. When the outcome of the first attempt is unknown (timeout, 503), retry only with the same key.\n\n**Replacement.** Issuing again for the same phone number and purpose (with a new key) marks the previous `issued` OTP as `replaced`. Phone numbers are compared in canonical form: a Korean mobile number is the same number in any spelling (`010-1234-5678`, `01012345678`, `+82 10 1234 5678`); other numbers are compared by their digits only (`+1 415-555-2671` = `14155552671`).\n\n**WebOTP.** With `webOtp` the SMS fallback ends with `@<host> #<code>` so Android Chrome can auto-fill the code on that origin when it arrives by SMS. `true` binds the request `Origin` header (any key type that sends one); `{ origin }` names it (server `sk_` calls; a `pk_` key may only name its own `Origin`). The origin must be `https` without a path or port and must be listed in the key's `allowedOrigins`; a key without `allowedOrigins` cannot use WebOTP (`http://localhost` and unlisted origins are accepted only in local development). It uses a compact template and never changes the message type or price: when the compact SMS with the line would exceed 90 bytes (line breaks counted as 2), the normal text is sent without it. The KakaoTalk message never carries the line, so the response `webOtp` reports `fallback_only` (or `skipped` with a `reason`; `channel_alimtalk` with `smsFallback: false`).\n\n**Billing.** Credit is reserved at admission and finalized asynchronously after send processing; the response does not include balance or debit amounts. The charged amount is decided server-side per delivery channel (the SMS fallback is included in the AlimTalk price); the deprecated `cost` field is ignored for billing for every key type. Quota rejection returns 402 with `data.code`.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.\n\n**Test mode.** A `pk_test_`/`sk_test_` key never sends a message and never uses credits: the issue is simulated and kept for 7 days, separately from live data (idempotency keys, issue ids and rate limits of test and live keys never mix; a live key cannot read a test issue and vice versa). Test keys only accept test phone numbers (anything else is 400 `TEST_NUMBER_REQUIRED`), and live keys reject them (400 `TEST_NUMBER_IN_LIVE_MODE`); both codes are the first token of `message` and are also in `data.code`. Test numbers: Korean `010-0000-00xx` (`+82 10-0000-00xx`), UK `+44 7700 9000xx` and US `+1 NXX 555-01xx`; the last two digits `xx` pick the scenario. Every test issue that is created verifies with the fixed code `000000` (except `05`), and responses carry `mode: 'test'`.\n\n| `xx` | Issue response and delivery (`GET /status`) | Verify |\n| --- | --- | --- |\n| `00` | 200; `sent` after 1s, `delivered` after 2s | `000000` verifies |\n| `01` | 200; `sent` after 1s, `failed` after 3s | `000000` verifies (delivery and verification are independent) |\n| `02` | 200; `queued`/`sent` until 30s, then `delivered` (polling) | `000000` verifies |\n| `03` | 200; stays `sent` with `providerOutcomeAmbiguous: true` (provider outcome unknown) | `000000` verifies |\n| `04` | 200 with `expiresAt` = issue + 10s; `delivered` | `EXPIRED` after that |\n| `05` | 200; `delivered` | every code is `MISMATCH`; the last attempt is `MAX_ATTEMPTS` |\n| `06` | 429 `TOO_MANY_REQUESTS` (`perPhone`, `Retry-After: 60`) | - |\n| `07` | 402 `INSUFFICIENT_CREDIT` | - |\n| `08` | 402 `TRIAL_DAILY_LIMIT_EXCEEDED` | - |\n| `09` | 503 `SERVICE_UNAVAILABLE` (`Retry-After: 2`) | - |\n| `10` | 200; with AlimTalk delivery the AlimTalk send fails and the SMS fallback is `delivered` after 4s | `000000` verifies |\n| `11-99` | reserved; behave like `00` | `000000` verifies |\n\nTest keys use a fixed platform rate limit instead of the key policy: `perKey` 120 requests per minute and `perKeyDaily` 5,000 requests per day, counted per key and separately for issue, verify and reads (status, issues, balance, credit ledger). New test issues also share daily budgets per organization (`perOrgDaily`, 10,000 by default) and platform-wide (`testModeDaily`), reset at 00:00 UTC; an exhausted budget returns 429 with `Retry-After`.\n\n**Rate limits.** The key's `perKey`, `perIp` and `perPhone` rules are enforced after validation. For `pk_` keys the platform default covers `perKey`/`perIp` the key does not set and its `perPhone` default always applies; `perKey`/`perIp` never exceed the platform ceiling. An exceeded rule returns 429 with `Retry-After` and `data.retryAfterMs`.",
         "tags": [
           "otp"
         ],
@@ -1278,7 +1345,7 @@
                 "properties": {
                   "phoneNumber": {
                     "type": "string",
-                    "description": "Recipient mobile number (at most 32 characters after trimming, with at least\none digit). Handled in canonical form: a Korean mobile number in any spelling\n(`010-1234-5678`, `+82 10 1234 5678`) is `01012345678`; other numbers are\ntheir digits only (`+1 415-555-0100` is `14155550100`). Stored only as a\nhash and never returned by any endpoint.",
+                    "description": "Recipient mobile number (at most 32 characters after trimming, with at least\none digit). Handled in canonical form: a Korean mobile number in any spelling\n(`010-1234-5678`, `+82 10 1234 5678`) is `01012345678`; other numbers are\ntheir digits only (`+1 415-555-2671` is `14155552671`). Stored only as a\nhash and never returned by any endpoint.",
                     "example": "01012345678"
                   },
                   "purpose": {
@@ -1395,6 +1462,17 @@
                     "webOtp": {
                       "$ref": "#/components/schemas/IssueWebOtpResult",
                       "description": "Present only when the request set `webOtp`."
+                    },
+                    "mode": {
+                      "oneOf": [
+                        {
+                          "const": "live"
+                        },
+                        {
+                          "const": "test"
+                        }
+                      ],
+                      "description": "Mode of the API key that made the request: `live`, or `test` for a\n`pk_test_`/`sk_test_` key (simulated, no message sent, no credit used)."
                     }
                   },
                   "required": [
@@ -1414,7 +1492,7 @@
             }
           },
           "400": {
-            "description": "BAD_REQUEST: invalid payload, missing/blank idempotency key, header/body key mismatch, a `phoneNumber` without digits, unknown template or template variables, a `channel` the template does not support, `expiresInSec`/`maxAttempts`/`cost` out of range (`cost` is still range-checked though it no longer affects billing), or a `webOtp` origin the key may not bind (not listed in the key `allowedOrigins` or the key has none, not https, has a path or a port, not a domain, missing request `Origin` for `true`, or a `pk_` origin other than the request `Origin`).",
+            "description": "BAD_REQUEST: `TEST_NUMBER_REQUIRED` (a test key with a real number) or `TEST_NUMBER_IN_LIVE_MODE` (a live key with a test number), as the first token of `message` and in `data.code`; invalid payload, missing/blank idempotency key, header/body key mismatch, a `phoneNumber` without digits, unknown template or template variables, a `channel` the template does not support, `expiresInSec`/`maxAttempts`/`cost` out of range (`cost` is still range-checked though it no longer affects billing), or a `webOtp` origin the key may not bind (not listed in the key `allowedOrigins` or the key has none, not https, has a path or a port, not a domain, missing request `Origin` for `true`, or a `pk_` origin other than the request `Origin`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1743,7 +1821,7 @@
             }
           },
           "429": {
-            "description": "TOO_MANY_REQUESTS: the API key exceeded a rate limit. `data.limit` names the rule (`perKey`, `perIp` or `perPhone`) and `data.policy` whether it came from the key's own policy (`key`) or a platform limit (`platform`: the default for `pk_` keys or the platform ceiling). Wait `data.retryAfterMs` milliseconds (the `Retry-After` header carries the same wait in seconds) before retrying; reuse the same idempotency key. Rejected requests do not consume the limit.",
+            "description": "TOO_MANY_REQUESTS: the API key exceeded a rate limit. `data.limit` names the rule (`perKey`, `perIp`, `perPhone`, or for test keys `perKeyDaily`, `perOrgDaily` or `testModeDaily`) and `data.policy` whether it came from the key's own policy (`key`) or a platform limit (`platform`: the default for `pk_` keys or the platform ceiling). Wait `data.retryAfterMs` milliseconds (the `Retry-After` header carries the same wait in seconds) before retrying; reuse the same idempotency key. Rejected requests do not consume the limit.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1776,10 +1854,19 @@
                                   "const": "perKey"
                                 },
                                 {
+                                  "const": "perKeyDaily"
+                                },
+                                {
+                                  "const": "perOrgDaily"
+                                },
+                                {
                                   "const": "perPhone"
+                                },
+                                {
+                                  "const": "testModeDaily"
                                 }
                               ],
-                              "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only) or `perPhone` (per\nrecipient number, issue only)."
+                              "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only), `perPhone` (per\nrecipient number, issue only), or for test-mode keys: `perKeyDaily`\n(daily cap per key and operation), `perOrgDaily` (daily test issue budget\nof the organization) or `testModeDaily` (platform-wide daily test issue\nbudget)."
                             },
                             "policy": {
                               "oneOf": [
@@ -1918,7 +2005,7 @@
             }
           },
           "503": {
-            "description": "SERVICE_UNAVAILABLE: introspection or a downstream dependency is unavailable, the rate limiter is unavailable for a `pk_` key (fail-closed, `Retry-After` set), or an earlier attempt with this idempotency key is still being resolved. Retry later with the same key.",
+            "description": "SERVICE_UNAVAILABLE: introspection or a downstream dependency is unavailable, the rate limiter is unavailable for a `pk_` key (fail-closed, `Retry-After` set), or an earlier attempt with this idempotency key is still being resolved. Retry later with the same key. Test scenario `09` returns the same 503 with `Retry-After`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2020,7 +2107,7 @@
       "post": {
         "operationId": "otp.verify",
         "summary": "Verify OTP code",
-        "description": "Checks a 6-digit `code` against `issueId` with one-time semantics. On success the issue transitions to `verified` and cannot be verified again. A wrong code consumes one attempt. Verification failures are returned as 200 with `verified: false` and a `reasonCode` (`MISMATCH`, `MAX_ATTEMPTS`, `EXPIRED`, `ALREADY_VERIFIED`, `REPLACED`, `NOT_FOUND`), not as HTTP errors.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.\n\n**Rate limits.** The key's `perKey` rule (for `pk_` keys the platform default when the key sets none), capped at the platform ceiling, is enforced after validation; an exceeded rule returns 429 with `Retry-After` and `data.retryAfterMs`.",
+        "description": "Checks a 6-digit `code` against `issueId` with one-time semantics. On success the issue transitions to `verified` and cannot be verified again. A wrong code consumes one attempt. Verification failures are returned as 200 with `verified: false` and a `reasonCode` (`MISMATCH`, `MAX_ATTEMPTS`, `EXPIRED`, `ALREADY_VERIFIED`, `REPLACED`, `NOT_FOUND`), not as HTTP errors.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.\n\n**Test mode.** A test issue (`pk_test_`/`sk_test_` key) verifies with the fixed code `000000`, except scenario `05`, where every code is `MISMATCH`; scenario `04` expires 10 seconds after issue. Responses carry `mode: 'test'`.\n\n**Rate limits.** The key's `perKey` rule (for `pk_` keys the platform default when the key sets none), capped at the platform ceiling, is enforced after validation; an exceeded rule returns 429 with `Retry-After` and `data.retryAfterMs`.",
         "tags": [
           "otp"
         ],
@@ -2099,6 +2186,17 @@
                     "verifiedAt": {
                       "type": "string",
                       "description": "When the issue was verified (RFC 3339), if it has been."
+                    },
+                    "mode": {
+                      "oneOf": [
+                        {
+                          "const": "live"
+                        },
+                        {
+                          "const": "test"
+                        }
+                      ],
+                      "description": "Mode of the API key that made the request: `live`, or `test` for a\n`pk_test_`/`sk_test_` key (simulated, no message sent, no credit used)."
                     }
                   },
                   "required": [
@@ -2378,7 +2476,7 @@
             }
           },
           "429": {
-            "description": "TOO_MANY_REQUESTS: the API key exceeded a rate limit. `data.limit` names the rule (`perKey`) and `data.policy` whether it came from the key's own policy (`key`) or a platform limit (`platform`: the default for `pk_` keys or the platform ceiling). Wait `data.retryAfterMs` milliseconds (the `Retry-After` header carries the same wait in seconds) before retrying; rejected requests do not consume the limit or a verification attempt.",
+            "description": "TOO_MANY_REQUESTS: the API key exceeded a rate limit. `data.limit` names the rule (`perKey`, or `perKeyDaily` for test keys) and `data.policy` whether it came from the key's own policy (`key`) or a platform limit (`platform`: the default for `pk_` keys or the platform ceiling). Wait `data.retryAfterMs` milliseconds (the `Retry-After` header carries the same wait in seconds) before retrying; rejected requests do not consume the limit or a verification attempt.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2411,10 +2509,19 @@
                                   "const": "perKey"
                                 },
                                 {
+                                  "const": "perKeyDaily"
+                                },
+                                {
+                                  "const": "perOrgDaily"
+                                },
+                                {
                                   "const": "perPhone"
+                                },
+                                {
+                                  "const": "testModeDaily"
                                 }
                               ],
-                              "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only) or `perPhone` (per\nrecipient number, issue only)."
+                              "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only), `perPhone` (per\nrecipient number, issue only), or for test-mode keys: `perKeyDaily`\n(daily cap per key and operation), `perOrgDaily` (daily test issue budget\nof the organization) or `testModeDaily` (platform-wide daily test issue\nbudget)."
                             },
                             "policy": {
                               "oneOf": [
@@ -2642,7 +2749,7 @@
       "get": {
         "operationId": "otp.status",
         "summary": "Get OTP issue status",
-        "description": "Returns verification state, delivery state, and the computed `overallStatus` for one issue owned by the authenticated app. `overallStatus` equals `verificationStatus` unless it is `issued`; while `issued` it is derived from `deliveryStatus` (`delivered` -> `delivered`, `failed` -> `delivery_failed`, `queued`/`sent` -> `in_progress`, `unknown` -> `pending_lookup`).\n\nImmediately after `POST /issue` the issue row may still be persisting asynchronously; for up to 60 seconds such an issue is reported as `pending_lookup` instead of 404. The phone number is never returned.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "description": "Returns verification state, delivery state, and the computed `overallStatus` for one issue owned by the authenticated app. `overallStatus` equals `verificationStatus` unless it is `issued`; while `issued` it is derived from `deliveryStatus` (`delivered` -> `delivered`, `failed` -> `delivery_failed`, `queued`/`sent` -> `in_progress`, `unknown` -> `pending_lookup`).\n\nImmediately after `POST /issue` the issue row may still be persisting asynchronously; for up to 60 seconds such an issue is reported as `pending_lookup` instead of 404. The phone number is never returned.\n\n**Test mode.** A `sk_test_` key reads only its simulated test issues; the delivery state follows the scenario timeline of the test number (see `POST /issue`). Live and test issue ids never resolve across modes (404). Responses carry `mode`.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
         "tags": [
           "otp"
         ],
@@ -2781,6 +2888,17 @@
                     "updatedAt": {
                       "type": "string",
                       "description": "RFC 3339 timestamp."
+                    },
+                    "mode": {
+                      "oneOf": [
+                        {
+                          "const": "live"
+                        },
+                        {
+                          "const": "test"
+                        }
+                      ],
+                      "description": "Mode of the API key that made the request: `live`, or `test` for a\n`pk_test_`/`sk_test_` key (simulated, no message sent, no credit used)."
                     }
                   },
                   "required": [
@@ -3134,6 +3252,125 @@
               }
             }
           },
+          "429": {
+            "description": "TOO_MANY_REQUESTS: only for test-mode (`sk_test_`) keys, whose reads are metered (`data.limit`: `perKey` per minute or `perKeyDaily` per day, `data.policy: platform`). Wait `data.retryAfterMs` milliseconds (`Retry-After` in seconds). Live keys are never rate limited on reads.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "TOO_MANY_REQUESTS"
+                        },
+                        "status": {
+                          "const": 429
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Too Many Requests"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "limit": {
+                              "oneOf": [
+                                {
+                                  "const": "perIp"
+                                },
+                                {
+                                  "const": "perKey"
+                                },
+                                {
+                                  "const": "perKeyDaily"
+                                },
+                                {
+                                  "const": "perOrgDaily"
+                                },
+                                {
+                                  "const": "perPhone"
+                                },
+                                {
+                                  "const": "testModeDaily"
+                                }
+                              ],
+                              "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only), `perPhone` (per\nrecipient number, issue only), or for test-mode keys: `perKeyDaily`\n(daily cap per key and operation), `perOrgDaily` (daily test issue budget\nof the organization) or `testModeDaily` (platform-wide daily test issue\nbudget)."
+                            },
+                            "policy": {
+                              "oneOf": [
+                                {
+                                  "const": "key"
+                                },
+                                {
+                                  "const": "platform"
+                                }
+                              ],
+                              "description": "`key`: the rate-limit policy configured on the API key. `platform`: a\nplatform limit, either the default for the key type (currently `pk_`\npublic keys) or the platform ceiling a key rule was capped at."
+                            },
+                            "retryAfterMs": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "description": "Milliseconds until a retry can be admitted.",
+                              "example": 1500
+                            }
+                          },
+                          "required": [
+                            "limit",
+                            "policy",
+                            "retryAfterMs"
+                          ],
+                          "description": "Error data of a 429 TOO_MANY_REQUESTS response from `POST /v1/issue` or\n`POST /v1/verify`. The `Retry-After` response header carries the same wait\nin whole seconds (rounded up)."
+                        }
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message",
+                        "data"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            }
+          },
           "500": {
             "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
             "content": {
@@ -3283,7 +3520,7 @@
       "get": {
         "operationId": "otp.listIssues",
         "summary": "List OTP issues for the authenticated app",
-        "description": "Returns a PII-free dashboard projection of OTP issues. The tenant is always derived from the bearer credential. Phone numbers, OTP material, provider payloads, idempotency keys, and free-form metadata are never included.\n\nResults are ordered newest first (`createdAt` descending, ties broken by id) and keyset-paginated. Pass `limit` (1-100, default 50) and, for subsequent pages, the opaque `cursor` returned as `nextCursor`; `nextCursor` is omitted on the last page. Cursors are bound to the endpoint that issued them and must be sent unchanged. Keep the same filters while paging.\n\nOptional `createdFrom`/`createdTo` (RFC 3339 date-time) select the half-open range `[createdFrom, createdTo)`; when both are given `createdFrom` must be earlier than `createdTo`. `verificationStatus` filters by effective status: `issued` matches only unexpired issues, and `expired` also includes `issued` rows whose expiry has passed.\n\n`deliveryStatus` is read from the delivery tracker and falls back to `unknown` if the tracker is temporarily unavailable.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "description": "Returns a PII-free dashboard projection of OTP issues. The tenant is always derived from the bearer credential. Phone numbers, OTP material, provider payloads, idempotency keys, and free-form metadata are never included.\n\nResults are ordered newest first (`createdAt` descending, ties broken by id) and keyset-paginated. Pass `limit` (1-100, default 50) and, for subsequent pages, the opaque `cursor` returned as `nextCursor`; `nextCursor` is omitted on the last page. Cursors are bound to the endpoint that issued them and must be sent unchanged. Keep the same filters while paging.\n\nOptional `createdFrom`/`createdTo` (RFC 3339 date-time) select the half-open range `[createdFrom, createdTo)`; when both are given `createdFrom` must be earlier than `createdTo`. `verificationStatus` filters by effective status: `issued` matches only unexpired issues, and `expired` also includes `issued` rows whose expiry has passed.\n\n`deliveryStatus` is read from the delivery tracker and falls back to `unknown` if the tracker is temporarily unavailable.\n\n**Test mode.** A `sk_test_` key lists only its simulated test issues of the last 7 days (never charged: `billingStatus: released`, `debitedAmount: 0`), and a live key never lists them. Each item carries `mode`. A test-key page can hold fewer items than `limit` (even none) while `nextCursor` is present: keep paging until it is absent.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
         "tags": [
           "otp"
         ],
@@ -3664,6 +3901,125 @@
               }
             }
           },
+          "429": {
+            "description": "TOO_MANY_REQUESTS: only for test-mode (`sk_test_`) keys, whose reads are metered (`data.limit`: `perKey` per minute or `perKeyDaily` per day, `data.policy: platform`). Wait `data.retryAfterMs` milliseconds (`Retry-After` in seconds). Live keys are never rate limited on reads.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "TOO_MANY_REQUESTS"
+                        },
+                        "status": {
+                          "const": 429
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Too Many Requests"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "limit": {
+                              "oneOf": [
+                                {
+                                  "const": "perIp"
+                                },
+                                {
+                                  "const": "perKey"
+                                },
+                                {
+                                  "const": "perKeyDaily"
+                                },
+                                {
+                                  "const": "perOrgDaily"
+                                },
+                                {
+                                  "const": "perPhone"
+                                },
+                                {
+                                  "const": "testModeDaily"
+                                }
+                              ],
+                              "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only), `perPhone` (per\nrecipient number, issue only), or for test-mode keys: `perKeyDaily`\n(daily cap per key and operation), `perOrgDaily` (daily test issue budget\nof the organization) or `testModeDaily` (platform-wide daily test issue\nbudget)."
+                            },
+                            "policy": {
+                              "oneOf": [
+                                {
+                                  "const": "key"
+                                },
+                                {
+                                  "const": "platform"
+                                }
+                              ],
+                              "description": "`key`: the rate-limit policy configured on the API key. `platform`: a\nplatform limit, either the default for the key type (currently `pk_`\npublic keys) or the platform ceiling a key rule was capped at."
+                            },
+                            "retryAfterMs": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "description": "Milliseconds until a retry can be admitted.",
+                              "example": 1500
+                            }
+                          },
+                          "required": [
+                            "limit",
+                            "policy",
+                            "retryAfterMs"
+                          ],
+                          "description": "Error data of a 429 TOO_MANY_REQUESTS response from `POST /v1/issue` or\n`POST /v1/verify`. The `Retry-After` response header carries the same wait\nin whole seconds (rounded up)."
+                        }
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message",
+                        "data"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            }
+          },
           "500": {
             "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
             "content": {
@@ -3971,6 +4327,17 @@
                     "updatedAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "mode": {
+                      "oneOf": [
+                        {
+                          "const": "live"
+                        },
+                        {
+                          "const": "test"
+                        }
+                      ],
+                      "description": "Mode of the API key that made the request. Test-mode keys list only\nsimulated test issues (never charged: `billingStatus` `released`,\n`debitedAmount` 0); live keys never see them."
                     }
                   },
                   "required": [
@@ -4326,6 +4693,125 @@
               }
             }
           },
+          "429": {
+            "description": "TOO_MANY_REQUESTS: only for test-mode (`sk_test_`) keys, whose reads are metered (`data.limit`: `perKey` per minute or `perKeyDaily` per day, `data.policy: platform`). Wait `data.retryAfterMs` milliseconds (`Retry-After` in seconds). Live keys are never rate limited on reads.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "TOO_MANY_REQUESTS"
+                        },
+                        "status": {
+                          "const": 429
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Too Many Requests"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "limit": {
+                              "oneOf": [
+                                {
+                                  "const": "perIp"
+                                },
+                                {
+                                  "const": "perKey"
+                                },
+                                {
+                                  "const": "perKeyDaily"
+                                },
+                                {
+                                  "const": "perOrgDaily"
+                                },
+                                {
+                                  "const": "perPhone"
+                                },
+                                {
+                                  "const": "testModeDaily"
+                                }
+                              ],
+                              "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only), `perPhone` (per\nrecipient number, issue only), or for test-mode keys: `perKeyDaily`\n(daily cap per key and operation), `perOrgDaily` (daily test issue budget\nof the organization) or `testModeDaily` (platform-wide daily test issue\nbudget)."
+                            },
+                            "policy": {
+                              "oneOf": [
+                                {
+                                  "const": "key"
+                                },
+                                {
+                                  "const": "platform"
+                                }
+                              ],
+                              "description": "`key`: the rate-limit policy configured on the API key. `platform`: a\nplatform limit, either the default for the key type (currently `pk_`\npublic keys) or the platform ceiling a key rule was capped at."
+                            },
+                            "retryAfterMs": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "description": "Milliseconds until a retry can be admitted.",
+                              "example": 1500
+                            }
+                          },
+                          "required": [
+                            "limit",
+                            "policy",
+                            "retryAfterMs"
+                          ],
+                          "description": "Error data of a 429 TOO_MANY_REQUESTS response from `POST /v1/issue` or\n`POST /v1/verify`. The `Retry-After` response header carries the same wait\nin whole seconds (rounded up)."
+                        }
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message",
+                        "data"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            }
+          },
           "500": {
             "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
             "content": {
@@ -4475,7 +4961,7 @@
       "get": {
         "operationId": "otp.listCreditLedger",
         "summary": "List wallet ledger entries visible to the authenticated app",
-        "description": "Returns an audit projection of mutations of the wallet the key spends from: for an organization wallet, its `credit` top-ups and `clawback`s plus only the authenticated app's per-issue `debit`s and `refund`s (`appId` attributes app-level entries). `amountDelta` is signed (debits are negative) and `balanceAfter` is the wallet balance after the entry. Internal billing references, external payment references, and initiator metadata are omitted; `issueId` is present only for issue-linked entries.\n\nResults are ordered newest first (`createdAt` descending, ties broken by id) and keyset-paginated. Pass `limit` (1-100, default 50) and, for subsequent pages, the opaque `cursor` returned as `nextCursor`; `nextCursor` is omitted on the last page. Cursors are bound to the endpoint that issued them and must be sent unchanged. Keep the same filters while paging.\n\nOptional `createdFrom`/`createdTo` (RFC 3339 date-time) select the half-open range `[createdFrom, createdTo)`; when both are given `createdFrom` must be earlier than `createdTo`. `entryType` filters by entry type.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "description": "Returns an audit projection of mutations of the wallet the key spends from: for an organization wallet, its `credit` top-ups and `clawback`s plus only the authenticated app's per-issue `debit`s and `refund`s (`appId` attributes app-level entries). `amountDelta` is signed (debits are negative) and `balanceAfter` is the wallet balance after the entry. Internal billing references, external payment references, and initiator metadata are omitted; `issueId` is present only for issue-linked entries.\n\nResults are ordered newest first (`createdAt` descending, ties broken by id) and keyset-paginated. Pass `limit` (1-100, default 50) and, for subsequent pages, the opaque `cursor` returned as `nextCursor`; `nextCursor` is omitted on the last page. Cursors are bound to the endpoint that issued them and must be sent unchanged. Keep the same filters while paging.\n\nOptional `createdFrom`/`createdTo` (RFC 3339 date-time) select the half-open range `[createdFrom, createdTo)`; when both are given `createdFrom` must be earlier than `createdTo`. `entryType` filters by entry type.\n\nA `sk_test_` key never reads the real ledger: it always gets an empty page (`items: []`).\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
         "tags": [
           "otp"
         ],
@@ -4862,6 +5348,125 @@
               }
             }
           },
+          "429": {
+            "description": "TOO_MANY_REQUESTS: only for test-mode (`sk_test_`) keys, whose reads are metered (`data.limit`: `perKey` per minute or `perKeyDaily` per day, `data.policy: platform`). Wait `data.retryAfterMs` milliseconds (`Retry-After` in seconds). Live keys are never rate limited on reads.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "TOO_MANY_REQUESTS"
+                        },
+                        "status": {
+                          "const": 429
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Too Many Requests"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "limit": {
+                              "oneOf": [
+                                {
+                                  "const": "perIp"
+                                },
+                                {
+                                  "const": "perKey"
+                                },
+                                {
+                                  "const": "perKeyDaily"
+                                },
+                                {
+                                  "const": "perOrgDaily"
+                                },
+                                {
+                                  "const": "perPhone"
+                                },
+                                {
+                                  "const": "testModeDaily"
+                                }
+                              ],
+                              "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only), `perPhone` (per\nrecipient number, issue only), or for test-mode keys: `perKeyDaily`\n(daily cap per key and operation), `perOrgDaily` (daily test issue budget\nof the organization) or `testModeDaily` (platform-wide daily test issue\nbudget)."
+                            },
+                            "policy": {
+                              "oneOf": [
+                                {
+                                  "const": "key"
+                                },
+                                {
+                                  "const": "platform"
+                                }
+                              ],
+                              "description": "`key`: the rate-limit policy configured on the API key. `platform`: a\nplatform limit, either the default for the key type (currently `pk_`\npublic keys) or the platform ceiling a key rule was capped at."
+                            },
+                            "retryAfterMs": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "description": "Milliseconds until a retry can be admitted.",
+                              "example": 1500
+                            }
+                          },
+                          "required": [
+                            "limit",
+                            "policy",
+                            "retryAfterMs"
+                          ],
+                          "description": "Error data of a 429 TOO_MANY_REQUESTS response from `POST /v1/issue` or\n`POST /v1/verify`. The `Retry-After` response header carries the same wait\nin whole seconds (rounded up)."
+                        }
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message",
+                        "data"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            }
+          },
           "500": {
             "description": "INTERNAL_SERVER_ERROR: unexpected server failure. Undefined errors (`defined: false`) use the same envelope.",
             "content": {
@@ -5012,7 +5617,7 @@
       "get": {
         "operationId": "otp.balance",
         "summary": "Get wallet balance",
-        "description": "Returns the current balance of the credit wallet the authenticated app spends from: the organization wallet shared by every app of the organization (`walletScope: organization`), or a legacy per-app wallet (`walletScope: app`). `balance` is a credit quantity (not money) and `currency` is `CREDIT`. Reading the balance never affects OTP issue status.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "description": "Returns the current balance of the credit wallet the authenticated app spends from: the organization wallet shared by every app of the organization (`walletScope: organization`), or a legacy per-app wallet (`walletScope: app`). `balance` is a credit quantity (not money) and `currency` is `CREDIT`. Reading the balance never affects OTP issue status.\n\n**Test mode.** A `sk_test_` key never reads the real wallet: it gets a fixed simulated balance (`walletScope: test`, `walletId: test:<appId>`, `balance: 1000000`, `promoBalance: 0`, `promoNextExpiry: null`, `mode: test`) that test issues never reduce. Scenarios `07`/`08` of `POST /issue` simulate the insufficient-credit paths.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
         "tags": [
           "otp"
         ],
@@ -5031,11 +5636,11 @@
                     },
                     "walletId": {
                       "type": "string",
-                      "description": "`org:<organizationId>` for the organization wallet; `app:<appId>` for a legacy per-app wallet."
+                      "description": "`org:<organizationId>` for the organization wallet; `app:<appId>` for a legacy\nper-app wallet; `test:<appId>` for the simulated wallet of a test-mode key."
                     },
                     "walletScope": {
                       "$ref": "#/components/schemas/WalletScope",
-                      "description": "`organization` when the balance is shared by every app of the organization."
+                      "description": "`organization` when the balance is shared by every app of the organization;\n`test` for the simulated wallet of a test-mode key."
                     },
                     "organizationId": {
                       "type": "string",
@@ -5068,6 +5673,17 @@
                         }
                       ],
                       "description": "The promotional credits that expire first, or `null` when there are none."
+                    },
+                    "mode": {
+                      "oneOf": [
+                        {
+                          "const": "live"
+                        },
+                        {
+                          "const": "test"
+                        }
+                      ],
+                      "description": "Mode of the API key that made the request. A `test` key gets a fixed\nsimulated balance (`walletScope: 'test'`, `walletId: 'test:<appId>'`) that\nnever changes; the real wallet is never read."
                     }
                   },
                   "required": [
@@ -5347,6 +5963,125 @@
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/XRequestId"
+              }
+            }
+          },
+          "429": {
+            "description": "TOO_MANY_REQUESTS: only for test-mode (`sk_test_`) keys, whose reads are metered (`data.limit`: `perKey` per minute or `perKeyDaily` per day, `data.policy: platform`). Wait `data.retryAfterMs` milliseconds (`Retry-After` in seconds). Live keys are never rate limited on reads.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": true
+                        },
+                        "code": {
+                          "const": "TOO_MANY_REQUESTS"
+                        },
+                        "status": {
+                          "const": 429
+                        },
+                        "message": {
+                          "type": "string",
+                          "default": "Too Many Requests"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "limit": {
+                              "oneOf": [
+                                {
+                                  "const": "perIp"
+                                },
+                                {
+                                  "const": "perKey"
+                                },
+                                {
+                                  "const": "perKeyDaily"
+                                },
+                                {
+                                  "const": "perOrgDaily"
+                                },
+                                {
+                                  "const": "perPhone"
+                                },
+                                {
+                                  "const": "testModeDaily"
+                                }
+                              ],
+                              "description": "Rule that rejected the request: `perKey` (all requests of the key for this\noperation), `perIp` (per client IP, issue only), `perPhone` (per\nrecipient number, issue only), or for test-mode keys: `perKeyDaily`\n(daily cap per key and operation), `perOrgDaily` (daily test issue budget\nof the organization) or `testModeDaily` (platform-wide daily test issue\nbudget)."
+                            },
+                            "policy": {
+                              "oneOf": [
+                                {
+                                  "const": "key"
+                                },
+                                {
+                                  "const": "platform"
+                                }
+                              ],
+                              "description": "`key`: the rate-limit policy configured on the API key. `platform`: a\nplatform limit, either the default for the key type (currently `pk_`\npublic keys) or the platform ceiling a key rule was capped at."
+                            },
+                            "retryAfterMs": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "description": "Milliseconds until a retry can be admitted.",
+                              "example": 1500
+                            }
+                          },
+                          "required": [
+                            "limit",
+                            "policy",
+                            "retryAfterMs"
+                          ],
+                          "description": "Error data of a 429 TOO_MANY_REQUESTS response from `POST /v1/issue` or\n`POST /v1/verify`. The `Retry-After` response header carries the same wait\nin whole seconds (rounded up)."
+                        }
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message",
+                        "data"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defined": {
+                          "const": false
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "number"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {}
+                      },
+                      "required": [
+                        "defined",
+                        "code",
+                        "status",
+                        "message"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/XRequestId"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
               }
             }
           },
