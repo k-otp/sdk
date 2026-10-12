@@ -39,7 +39,8 @@ idempotency key.
    attempt must survive a reload: the flow exposes it as `idempotencyKey`).
 3. **Ambiguous failure, same key.** After `TIMEOUT`, `NETWORK_ERROR`,
    `SERVICE_UNAVAILABLE`, `INTERNAL_SERVER_ERROR`, `TOO_MANY_REQUESTS` or
-   `ABORTED`, the message may already be on its way. Retrying the same
+   `ABORTED`, or an `UNKNOWN` error for a redirect or an unreadable success
+   response (`isAmbiguousIssueError`), the message may already be on its way. Retrying the same
    input with the **same key** is always safe: the API replays the original
    result (or answers 503 while the first attempt is still being resolved)
    and never sends or charges twice. A new key could deliver a second message.

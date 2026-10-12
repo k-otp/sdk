@@ -129,7 +129,7 @@ Options: `resendCooldownMs` (default `30000`; `0` disables it), `idempotencyKeyP
 
 The flow reuses the idempotency key when `send` is called again with the same
 input after an ambiguous failure (`TIMEOUT`, `NETWORK_ERROR`, 5xx, 429,
-`ABORTED`) and drops it after a success or a definitive error. Server
+`ABORTED`, or an unreadable or redirected response: `isAmbiguousIssueError`) and drops it after a success or a definitive error. Server
 `retryAfterMs` (429/503) on `send` starts a cooldown like `resendCooldownMs`;
 on `verify` it starts a separate verify cooldown
 (`verifyCooldownRemainingMs`, `canVerify` is `false`). Actions that cannot

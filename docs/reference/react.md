@@ -140,7 +140,8 @@ Returns the state plus `send(input)`, `resend()`, `verify(code)`, `reset()`:
 
 Key handling: a key is generated per send attempt and **reused** when `send`
 is called again with the same input after an ambiguous failure (`TIMEOUT`,
-`NETWORK_ERROR`, 5xx, 429, `ABORTED`); it is dropped after a success or a
+`NETWORK_ERROR`, 5xx, 429, `ABORTED`, or an unreadable or redirected response:
+`isAmbiguousIssueError`); it is dropped after a success or a
 definitive error (400/401/402/403/409), so the next send is a new attempt.
 Server `retryAfterMs` (429/503) on `send` starts a cooldown just like
 `resendCooldownMs`; on `verify` it starts the separate verify cooldown

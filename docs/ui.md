@@ -273,7 +273,7 @@ function:
 
 Every SDK error code (`error.TOO_MANY_REQUESTS`, ...), verify reason
 (`reason.EXPIRED`, ...) and flow skip reason (`skip.cooldown`, ...) has a
-message; an ambiguous send failure (timeout, network, 5xx) shows
+message; an ambiguous send failure (timeout, network, 5xx, or an unreadable or redirected response) shows
 `error.sendUncertain` ("trying again is safe": the same idempotency key is
 reused). The full catalog is `OTP_MESSAGES` in `@k-otp/sdk/ui`.
 

@@ -109,7 +109,8 @@ export default {
 | Option | Default | |
 | --- | --- | --- |
 | `apiKey` | required | `sk_...` secret key, or a (possibly async) function resolved before every request. |
-| `baseUrl` | `https://api.k-otp.dev/v1` | Must include `/v1`. |
+| `baseUrl` | `https://api.k-otp.dev/v1` | Must include `/v1`. HTTPS only; plain HTTP just for loopback hosts (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`). |
+| `allowInsecureHttp` | `false` | Development/test only: accept plain `http://` on any host (the key is sent unencrypted). A custom `fetch` does not lift the HTTPS rule. |
 | `timeoutMs` | `10000` (10 s) | Per request; `0` disables. Override per call with `{ timeoutMs }`. |
 | `fetch` | `globalThis.fetch` | Custom fetch (tests, proxies, instrumentation). |
 | `headers` | | Extra headers; `authorization` cannot be overridden. |
@@ -216,7 +217,10 @@ test number, rejects with `BAD_REQUEST` and `data.code`
   supported Node.js version, Bun, Deno and edge runtimes.
 - The default timeout is **10 seconds** per request (`DEFAULT_TIMEOUT_MS`).
   A timeout rejects with `TIMEOUT`; for `issue` that outcome is ambiguous, so
-  retry with the same idempotency key.
+  retry with the same idempotency key. The budget includes resolving an async
+  `apiKey`. Redirects are never followed and an unreadable success body
+  rejects with `UNKNOWN`: also ambiguous for `issue`, see
+  [errors and retries](../errors-and-retries.md#ambiguous-issue-outcomes).
 
 ## Scope
 

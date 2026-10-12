@@ -7,7 +7,7 @@ All SDK methods reject with `OtpApiError`:
 | Field | Meaning |
 | --- | --- |
 | `code` | Normalized code (table below). |
-| `status` | HTTP status, or `0` when no HTTP response was received (timeout, network, abort). |
+| `status` | HTTP status, or `0` when no HTTP response was received (timeout, network, abort, opaque redirect). |
 | `message` | Server message, or a descriptive client message. |
 | `requestId` | `X-Request-Id` response header (sent on every API response, exposed to allowed browser origins), else `request-id` / `cf-ray`. Include it in support requests. |
 | `data` | Error payload. For a test-mode 400: `{ code: "TEST_NUMBER_REQUIRED" \| "TEST_NUMBER_IN_LIVE_MODE" }` (`OtpBadRequestData`). For 402: `{ code: "INSUFFICIENT_CREDIT" \| "OVERDRAFT_LIMIT_EXCEEDED" \| "TRIAL_DAILY_LIMIT_EXCEEDED", resetAt? }`. For 429: `{ limit: "perKey" \| "perIp" \| "perPhone" \| "perKeyDaily" \| "perOrgDaily" \| "testModeDaily", policy: "key" \| "platform", retryAfterMs }` (`OtpRateLimitedData`). |
@@ -29,10 +29,12 @@ All SDK methods reject with `OtpApiError`:
 | `TIMEOUT` | 0 (or 408) | yes | No response within `timeoutMs`. |
 | `NETWORK_ERROR` | 0 | yes | DNS/TLS/connection failure, or a CORS rejection in browsers, most often a `pk_` key used from an origin that is not in its `allowedOrigins` (see below). |
 | `ABORTED` | 0 | no | Your `AbortSignal` fired. |
-| `UNKNOWN` | any | no | Anything else (unexpected status, malformed success body). |
+| `UNKNOWN` | any | no | Anything else: an unexpected status, a redirect (3xx, never followed), or a success response that is empty, not JSON or lacks the documented fields. For `issue` this outcome is **ambiguous** when `status` is `0` or 2xx/3xx; see [ambiguous outcomes](#ambiguous-issue-outcomes). |
 
 Configuration mistakes (missing `apiKey`, a key without the `sk_` prefix in
-`@k-otp/sdk/server`, an `sk_` key in a browser, no `fetch`) throw `TypeError` instead.
+`@k-otp/sdk/server`, an `sk_` key in a browser, no `fetch`, a `baseUrl` that is
+not HTTPS, see [getting started](./getting-started.md#configuration-reference))
+throw `TypeError` instead.
 
 ## `NETWORK_ERROR` in the browser, but the same call works with curl
 
@@ -77,20 +79,61 @@ For the user-facing side (buttons, cooldowns, messages) see
 [issue -> verify UX](./issue-verify-ux.md). The adapters' flow helpers apply
 these idempotency rules automatically.
 
+## Ambiguous `issue` outcomes
+
+An `issue` call is **ambiguous** when the request may have reached the API but
+you did not get a usable answer. Retry the same input with the **same
+idempotency key**; the API replays the original result without sending or
+charging again. An ambiguous outcome is any of:
+
+- `TIMEOUT`, `NETWORK_ERROR`, `ABORTED`, or another `retryable` code (429, 5xx);
+- `UNKNOWN` with `status` `0`, or with a 2xx/3xx `status`: the response was a
+  redirect (the SDK never follows redirects, so the request may already have
+  been processed), or a success whose body is empty (including 204), is not
+  JSON, or lacks `issueId`.
+
+Definitive failures (400, 401, 402, 403, 404, 409 and other 4xx) mean the
+request was rejected: mint a new key for the next attempt.
+
+`isAmbiguousIssueError(error)` (exported from `@k-otp/sdk`) applies exactly
+this rule. The headless flow helpers use it to decide whether to keep the key,
+and the UI shows `error.sendUncertain` for it; use it when you manage the key
+yourself:
+
+```ts
+import { createIdempotencyKey, isAmbiguousIssueError, isOtpApiError } from "@k-otp/sdk";
+
+let key = createIdempotencyKey("login");
+try {
+  await otp.issue({ phoneNumber, purpose: "login", idempotencyKey: key });
+  key = createIdempotencyKey("login"); // success: the next send is a new attempt
+} catch (error) {
+  // Ambiguous: keep `key` and retry the same input. Otherwise mint a new key.
+  if (!isOtpApiError(error) || !isAmbiguousIssueError(error)) key = createIdempotencyKey("login");
+}
+```
+
+`UNKNOWN` is not `retryable`, so the generic recipe below does not retry it
+by itself: for `issue`, check `isAmbiguousIssueError` instead of (or in
+addition to) `error.retryable`. Note that `UNKNOWN` with `status` `0` also
+covers some failures that happen before any request is sent; retrying them
+with the same key is harmless.
+
 ## Retry recipe
 
 The SDK does not retry automatically, so you stay in control of user-visible
 side effects. A reasonable policy:
 
 ```ts
-import { isOtpApiError } from "@k-otp/sdk";
+import { isAmbiguousIssueError, isOtpApiError } from "@k-otp/sdk";
 
 async function issueWithRetry(otp, input, attempts = 3) {
   for (let attempt = 1; ; attempt++) {
     try {
       return await otp.issue(input); // same input.idempotencyKey every time
     } catch (error) {
-      if (!isOtpApiError(error) || !error.retryable || attempt >= attempts) throw error;
+      // For issue, `isAmbiguousIssueError` also covers UNKNOWN (redirects, unreadable success bodies).
+      if (!isOtpApiError(error) || !isAmbiguousIssueError(error) || attempt >= attempts) throw error;
       const backoff = error.retryAfterMs ?? Math.min(8000, 500 * 2 ** attempt);
       await new Promise((r) => setTimeout(r, backoff + Math.random() * 250));
     }
@@ -158,6 +201,9 @@ if (isOtpApiError(error) && error.code === "TOO_MANY_REQUESTS") {
 ## Timeouts and cancellation
 
 - `timeoutMs` (default 10 s) applies per request; override per call with
-  `{ timeoutMs }`.
+  `{ timeoutMs }`. The budget also covers resolving an asynchronous `apiKey`
+  function: a resolver that is slower than the timeout rejects with `TIMEOUT`
+  although no HTTP request was sent (for `issue` that is still treated as
+  ambiguous, which is safe: retrying with the same key sends it once).
 - Pass `{ signal }` to cancel (for example when a component unmounts); the
   promise rejects with `ABORTED`.

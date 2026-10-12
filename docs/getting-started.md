@@ -109,8 +109,26 @@ filled in by the server.
 | Option | Default |
 | --- | --- |
 | `baseUrl` | `https://api.k-otp.dev/v1` |
-| `timeoutMs` | `10000` (10 s, per request) |
+| `timeoutMs` | `10000` (10 s, per request, including resolving an async `apiKey`) |
 | `fetch` | `globalThis.fetch` |
+| `allowInsecureHttp` | `false` (development/test only, see below) |
+
+`baseUrl` rules: it must be `https://`, without credentials, query or fragment,
+and include `/v1`. Plain `http://` is accepted only for loopback hosts:
+`localhost`, `*.localhost`, `127.0.0.0/8` and `::1`. Any other `http://` URL
+(a container hostname such as `host.docker.internal`, a LAN address, a
+staging proxy) throws a `TypeError` at construction, before a key is used.
+For those, pass `allowInsecureHttp: true`: it is meant for development and
+tests only, because the API key then travels unencrypted. Passing a custom
+`fetch` (a service binding, a test double) does **not** lift the rule, since
+a custom `fetch` can still reach the network: give it an `https://` placeholder
+`baseUrl`, or set `allowInsecureHttp` explicitly. A relative `baseUrl` such as
+`/v1` (same-origin proxy in a browser) resolves against the page, so it
+inherits the page's scheme: it works on HTTPS pages and on loopback pages and
+is refused on a plain-HTTP, non-loopback page unless `allowInsecureHttp` is
+set. The SDK does not follow redirects; a redirect response is reported as an
+ambiguous `UNKNOWN` error (see
+[errors and retries](./errors-and-retries.md#ambiguous-issue-outcomes)).
 
 Runtime requirements: Node.js >= 20.19 (the CommonJS builds `require()` the
 ESM-only oRPC packages, which needs `require(esm)` support), Bun, Deno, modern
