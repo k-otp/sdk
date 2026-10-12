@@ -8,6 +8,17 @@ import type {
   VerifyResult,
 } from "./types";
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isIssueResult = (value: unknown): boolean =>
+  isRecord(value) && typeof value.issueId === "string" && value.issueId !== "";
+
+const isVerifyResult = (value: unknown): boolean =>
+  isRecord(value) &&
+  typeof value.issueId === "string" &&
+  typeof value.verified === "boolean";
+
 /**
  * `POST /issue`. Validates the idempotency key before any network request and
  * sends it as both the `Idempotency-Key` header and the body field (the API
@@ -28,6 +39,7 @@ export const issueWith = async (
         callOptions,
       ),
     options,
+    isIssueResult,
   );
 };
 
@@ -41,4 +53,5 @@ export const verifyWith = async (
     "verify",
     (callOptions) => transport.client.verify(input, callOptions),
     options,
+    isVerifyResult,
   );

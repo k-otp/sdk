@@ -67,6 +67,14 @@ export type OtpTransportOptions = {
    */
   headers?: Record<string, string>;
   hooks?: OtpTelemetryHooks;
+  /**
+   * Development and test only: accept a plain `http://` `baseUrl` on a
+   * non-loopback host (for example a container or LAN hostname). The API key is
+   * then sent unencrypted, so never enable it with a production key. HTTPS and
+   * loopback hosts (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) need no
+   * opt-in. A custom `fetch` does not lift the HTTPS requirement by itself.
+   */
+  allowInsecureHttp?: boolean;
 };
 
 /** Transport-only options used by the SDK packages themselves. */
@@ -106,11 +114,34 @@ export type OtpTransport<TContract extends AnyContractRouter> = {
     op: OtpOperation,
     execute: (options: OtpCallOptions) => Promise<T>,
     requestOptions?: OtpRequestOptions,
+    /**
+     * Shape check of the decoded success body. A body that is empty, not JSON
+     * or lacks the expected fields rejects with an ambiguous UNKNOWN error.
+     */
+    isValidResult?: (result: unknown) => boolean,
   ) => Promise<T>;
 };
 
-/** `https://x/v1/` -> `https://x/v1`; relative URLs resolve against `location`. */
-export const resolveBaseUrl = (baseUrl: string): string => {
+const isLoopbackHost = (host: string): boolean =>
+  host === "localhost" ||
+  host.endsWith(".localhost") ||
+  host === "localhost." ||
+  host.endsWith(".localhost.") ||
+  host === "[::1]" ||
+  /^127\.(?:\d{1,3}\.){2}\d{1,3}$/.test(host) ||
+  /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/.test(host);
+
+/**
+ * `https://x/v1/` -> `https://x/v1`; relative URLs resolve against `location`
+ * (so they inherit the page's scheme: a relative `baseUrl` on a plain-HTTP,
+ * non-loopback page is refused like any other remote HTTP URL).
+ *
+ * Plain HTTP is accepted for loopback hosts only, unless `allowInsecureHttp`.
+ */
+export const resolveBaseUrl = (
+  baseUrl: string,
+  options: { allowInsecureHttp?: boolean | undefined } = {},
+): string => {
   let url: URL;
   try {
     const location = (globalThis as { location?: { href?: string } }).location;
@@ -120,22 +151,18 @@ export const resolveBaseUrl = (baseUrl: string): string => {
       "baseUrl must be an absolute HTTPS URL or a local HTTP URL",
     );
   }
-  const host = url.hostname;
-  const local =
-    host === "localhost" ||
-    host === "localhost." ||
-    host === "[::1]" ||
-    /^127\.(?:\d{1,3}\.){2}\d{1,3}$/.test(host) ||
-    /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/.test(host);
+  const insecureOk =
+    url.protocol === "http:" &&
+    (isLoopbackHost(url.hostname) || options.allowInsecureHttp === true);
   if (
-    (url.protocol !== "https:" && !(local && url.protocol === "http:")) ||
+    (url.protocol !== "https:" && !insecureOk) ||
     url.username ||
     url.password ||
     url.search ||
     url.hash
   ) {
     throw new TypeError(
-      "baseUrl requires HTTPS (HTTP is local-only), without credentials, query or fragment",
+      "baseUrl requires HTTPS (HTTP: localhost only, or allowInsecureHttp in dev/test), without credentials, query or fragment",
     );
   }
   return url.href.replace(/\/+$/, "");
@@ -225,7 +252,9 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
   } else if (typeof options.apiKey !== "function") {
     throw new TypeError("apiKey is required");
   }
-  const baseUrl = resolveBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
+  const baseUrl = resolveBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL, {
+    allowInsecureHttp: options.allowInsecureHttp,
+  });
   const defaultTimeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const userFetch = options.fetch;
   const hooks = options.hooks;
@@ -247,6 +276,23 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
       });
       callOptions.context.capture.status = response.status;
       callOptions.context.capture.headers = response.headers;
+      // `redirect: "manual"` hands 3xx (and a browser's opaque redirect,
+      // status 0) back to us, and oRPC would decode them as a success. A
+      // redirect is never a well-formed API answer and the request may have
+      // been processed: surface it as an ambiguous UNKNOWN carrying the status.
+      if (
+        response.type === "opaqueredirect" ||
+        response.status === 0 ||
+        (response.status >= 300 && response.status < 400)
+      ) {
+        void response.body?.cancel().catch(() => {});
+        throw new OtpApiError({
+          code: "UNKNOWN",
+          status: response.status,
+          message: `Unexpected K-OTP API redirect (HTTP ${response.status})`,
+          requestId: readRequestId(response.headers),
+        });
+      }
       return response;
     },
     // The codec throws whatever this returns, so we can hand back our own
@@ -266,6 +312,7 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
     op: OtpOperation,
     execute: (callOptions: OtpCallOptions) => Promise<T>,
     requestOptions: OtpRequestOptions = {},
+    isValidResult?: (result: unknown) => boolean,
   ): Promise<T> => {
     const capture: ResponseCapture = {};
     const controller = new AbortController();
@@ -329,6 +376,20 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
         signal: controller.signal,
         context: { apiKey, fetch: fetchImpl, capture },
       });
+      // A 2xx with an empty (204), non-JSON or truncated body decodes to
+      // `undefined`/`{}`; never report that as a success.
+      if (
+        typeof result !== "object" ||
+        result === null ||
+        (isValidResult && !isValidResult(result))
+      ) {
+        throw new OtpApiError({
+          code: "UNKNOWN",
+          status: capture.status ?? 0,
+          message: "Unexpected K-OTP API response: malformed success body",
+          requestId: readRequestId(capture.headers),
+        });
+      }
       end(true);
       return result;
     } catch (error) {
