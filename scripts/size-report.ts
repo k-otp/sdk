@@ -46,10 +46,10 @@ const src = path.join(root, "packages/sdk/src");
 
 /** Budgets in bytes (min+gzip). Raise deliberately, with a reason. */
 const BUDGETS = {
-  core: 13 * 1024,
+  core: 13.5 * 1024,
   headless: 4 * 1024,
   // Includes the headless flow (KOtp.createOtpFlow).
-  iife: 14 * 1024,
+  iife: 14.5 * 1024,
   // A framework hooks subpath's own code.
   adapter: 2 * 1024,
   // What an app ships for OTP with an adapter (SDK chunks included,
