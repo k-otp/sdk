@@ -335,3 +335,16 @@ export const normalizeOtpApiError = (error: unknown): OtpApiError => {
     error instanceof Error ? error.message : "Unknown K-OTP SDK error";
   return new OtpApiError({ code: "UNKNOWN", status: 0, message, cause: error });
 };
+
+/** Whether an issue may have reached the server: retry the same input with the same idempotency key. */
+export const isAmbiguousIssueError = (
+  error: Pick<OtpApiError, "code" | "retryable"> &
+    Partial<Pick<OtpApiError, "status">>,
+): boolean =>
+  error.retryable ||
+  error.code === "ABORTED" ||
+  (error.code === "UNKNOWN" &&
+    (error.status === 0 ||
+      (typeof error.status === "number" &&
+        error.status >= 200 &&
+        error.status < 400)));

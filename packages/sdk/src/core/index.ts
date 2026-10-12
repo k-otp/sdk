@@ -4,6 +4,7 @@ export {
   type OtpClientOptions,
 } from "./client";
 export {
+  isAmbiguousIssueError,
   isOtpApiError,
   normalizeOtpApiError,
   OTP_API_ERROR_CODES,

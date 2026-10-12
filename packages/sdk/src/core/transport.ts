@@ -28,7 +28,7 @@ export const DEFAULT_TIMEOUT_MS = 10_000;
 export type OtpOperation = keyof OpenApiOperations;
 
 export type OtpRequestEndInfo = {
-  /** Wall-clock duration including body decoding. */
+  /** Wall-clock duration including API-key resolution and body decoding. */
   durationMs: number;
   requestId?: string | undefined;
   /** The normalized error when `ok` is false. */
@@ -111,15 +111,34 @@ export type OtpTransport<TContract extends AnyContractRouter> = {
 
 /** `https://x/v1/` -> `https://x/v1`; relative URLs resolve against `location`. */
 export const resolveBaseUrl = (baseUrl: string): string => {
-  const trimmed = baseUrl.trim().replace(/\/+$/, "");
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  const location = (globalThis as { location?: { href?: string } }).location;
-  if (location?.href) {
-    return new URL(trimmed, location.href).href.replace(/\/+$/, "");
+  let url: URL;
+  try {
+    const location = (globalThis as { location?: { href?: string } }).location;
+    url = new URL(baseUrl.trim(), location?.href);
+  } catch {
+    throw new TypeError(
+      "baseUrl must be an absolute HTTPS URL or a local HTTP URL",
+    );
   }
-  throw new TypeError(
-    `baseUrl must be an absolute http(s) URL (received "${baseUrl}")`,
-  );
+  const host = url.hostname;
+  const local =
+    host === "localhost" ||
+    host === "localhost." ||
+    host === "[::1]" ||
+    /^127\.(?:\d{1,3}\.){2}\d{1,3}$/.test(host) ||
+    /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/.test(host);
+  if (
+    (url.protocol !== "https:" && !(local && url.protocol === "http:")) ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw new TypeError(
+      "baseUrl requires HTTPS (HTTP is local-only), without credentials, query or fragment",
+    );
+  }
+  return url.href.replace(/\/+$/, "");
 };
 
 /**
@@ -165,6 +184,30 @@ export const resolveApiKey = async (apiKey: OtpApiKey): Promise<string> => {
   return key;
 };
 
+/** Stop waiting for a key resolver without allowing its late result to send a request. */
+const awaitWithAbort = <T>(
+  pending: Promise<T>,
+  signal: AbortSignal,
+): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const abort = () => {
+      signal.removeEventListener("abort", abort);
+      reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+    };
+    signal.addEventListener("abort", abort, { once: true });
+    void pending.then(
+      (value) => {
+        signal.removeEventListener("abort", abort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", abort);
+        reject(error);
+      },
+    );
+    if (signal.aborted) abort();
+  });
+
 /**
  * Creates a transport bound to one contract. Internal building block shared
  * with `@k-otp/sdk/server`; not a package export.
@@ -198,7 +241,10 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
       ),
     fetch: async (request, init, callOptions) => {
       callOptions.context.capture.fetchStarted = true;
-      const response = await callOptions.context.fetch(request, init);
+      const response = await callOptions.context.fetch(request, {
+        ...init,
+        redirect: "manual",
+      });
       callOptions.context.capture.status = response.status;
       callOptions.context.capture.headers = response.headers;
       return response;
@@ -221,16 +267,6 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
     execute: (callOptions: OtpCallOptions) => Promise<T>,
     requestOptions: OtpRequestOptions = {},
   ): Promise<T> => {
-    // Configuration problems are programmer errors: they reject with a
-    // TypeError before any hook or request, instead of an OtpApiError.
-    const apiKey = await resolveApiKey(options.apiKey);
-    validateApiKey?.(apiKey);
-    const fetchImpl = userFetch ?? globalThis.fetch;
-    if (typeof fetchImpl !== "function") {
-      throw new TypeError(
-        "No fetch implementation found. Pass `fetch` in the client options.",
-      );
-    }
     const capture: ResponseCapture = {};
     const controller = new AbortController();
     const timeoutMs = requestOptions.timeoutMs ?? defaultTimeoutMs;
@@ -252,13 +288,10 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
     }
 
     const startedAt = now();
-    if (hooks?.onRequestStart) {
-      const onStart = hooks.onRequestStart;
-      safeHook(() => onStart(op));
-    }
+    let hookStarted = false;
 
     const end = (ok: boolean, error?: OtpApiError): void => {
-      if (!hooks?.onRequestEnd) return;
+      if (!hookStarted || !hooks?.onRequestEnd) return;
       const onEnd = hooks.onRequestEnd;
       const status = error ? error.status || undefined : capture.status;
       const info: OtpRequestEndInfo = {
@@ -273,6 +306,25 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
       if (controller.signal.aborted) {
         throw new DOMException("The operation was aborted.", "AbortError");
       }
+      // Configuration problems are programmer errors: they reject with a
+      // TypeError before any hook or request, instead of an OtpApiError.
+      const apiKey = await awaitWithAbort(
+        resolveApiKey(options.apiKey),
+        controller.signal,
+      );
+      controller.signal.throwIfAborted();
+      validateApiKey?.(apiKey);
+      const fetchImpl = userFetch ?? globalThis.fetch;
+      if (typeof fetchImpl !== "function") {
+        throw new TypeError(
+          "No fetch implementation found. Pass `fetch` in the client options.",
+        );
+      }
+      hookStarted = true;
+      if (hooks?.onRequestStart) {
+        const onStart = hooks.onRequestStart;
+        safeHook(() => onStart(op));
+      }
       const result = await execute({
         signal: controller.signal,
         context: { apiKey, fetch: fetchImpl, capture },
@@ -280,6 +332,7 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
       end(true);
       return result;
     } catch (error) {
+      if (!hookStarted && !controller.signal.aborted) throw error;
       const normalized = normalizeTransportError(error, {
         timedOut,
         timeoutMs,

@@ -153,3 +153,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md).
 [Server SDK installation guides](sdks/README.md) cover C#, Java, Kotlin/JVM,
 PHP, Go, Python, Ruby and Dart. TypeScript also provides an official Kiota
 client through [`@k-otp/sdk/kiota`](sdks/typescript/README.md).
+
+### Transport safety
+
+Use an HTTPS `baseUrl`; HTTP is accepted only for localhost, IPv4 127/8, IPv6 ::1 and IPv4-mapped 127/8 loopback development. URL credentials, query parameters and fragments are refused, and API redirects are not followed. Request timeout and cancellation also cover an asynchronous API-key resolver. If an issue response cannot be decoded, the headless flow retains its idempotency key for the same input because the OTP may already have been sent.

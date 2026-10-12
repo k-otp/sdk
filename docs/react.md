@@ -42,13 +42,15 @@ const otp = useOtpFlow({ resendCooldownMs: 30_000, idempotencyKeyPrefix: "login"
 With the lower-level hooks you manage the idempotency key yourself:
 
 ```tsx
+import { isAmbiguousIssueError } from "@k-otp/sdk";
+
 const issue = useOtpIssue();
 const [key, setKey] = useState(() => createIdempotencyKey("login"));
 
 const send = async () => {
   const { data, error } = await issue.run({ phoneNumber, purpose: "login", idempotencyKey: key });
-  // Keep the key after ambiguous failures (retryable codes, ABORTED); otherwise the next send is a new attempt.
-  if (data || (error && !error.retryable && error.code !== "ABORTED")) setKey(createIdempotencyKey("login"));
+  // Keep the key after ambiguous failures, including unreadable or opaque responses; otherwise the next send is a new attempt.
+  if (data || (error && !isAmbiguousIssueError(error))) setKey(createIdempotencyKey("login"));
 };
 ```
 

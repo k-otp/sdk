@@ -4,7 +4,11 @@
  * flow skip reason. Override any entry with `messages` and pick the language
  * with `locale`.
  */
-import type { OtpApiError, OtpApiErrorCode } from "../core/errors";
+import {
+  isAmbiguousIssueError,
+  type OtpApiError,
+  type OtpApiErrorCode,
+} from "../core/errors";
 import type { VerifyReasonCode } from "../core/types";
 import type { OtpFlowSkipReason } from "../headless";
 import type { OtpPhoneErrorCode } from "./phone";
@@ -266,13 +270,14 @@ export const otpPhoneErrorMessageKey = (
  * code may have been sent, and retrying reuses the same idempotency key.
  */
 export const otpErrorMessageKey = (
-  error: Pick<OtpApiError, "code" | "retryable">,
+  error: Pick<OtpApiError, "code" | "retryable"> &
+    Partial<Pick<OtpApiError, "status">>,
   operation?: "send" | "verify",
 ): OtpMessageKey => {
   if (
     operation === "send" &&
     error.code !== "TOO_MANY_REQUESTS" &&
-    (error.retryable || error.code === "ABORTED")
+    isAmbiguousIssueError(error)
   ) {
     return "error.sendUncertain";
   }
