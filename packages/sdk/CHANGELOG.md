@@ -1,5 +1,11 @@
 # @k-otp/sdk
 
+## 2.0.0 — 2026-10-12
+
+### Major changes
+
+- [651415b](https://github.com/k-otp/sdk/commit/651415b28a0c42f0d4ddb60e9ffd3eecd94a68e6) Keep the issue idempotency key whenever an `issue` outcome is unknown: a timeout or network failure, an unreadable success body, and now also a redirect or a 2xx response that is empty, not JSON or lacks `issueId`, which reject with an `UNKNOWN` error carrying the HTTP status instead of resolving as a success. `isAmbiguousIssueError(error)` is exported for callers that manage keys themselves. Timeout and cancellation now also cover resolving an asynchronous API key. Requests no longer follow redirects automatically. Breaking: `baseUrl` must be HTTPS, with plain HTTP accepted only for loopback hosts (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`); a `baseUrl` with credentials, a query or a fragment is refused. For a container, LAN or other non-loopback HTTP URL in development or tests, pass `allowInsecureHttp: true` (a custom `fetch` does not lift the rule). A relative `baseUrl` inherits the page scheme, so it is refused on a plain-HTTP non-loopback page unless that option is set. — Thanks @imjlk!
+
 ## 1.4.0 — 2026-10-11
 
 ### Minor changes
