@@ -83,7 +83,14 @@ describe("plugin and injection", () => {
 
 describe("components", () => {
   test("refs drive the template; unmount aborts in-flight calls", async () => {
-    const { fetch, calls } = mockFetch((r) => hangUntilAborted(r.signal));
+    let sent: () => void = () => {};
+    const started = new Promise<void>((resolve) => {
+      sent = resolve;
+    });
+    const { fetch, calls } = mockFetch((r) => {
+      sent();
+      return hangUntilAborted(r.signal);
+    });
     let otp!: ReturnType<typeof useOtp>;
     const Comp = defineComponent({
       setup: () => {
@@ -100,6 +107,7 @@ describe("components", () => {
     await nextTick();
     expect(el.textContent).toBe("sending");
     expect(otp.loading.value).toBe(true);
+    await started;
     app.unmount();
     const result = await pending;
     expect(result.error?.code).toBe("ABORTED");

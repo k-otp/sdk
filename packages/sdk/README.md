@@ -123,9 +123,10 @@ variant.
 | Option | Type | Default | |
 | --- | --- | --- | --- |
 | `apiKey` | `string \| () => string \| Promise<string>` | required | `pk_` in browsers. A function is resolved before every request (key rotation, runtime injection). |
-| `baseUrl` | `string` | `https://api.k-otp.dev/v1` | Must include `/v1`. Relative URLs resolve against `location` in browsers. |
+| `baseUrl` | `string` | `https://api.k-otp.dev/v1` | Must be HTTPS (plain HTTP only for loopback hosts) and include `/v1`. Relative URLs resolve against `location` in browsers and inherit its scheme. |
 | `fetch` | `typeof fetch` | `globalThis.fetch` (looked up lazily) | Custom fetch (tests, proxies, instrumentation). |
 | `timeoutMs` | `number` | `10000` | Per request; `0` disables. |
+| `allowInsecureHttp` | `boolean` | `false` | Development/test only: accept plain `http://` on a non-loopback host. HTTPS and loopback (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) need no opt-in; a custom `fetch` does not lift the rule. |
 | `headers` | `Record<string, string>` | | Extra headers; `authorization` cannot be overridden. Custom headers must be allowed by the API's CORS policy in browsers. |
 | `hooks` | `OtpTelemetryHooks` | | See [Telemetry](#telemetry). |
 | `dangerouslyAllowSecretKeyInBrowser` | `boolean` | `false` | The client throws if an `sk_` key is used where `window` and `document` exist. |

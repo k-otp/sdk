@@ -153,3 +153,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md).
 [Server SDK installation guides](sdks/README.md) cover C#, Java, Kotlin/JVM,
 PHP, Go, Python, Ruby and Dart. TypeScript also provides an official Kiota
 client through [`@k-otp/sdk/kiota`](sdks/typescript/README.md).
+
+### Transport safety
+
+Use an HTTPS `baseUrl`; plain HTTP is accepted only for loopback development hosts (`localhost`, `*.localhost`, IPv4 127/8, IPv6 `::1`, IPv4-mapped 127/8). For a container or LAN hostname in development or tests, opt in explicitly with `allowInsecureHttp: true`; a custom `fetch` does not lift the rule. URL credentials, query parameters and fragments are refused, and API redirects are not followed (a redirect is reported as an ambiguous `UNKNOWN` error). Request timeout and cancellation also cover an asynchronous API-key resolver. If an `issue` response cannot be used (redirect, empty or non-JSON body, missing `issueId`), the call fails with `UNKNOWN` and the headless flow retains its idempotency key for the same input because the OTP may already have been sent; see `isAmbiguousIssueError` in [errors and retries](./docs/errors-and-retries.md#ambiguous-issue-outcomes).

@@ -90,7 +90,7 @@ A `Readable<OtpFlowState>` (`issueId`, `expiresAt`, `attemptsRemaining`,
 
 The flow reuses the idempotency key when `send` is called again with the same
 input after an ambiguous failure (`TIMEOUT`, `NETWORK_ERROR`, 5xx, 429,
-`ABORTED`) and drops it after a success or a definitive error. Server
+`ABORTED`, or an unreadable or redirected response: `isAmbiguousIssueError`) and drops it after a success or a definitive error. Server
 `retryAfterMs` (429/503) on `send` starts a cooldown like `resendCooldownMs`,
 on `verify` a separate verify cooldown (`canVerify` is `false`); the countdowns tick
 about once a second while the store has subscribers. Actions that cannot run

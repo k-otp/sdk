@@ -28,7 +28,7 @@ export const DEFAULT_TIMEOUT_MS = 10_000;
 export type OtpOperation = keyof OpenApiOperations;
 
 export type OtpRequestEndInfo = {
-  /** Wall-clock duration including body decoding. */
+  /** Wall-clock duration including API-key resolution and body decoding. */
   durationMs: number;
   requestId?: string | undefined;
   /** The normalized error when `ok` is false. */
@@ -67,6 +67,14 @@ export type OtpTransportOptions = {
    */
   headers?: Record<string, string>;
   hooks?: OtpTelemetryHooks;
+  /**
+   * Development and test only: accept a plain `http://` `baseUrl` on a
+   * non-loopback host (for example a container or LAN hostname). The API key is
+   * then sent unencrypted, so never enable it with a production key. HTTPS and
+   * loopback hosts (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) need no
+   * opt-in. A custom `fetch` does not lift the HTTPS requirement by itself.
+   */
+  allowInsecureHttp?: boolean;
 };
 
 /** Transport-only options used by the SDK packages themselves. */
@@ -106,20 +114,58 @@ export type OtpTransport<TContract extends AnyContractRouter> = {
     op: OtpOperation,
     execute: (options: OtpCallOptions) => Promise<T>,
     requestOptions?: OtpRequestOptions,
+    /**
+     * Shape check of the decoded success body. A body that is empty, not JSON
+     * or lacks the expected fields rejects with an ambiguous UNKNOWN error.
+     */
+    isValidResult?: (result: unknown) => boolean,
   ) => Promise<T>;
 };
 
-/** `https://x/v1/` -> `https://x/v1`; relative URLs resolve against `location`. */
-export const resolveBaseUrl = (baseUrl: string): string => {
-  const trimmed = baseUrl.trim().replace(/\/+$/, "");
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  const location = (globalThis as { location?: { href?: string } }).location;
-  if (location?.href) {
-    return new URL(trimmed, location.href).href.replace(/\/+$/, "");
+const isLoopbackHost = (host: string): boolean =>
+  host === "localhost" ||
+  host.endsWith(".localhost") ||
+  host === "localhost." ||
+  host.endsWith(".localhost.") ||
+  host === "[::1]" ||
+  /^127\.(?:\d{1,3}\.){2}\d{1,3}$/.test(host) ||
+  /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/.test(host);
+
+/**
+ * `https://x/v1/` -> `https://x/v1`; relative URLs resolve against `location`
+ * (so they inherit the page's scheme: a relative `baseUrl` on a plain-HTTP,
+ * non-loopback page is refused like any other remote HTTP URL).
+ *
+ * Plain HTTP is accepted for loopback hosts only, unless `allowInsecureHttp`.
+ */
+export const resolveBaseUrl = (
+  baseUrl: string,
+  options: { allowInsecureHttp?: boolean | undefined } = {},
+): string => {
+  let url: URL;
+  try {
+    const location = (globalThis as { location?: { href?: string } }).location;
+    url = new URL(baseUrl.trim(), location?.href);
+  } catch {
+    throw new TypeError(
+      "baseUrl must be an absolute HTTPS URL or a local HTTP URL",
+    );
   }
-  throw new TypeError(
-    `baseUrl must be an absolute http(s) URL (received "${baseUrl}")`,
-  );
+  const insecureOk =
+    url.protocol === "http:" &&
+    (isLoopbackHost(url.hostname) || options.allowInsecureHttp === true);
+  if (
+    (url.protocol !== "https:" && !insecureOk) ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw new TypeError(
+      "baseUrl requires HTTPS (HTTP: localhost only, or allowInsecureHttp in dev/test), without credentials, query or fragment",
+    );
+  }
+  return url.href.replace(/\/+$/, "");
 };
 
 /**
@@ -165,6 +211,30 @@ export const resolveApiKey = async (apiKey: OtpApiKey): Promise<string> => {
   return key;
 };
 
+/** Stop waiting for a key resolver without allowing its late result to send a request. */
+const awaitWithAbort = <T>(
+  pending: Promise<T>,
+  signal: AbortSignal,
+): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const abort = () => {
+      signal.removeEventListener("abort", abort);
+      reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+    };
+    signal.addEventListener("abort", abort, { once: true });
+    void pending.then(
+      (value) => {
+        signal.removeEventListener("abort", abort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", abort);
+        reject(error);
+      },
+    );
+    if (signal.aborted) abort();
+  });
+
 /**
  * Creates a transport bound to one contract. Internal building block shared
  * with `@k-otp/sdk/server`; not a package export.
@@ -182,7 +252,9 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
   } else if (typeof options.apiKey !== "function") {
     throw new TypeError("apiKey is required");
   }
-  const baseUrl = resolveBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
+  const baseUrl = resolveBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL, {
+    allowInsecureHttp: options.allowInsecureHttp,
+  });
   const defaultTimeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const userFetch = options.fetch;
   const hooks = options.hooks;
@@ -198,9 +270,29 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
       ),
     fetch: async (request, init, callOptions) => {
       callOptions.context.capture.fetchStarted = true;
-      const response = await callOptions.context.fetch(request, init);
+      const response = await callOptions.context.fetch(request, {
+        ...init,
+        redirect: "manual",
+      });
       callOptions.context.capture.status = response.status;
       callOptions.context.capture.headers = response.headers;
+      // `redirect: "manual"` hands 3xx (and a browser's opaque redirect,
+      // status 0) back to us, and oRPC would decode them as a success. A
+      // redirect is never a well-formed API answer and the request may have
+      // been processed: surface it as an ambiguous UNKNOWN carrying the status.
+      if (
+        response.type === "opaqueredirect" ||
+        response.status === 0 ||
+        (response.status >= 300 && response.status < 400)
+      ) {
+        void response.body?.cancel().catch(() => {});
+        throw new OtpApiError({
+          code: "UNKNOWN",
+          status: response.status,
+          message: `Unexpected K-OTP API redirect (HTTP ${response.status})`,
+          requestId: readRequestId(response.headers),
+        });
+      }
       return response;
     },
     // The codec throws whatever this returns, so we can hand back our own
@@ -220,17 +312,8 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
     op: OtpOperation,
     execute: (callOptions: OtpCallOptions) => Promise<T>,
     requestOptions: OtpRequestOptions = {},
+    isValidResult?: (result: unknown) => boolean,
   ): Promise<T> => {
-    // Configuration problems are programmer errors: they reject with a
-    // TypeError before any hook or request, instead of an OtpApiError.
-    const apiKey = await resolveApiKey(options.apiKey);
-    validateApiKey?.(apiKey);
-    const fetchImpl = userFetch ?? globalThis.fetch;
-    if (typeof fetchImpl !== "function") {
-      throw new TypeError(
-        "No fetch implementation found. Pass `fetch` in the client options.",
-      );
-    }
     const capture: ResponseCapture = {};
     const controller = new AbortController();
     const timeoutMs = requestOptions.timeoutMs ?? defaultTimeoutMs;
@@ -252,13 +335,10 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
     }
 
     const startedAt = now();
-    if (hooks?.onRequestStart) {
-      const onStart = hooks.onRequestStart;
-      safeHook(() => onStart(op));
-    }
+    let hookStarted = false;
 
     const end = (ok: boolean, error?: OtpApiError): void => {
-      if (!hooks?.onRequestEnd) return;
+      if (!hookStarted || !hooks?.onRequestEnd) return;
       const onEnd = hooks.onRequestEnd;
       const status = error ? error.status || undefined : capture.status;
       const info: OtpRequestEndInfo = {
@@ -273,13 +353,47 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
       if (controller.signal.aborted) {
         throw new DOMException("The operation was aborted.", "AbortError");
       }
+      // Configuration problems are programmer errors: they reject with a
+      // TypeError before any hook or request, instead of an OtpApiError.
+      const apiKey = await awaitWithAbort(
+        resolveApiKey(options.apiKey),
+        controller.signal,
+      );
+      controller.signal.throwIfAborted();
+      validateApiKey?.(apiKey);
+      const fetchImpl = userFetch ?? globalThis.fetch;
+      if (typeof fetchImpl !== "function") {
+        throw new TypeError(
+          "No fetch implementation found. Pass `fetch` in the client options.",
+        );
+      }
+      hookStarted = true;
+      if (hooks?.onRequestStart) {
+        const onStart = hooks.onRequestStart;
+        safeHook(() => onStart(op));
+      }
       const result = await execute({
         signal: controller.signal,
         context: { apiKey, fetch: fetchImpl, capture },
       });
+      // A 2xx with an empty (204), non-JSON or truncated body decodes to
+      // `undefined`/`{}`; never report that as a success.
+      if (
+        typeof result !== "object" ||
+        result === null ||
+        (isValidResult && !isValidResult(result))
+      ) {
+        throw new OtpApiError({
+          code: "UNKNOWN",
+          status: capture.status ?? 0,
+          message: "Unexpected K-OTP API response: malformed success body",
+          requestId: readRequestId(capture.headers),
+        });
+      }
       end(true);
       return result;
     } catch (error) {
+      if (!hookStarted && !controller.signal.aborted) throw error;
       const normalized = normalizeTransportError(error, {
         timedOut,
         timeoutMs,

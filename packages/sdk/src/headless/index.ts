@@ -9,7 +9,11 @@
  * Nothing here runs at import time or touches `window`; timers only start
  * after an action while someone is subscribed.
  */
-import { isOtpApiError, type OtpApiError } from "../core/errors";
+import {
+  isAmbiguousIssueError,
+  isOtpApiError,
+  type OtpApiError,
+} from "../core/errors";
 import { createIdempotencyKey } from "../core/idempotency";
 import type { OtpRequestOptions } from "../core/transport";
 import type {
@@ -315,13 +319,6 @@ export type OtpFlowController = {
 /** Default local resend cooldown of `createOtpFlow` (30 seconds). */
 export const DEFAULT_RESEND_COOLDOWN_MS = 30_000;
 
-/**
- * Outcome may have reached the server: retry with the same key. Every
- * `retryable` error, plus an abort (the request may already have been sent).
- */
-const isAmbiguous = (error: OtpApiError): boolean =>
-  error.retryable || error.code === "ABORTED";
-
 /** Verification outcomes after which the issued code can no longer be used. */
 const TERMINAL_REASONS: ReadonlySet<VerifyReasonCode> =
   new Set<VerifyReasonCode>([
@@ -519,7 +516,7 @@ export const createOtpFlow = (
     if (current !== generation) return result;
     if (result.error) {
       lastError = result.error;
-      if (!isAmbiguous(result.error) && pending === attempt) {
+      if (!isAmbiguousIssueError(result.error) && pending === attempt) {
         pending = undefined;
       }
       startCooldown(result.error.retryAfterMs);
