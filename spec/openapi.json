@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "k-otp API",
-    "version": "1.9.0",
+    "version": "1.9.1",
     "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Test mode.** `pk_test_`/`sk_test_` keys use the same security schemes; the prefix selects test mode. Test keys never send a message and never use\ncredits: they only accept test phone numbers, simulate delivery from a fixed scenario table (see `POST /issue`), and their data never mixes with live data.\nResponses of issue, verify, status, issues and balance carry `mode` (`live` or `test`).\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`.\n\n**Rate limits.** `POST /issue` and `POST /verify` enforce the API key's rate-limit policy, a platform default for `pk_` keys and a platform ceiling.\nAn exceeded limit returns 429 `TOO_MANY_REQUESTS` with a `Retry-After` header (seconds) and `data.retryAfterMs`.\n\n**Request id.** Every response carries `X-Request-Id` (also exposed to allowed browser origins via CORS).\nA request `X-Request-Id` matching `^[A-Za-z0-9._:-]{8,128}$` is echoed; otherwise the API generates one.\nQuote it when contacting support."
   },
   "servers": [
