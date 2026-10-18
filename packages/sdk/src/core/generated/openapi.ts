@@ -20,22 +20,24 @@ export type IssueOtpInput = {
    */
   purpose: string;
   /**
-   * Delivery channel. When omitted, the OTP is delivered by KakaoTalk AlimTalk
-   * with an automatic SMS fallback if AlimTalk delivery fails (included in the
-   * AlimTalk price; turn it off with `smsFallback: false`).
+   * Delivery channel: only `alimtalk` (KakaoTalk AlimTalk), which is also the
+   * default when omitted. If AlimTalk delivery fails the same OTP text is sent by
+   * SMS automatically (included in the AlimTalk price; turn it off with
+   * `smsFallback: false`). Direct SMS (`sms`) is no longer offered: an explicit
+   * `sms` is refused with 400 `CHANNEL_NOT_SUPPORTED` (in `data.code`). A template
+   * without an approved AlimTalk code cannot be issued (400 `TEMPLATE_NOT_AVAILABLE`).
+   * `GET /v1/issues` items and delivery records still report `sms` as the
+   * delivered channel after a fallback (`GET /v1/status` has no channel field).
    */
-  channel?: "alimtalk" | "sms";
+  channel?: "alimtalk";
   /**
    * Automatic SMS fallback of AlimTalk delivery. Omitted or `true` (the
    * default): when AlimTalk delivery fails the same OTP text is sent by SMS.
-   * `false`: AlimTalk only; a failed AlimTalk delivery is not re-sent by SMS
-   * (and `webOtp`, carried only by that SMS, reports `skipped` with
-   * `channel_alimtalk`). The price is the AlimTalk price either way. Has no
-   * effect on SMS delivery (`channel: 'sms'` or an SMS-only template). On
-   * AlimTalk delivery an explicit `false` is part of the idempotency
-   * fingerprint (reusing a key with a different value is a 409); omitted and
-   * `true` are the same request, and on SMS delivery the field is not
-   * fingerprinted at all.
+   * `false`: AlimTalk only; a failed AlimTalk delivery is not re-sent by SMS.
+   * The price is the AlimTalk price either way. Has no
+   * effect on the idempotency fingerprint unless `false`: an explicit `false` is
+   * part of it (reusing a key with a different value is a 409); omitted and
+   * `true` are the same request.
    */
   smsFallback?: boolean;
   /**
@@ -51,7 +53,12 @@ export type IssueOtpInput = {
   templateVariables?: TrackMetadata;
   /** Optional sender identity override (at most 64 characters after trimming). */
   from?: string;
-  /** Message type option; AlimTalk delivery and its SMS fallback ignore it. */
+  /**
+   * Ignored: AlimTalk delivery and its SMS fallback do not use it, and direct SMS is
+   * no longer offered. Still accepted for compatibility.
+   *
+   * @deprecated
+   */
   messageType?: "LMS" | "SMS";
   /**
    * Deprecated and ignored for billing. The credit amount reserved and debited
@@ -59,6 +66,8 @@ export type IssueOtpInput = {
    * overridden by any key type. Still accepted for
    * compatibility: when sent it must be an integer from 1 to 100000, and it
    * remains part of the idempotency fingerprint.
+   *
+   * @deprecated
    */
   cost?: number;
   /**
@@ -76,42 +85,11 @@ export type IssueOtpInput = {
    * characters without spaces after trimming. Reuse the same key when retrying.
    */
   idempotencyKey?: string;
-  /**
-   * Opt in to WebOTP (SMS code auto-fill on Android Chrome): the SMS fallback of
-   * the AlimTalk message ends with the origin-bound line `@<host> #<code>`, so
-   * `navigator.credentials.get({ otp })` on that origin can read it when the code
-   * arrives by SMS. `true` binds the request `Origin` header (any key
-   * type that sends one, typically a `pk_` browser call); `{ origin }` names it
-   * explicitly (for `sk_` server calls; with a `pk_` key it must equal the request
-   * `Origin`). The origin must be `https` without a path or port, and must be
-   * listed in the key's `allowedOrigins`: a key without `allowedOrigins` cannot
-   * use WebOTP (`http://localhost` and unlisted origins work only in local
-   * development). `false` or omitted: no WebOTP line.
-   *
-   * The KakaoTalk message itself never carries the line (KakaoTalk is not
-   * readable by the OS), so `webOtp.status` is `fallback_only`: auto-fill works
-   * when AlimTalk delivery fails and the SMS fallback is sent. WebOTP never
-   * changes the price or the SMS type: the SMS fallback uses a compact template,
-   * and when the compact body plus the line would exceed one SMS (90 bytes; ASCII
-   * 1, line break and other characters 2) the line is left out and the normal
-   * text is sent. The response field `webOtp` reports the outcome. Part of the
-   * idempotency fingerprint (as the bound host).
-   */
-  webOtp?: boolean | IssueWebOtpOptions;
 };
 
 /** String-to-string map. */
 export type TrackMetadata = {
   [key: string]: string;
-};
-
-/** Explicit WebOTP binding for `POST /v1/issue`. */
-export type IssueWebOtpOptions = {
-  /**
-   * Origin of the page that reads the code, exactly as the browser serializes
-   * it (scheme and host, no path or trailing slash).
-   */
-  origin: string;
 };
 
 /** Result of `POST /v1/issue`. The OTP code itself is never returned. */
@@ -124,32 +102,11 @@ export type IssueOtpOutput = {
   attemptsRemaining: number;
   /** When delivery was queued (RFC 3339). */
   queuedAt: string;
-  /** Present only when the request set `webOtp`. */
-  webOtp?: IssueWebOtpResult;
   /**
    * Mode of the API key that made the request: `live`, or `test` for a
    * `pk_test_`/`sk_test_` key (simulated, no message sent, no credit used).
    */
   mode?: "live" | "test";
-};
-
-/** WebOTP outcome of an issue that asked for it (`webOtp` on the request). */
-export type IssueWebOtpResult = {
-  /**
-   * `fallback_only`: AlimTalk delivery (the default); the KakaoTalk message
-   * cannot carry the line, only the SMS fallback sent if AlimTalk delivery fails
-   * does, so auto-fill works only in that case. `applied`: the SMS carries
-   * `@<host> #<code>`. `skipped`: sent without the line (see `reason`).
-   */
-  status: "applied" | "fallback_only" | "skipped";
-  /**
-   * Why it was skipped. `host_too_long`: the compact SMS plus the WebOTP line
-   * would exceed one SMS, so the normal text was sent instead (the message type
-   * and price never change because of WebOTP). `channel_alimtalk`: AlimTalk
-   * delivery while the SMS fallback is unavailable (`smsFallback: false`, or
-   * the fallback is turned off service-wide).
-   */
-  reason?: "channel_alimtalk" | "host_too_long";
 };
 
 /**
@@ -500,7 +457,11 @@ export type TemplateSummary = {
   isDefault: boolean;
   /** Pre-registered provider (AlimTalk) template code; empty when the template has no AlimTalk. */
   providerTemplateCode: string;
-  /** Channels this template can be sent on. */
+  /**
+   * Channels this template can be sent on: `['alimtalk']` (SMS is only the automatic
+   * fallback of a failed AlimTalk delivery). Empty while its AlimTalk template is
+   * pending approval: such a template cannot be issued (400 `TEMPLATE_NOT_AVAILABLE`).
+   */
   channelSupport: ("alimtalk" | "sms")[];
   /** Message body; `#{code}` is replaced with the OTP and other `#{variable}` placeholders with `templateVariables`. */
   body: string;
@@ -516,7 +477,11 @@ export type GetTemplateInput = {
 export type TemplatePublicDetail = {
   templateId: string;
   name: string;
-  /** Channels this template can be sent on. */
+  /**
+   * Channels this template can be sent on: `['alimtalk']` (SMS is only the automatic
+   * fallback of a failed AlimTalk delivery). Empty while its AlimTalk template is
+   * pending approval: such a template cannot be issued (400 `TEMPLATE_NOT_AVAILABLE`).
+   */
   channelSupport: ("alimtalk" | "sms")[];
   /** Message body; `#{code}` is replaced with the OTP and other `#{variable}` placeholders with `templateVariables`. */
   body: string;

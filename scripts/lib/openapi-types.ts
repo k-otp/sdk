@@ -160,13 +160,19 @@ const isObject = (value: unknown): value is JsonObject =>
 const quoteKey = (key: string): string =>
   IDENTIFIER.test(key) ? key : JSON.stringify(key);
 
-const docComment = (text: unknown, indent: string): string => {
+const docComment = (
+  text: unknown,
+  indent: string,
+  deprecated = false,
+): string => {
   if (typeof text !== "string" || text.trim() === "") return "";
   const lines = text
     .replaceAll("*/", "*\\/")
     .trim()
     .split("\n")
     .map((line) => line.trimEnd());
+  // `deprecated: true` in the schema becomes a TSDoc tag editors strike through.
+  if (deprecated) lines.push("", "@deprecated");
   if (lines.length === 1) return `${indent}/** ${lines[0]} */\n`;
   return `${indent}/**\n${lines
     .map((line) => (line ? `${indent} * ${line}` : `${indent} *`))
@@ -329,7 +335,7 @@ export class OpenApiTypeRenderer {
       const property = properties[name] as Json;
       const optional = required.has(name) ? "" : "?";
       members.push(
-        `${docComment(isObject(property) ? property.description : undefined, inner)}${inner}${quoteKey(name)}${optional}: ${this.type(property, inner, `${at}.properties.${name}`)};`,
+        `${docComment(isObject(property) ? property.description : undefined, inner, isObject(property) && property.deprecated === true)}${inner}${quoteKey(name)}${optional}: ${this.type(property, inner, `${at}.properties.${name}`)};`,
       );
     }
     if (extra !== undefined && extra !== false) {
