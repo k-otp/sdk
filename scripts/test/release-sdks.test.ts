@@ -25,8 +25,8 @@ test("SDK publishing rejects failed, PR, stale and unrelated workflow evidence",
 });
 test("release assets use safe public names and skip Go proxy metadata", () => {
   expect(
-    releaseAssetName("Go", "github.com/k-otp/sdk/sdks/go/@v/v1.0.0.zip"),
-  ).toBe("kotp-sdk-go-1.0.0.zip");
-  expect(releaseAssetName("Go", "v1.0.0.mod")).toBeNull();
+    releaseAssetName("Go", "github.com/k-otp/sdk/sdks/go/@v/v0.2.0.zip"),
+  ).toBe("kotp-sdk-go-0.2.0.zip");
+  expect(releaseAssetName("Go", "v0.2.0.mod")).toBeNull();
   expect(() => releaseAssetName("Python", "../secret.whl")).toThrow();
 });

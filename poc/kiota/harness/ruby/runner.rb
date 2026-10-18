@@ -46,7 +46,7 @@ def call(client, test)
     raise ArgumentError, 'Invalid idempotency before HTTP' unless /\A[!-~]{1,128}\z/.match?(key)
     body = model(input, KOtpSdkGenerated::Issue::IssuePostRequestBody)
     body.idempotency_key = key
-    config.headers.add('Idempotency-Key', key);config.headers.add('Origin', 'https://poc.example.com')
+    config.headers.add('Idempotency-Key', key)
     client.issue.post(body, config).resume
   when 'verify'
     client.verify.post(model(test['request'], KOtpSdkGenerated::Verify::VerifyPostRequestBody), config).resume

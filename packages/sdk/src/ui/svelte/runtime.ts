@@ -390,10 +390,6 @@ export const buttonHandlers = (
   };
 };
 
-/** The digit shown by each segment. */
-export const codeDigits = (value: string, length: number): string[] =>
-  otpCodeSegments(value, length);
-
 /**
  * `use:` action on a code input group: writes the code into the
  * (uncontrolled) segments whenever it changes, never while an IME is

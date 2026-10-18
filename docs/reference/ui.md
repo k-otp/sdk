@@ -177,7 +177,7 @@ Vue 3.3+, render-function components, ESM + CJS.
   `description`; slot adds `input`), buttons, countdown and message (slots
   replace the default copy).
 - `OtpCodeInput`: `v-model`, `@complete`, `length`, `read-only`, `invalid`,
-  `id`, `auto-focus`, `web-otp`, `name`, `locale`, `messages`.
+  `id`, `auto-focus`, `name`, `locale`, `messages`.
 - `useOtpFormContext()`, `OTP_FORM_KEY`.
 
 ## `@k-otp/sdk/ui/svelte`

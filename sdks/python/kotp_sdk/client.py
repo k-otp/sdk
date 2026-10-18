@@ -127,7 +127,7 @@ class KotpClient:
         except (asyncio.TimeoutError, httpx.TransportError) as error:
             raise KotpTransportError("The request outcome is unknown") from error
 
-    async def issue(self, input, *, headers=None, origin=None, retry503=False):
+    async def issue(self, input, *, headers=None, retry503=False):
         key = input.get("idempotencyKey", "")
         key = key.strip() if isinstance(key, str) else ""
         if not re.fullmatch(r"[!-~]{1,128}", key):
@@ -136,8 +136,6 @@ class KotpClient:
         body.idempotency_key = key
         config = self._config(headers)
         config.headers.add("Idempotency-Key", key)
-        if origin is not None:
-            config.headers.add("Origin", origin)
         return await self._send(lambda: self._api.issue.post(body, config), retry503=retry503)
 
     async def verify(self, input, *, headers=None):

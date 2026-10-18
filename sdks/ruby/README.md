@@ -3,7 +3,7 @@
 Install the release gem:
 
 ```sh
-gem install --local kotp_sdk-1.0.0.gem
+gem install --local kotp_sdk-0.2.0.gem
 ```
 
 ```ruby
@@ -23,7 +23,7 @@ Issue requires a trimmed nonempty ASCII `idempotencyKey` up to 128 characters.
 The same key is sent in header and body. Automatic retries are disabled.
 `client.issue(input, retry503: true)` permits one retry following an explicit
 HTTP 503 response. Other operations never automatically retry. Per-call
-`headers` and issue `origin` may be provided; authentication and idempotency
+`headers` may be provided; authentication and idempotency
 headers cannot be replaced.
 
 `KOtp::ApiError` exposes HTTP `status`, JSON `envelope`, `request_id`,

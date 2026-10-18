@@ -28,7 +28,7 @@ key merely because the first request timed out.
 
 Automatic retries are disabled. To allow exactly one retry after an explicit
 HTTP 503 response, pass `{retry503: true}` to `issue`. Verification is never
-automatically retried. Optional request settings also accept `origin` and custom
+automatically retried. Optional request settings also accept custom
 `headers`; authentication and idempotency headers are managed by the client.
 
 `KotpApiError` exposes `status`, `envelope` (`defined`, `code`, `status`, `message`,

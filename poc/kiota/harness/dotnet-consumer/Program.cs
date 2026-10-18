@@ -65,7 +65,7 @@ static async Task<IParsable?> Call(KOtpApiClient client, JsonObject test, Cancel
             var key = input["idempotencyKey"]?.GetValue<string>().Trim() ?? "";
             if (!System.Text.RegularExpressions.Regex.IsMatch(key,"^[!-~]{1,128}$")) throw new ArgumentException("Invalid idempotency before HTTP");
             var body = await Model(input, IssuePostRequestBody.CreateFromDiscriminatorValue); body.IdempotencyKey = key;
-            return await client.Issue.PostAsIssuePostResponseAsync(body,c => {c.Headers.Add("X-Poc-Case",id);c.Headers.Add("Idempotency-Key",key);c.Headers.Add("Origin","https://poc.example.com");},cancel);
+            return await client.Issue.PostAsIssuePostResponseAsync(body,c => {c.Headers.Add("X-Poc-Case",id);c.Headers.Add("Idempotency-Key",key);},cancel);
         }
         case "verify": return await client.Verify.PostAsVerifyPostResponseAsync(await Model(test["request"]!,VerifyPostRequestBody.CreateFromDiscriminatorValue),c => c.Headers.Add("X-Poc-Case",id),cancel);
         case "status": return await client.Status.GetAsStatusGetResponseAsync(c => {c.Headers.Add("X-Poc-Case",id);c.QueryParameters.IssueId=query["issueId"]!.GetValue<string>();},cancel);

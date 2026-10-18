@@ -3,7 +3,7 @@
 Install the release wheel:
 
 ```sh
-python -m pip install ./kotp_sdk-1.0.0-py3-none-any.whl
+python -m pip install ./kotp_sdk-0.2.0-py3-none-any.whl
 ```
 
 ```python
@@ -33,8 +33,8 @@ the server. Reconcile an uncertain issue instead of retrying with a new key.
 Caller task cancellation still propagates normally.
 
 `timeout_ms` defaults to 10000. `base_url` defaults to the HTTPS API and accepts
-loopback HTTP for local tests. `headers` and issue `origin` are optional per-call
-settings. Authentication and idempotency headers cannot be replaced. Requests
+loopback HTTP for local tests. `headers` is an optional per-call
+setting. Authentication and idempotency headers cannot be replaced. Requests
 to another origin and redirects are rejected. Use `async with` or call `aclose()`;
 the client owns its transport, including a supplied test transport.
 

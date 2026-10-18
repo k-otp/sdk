@@ -1,7 +1,6 @@
 /** Server client using the official Kiota request builders and runtimes. */
 export interface RequestOptions {
   headers?: Record<string, string>;
-  origin?: string;
   retry503?: boolean;
 }
 export interface ClientOptions {

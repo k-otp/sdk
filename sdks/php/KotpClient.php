@@ -80,7 +80,6 @@ final class KotpClient {
             $key=isset($input['idempotencyKey'])&&is_string($input['idempotencyKey'])?trim($input['idempotencyKey']):'';
             if(preg_match('/^[!-~]{1,128}$/D',$key)!==1) throw new \InvalidArgumentException('Invalid issue idempotency key before HTTP');
             $input['idempotencyKey']=$key; $options['headers']['Idempotency-Key']=$key;
-            if(isset($options['origin'])) $options['headers']['Origin']=$options['origin'];
         }
         try {
             try { $value=$this->call($operation,$input,$query,$path,$options); }

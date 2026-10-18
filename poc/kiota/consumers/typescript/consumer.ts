@@ -13,7 +13,6 @@ for (const test of fixture.cases) {
   });
   const options = {
     headers: { "X-Poc-Case": test.id },
-    origin: "https://poc.example.com",
     retry503: test.explicitRetry === true,
   };
   const observation: Record<string, unknown> = { id: test.id };

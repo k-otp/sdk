@@ -13,7 +13,7 @@ export type WalletSummary = {
   balance: number;
   /** "organization" (shared) or "app" (legacy per-app wallet). */
   scope: OtpWalletScope;
-  walletId?: string;
+  walletId: string;
   /** Debits of THIS app among the latest ledger entries. */
   recentAppDebits: number;
 };
@@ -25,8 +25,7 @@ export const readWallet = async (
   const ledger = await otp.listCreditLedger({ limit: 20, entryType: "debit" });
   return {
     balance: wallet.balance,
-    // An API older than 1.4.0 omits walletScope: the balance is then the app's own.
-    scope: wallet.walletScope ?? "app",
+    scope: wallet.walletScope,
     walletId: wallet.walletId,
     recentAppDebits: ledger.items.length,
   };

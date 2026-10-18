@@ -30,7 +30,6 @@ import { jsonValue, KotpJsonParseNodeFactory, model } from "./compatibility";
 
 export interface RequestOptions {
   headers?: Record<string, string>;
-  origin?: string;
   retry503?: boolean;
 }
 export interface ClientOptions {
@@ -227,7 +226,6 @@ export class KotpClient {
       if (!/^[!-~]{1,128}$/.test(key))
         throw new TypeError("Invalid issue idempotency key before HTTP");
       headers["Idempotency-Key"] = key;
-      if (options.origin) headers.Origin = options.origin;
     }
     const call = () => {
       switch (operation) {

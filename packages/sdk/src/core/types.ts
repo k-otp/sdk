@@ -7,7 +7,6 @@ import type {
   GetIssueStatusOutput,
   IssueOtpInput,
   IssueOtpOutput,
-  IssueOtpPaymentErrorData,
   ListOtpCreditLedgerOutput,
   ListOtpIssuesOutput,
   ListTemplatesOutput,
@@ -15,7 +14,6 @@ import type {
   OtpBalanceOutput,
   OtpCreditLedgerItem,
   OtpDashboardIssue,
-  OtpRateLimitErrorData,
   TemplatePublicDetail,
   TemplateSummary,
   VerifyOtpInput,
@@ -49,7 +47,7 @@ export type VerifyResult = VerifyOtpOutput;
 export type VerifyReasonCode = NonNullable<VerifyOtpOutput["reasonCode"]>;
 /**
  * The `channel` an `issue` request may name: only `"alimtalk"` (KakaoTalk
- * AlimTalk, also the default). Direct SMS was removed in 3.0.0; SMS is only the
+ * AlimTalk, also the default). Direct SMS is not offered; SMS is only the
  * automatic fallback of a failed AlimTalk delivery (`smsFallback: false` turns
  * it off), and an explicit `"sms"` is refused with 400 `CHANNEL_NOT_SUPPORTED`.
  */
@@ -60,9 +58,6 @@ export type OtpChannel = NonNullable<IssueOtpInput["channel"]>;
  * took over. Not a value you can request.
  */
 export type OtpDeliveredChannel = OtpDashboardIssue["channel"];
-export type PaymentRequiredData = IssueOtpPaymentErrorData;
-/** `data` of a 429 TOO_MANY_REQUESTS error from `issue`/`verify` (1.3.1+). */
-export type RateLimitedData = OtpRateLimitErrorData;
 
 export type GetStatusInput = OpenApiOperations["status"]["query"];
 export type GetStatusResult = GetIssueStatusOutput;
@@ -87,26 +82,14 @@ export type CreditLedgerEntry = OtpCreditLedgerItem;
  */
 export type OtpWalletScope = WalletScope;
 /**
- * Result of `GET /v1/balance`. From API 1.4.0 the balance is the organization
- * wallet shared by all apps of the key's organization (`walletScope:
- * "organization"`, `organizationId` set). `walletId` and `walletScope` are
- * always sent by 1.4.0+ but are typed optional here: an API deployment older
- * than 1.4.0 omits them and the balance is then that app's own wallet.
- * Likewise `promoBalance` (free promotional credits included in `balance`) and
- * `promoNextExpiry` are sent by 1.6.0+ and typed optional for older APIs.
- * A `sk_test_` key (1.9.0+) gets a fixed simulated balance with `walletScope:
- * "test"` and `mode: "test"`; the real wallet is never read.
+ * Result of `GET /v1/balance`: the organization wallet shared by all apps of
+ * the key's organization (`walletScope: "organization"`, `organizationId`
+ * set), including `promoBalance` (free promotional credits included in
+ * `balance`) and `promoNextExpiry`. A `sk_test_` key gets a fixed simulated
+ * balance with `walletScope: "test"` and `mode: "test"`; the real wallet is
+ * never read.
  */
-export type GetBalanceResult = Omit<
-  OtpBalanceOutput,
-  "walletId" | "walletScope" | "promoBalance" | "promoNextExpiry"
-> &
-  Partial<
-    Pick<
-      OtpBalanceOutput,
-      "walletId" | "walletScope" | "promoBalance" | "promoNextExpiry"
-    >
-  >;
+export type GetBalanceResult = OtpBalanceOutput;
 export type ListTemplatesResult = ListTemplatesOutput;
 export type OtpTemplateSummary = TemplateSummary;
 export type GetTemplateInput = OpenApiOperations["getTemplate"]["params"];

@@ -29,7 +29,6 @@ for (const test of fixture.cases) {
     if (new URL(request.url).origin !== new URL(base).origin)
       throw new Error("Unexpected external network destination");
     request.headers.set("X-Poc-Case", test.id);
-    request.headers.set("Origin", "https://poc.example.com");
     return fetch(request);
   };
   const client = createOtpServerClient({
@@ -37,7 +36,6 @@ for (const test of fixture.cases) {
     baseUrl: base,
     fetch: customFetch,
     timeoutMs: test.timeoutMs ?? 10000,
-    headers: { Origin: "https://poc.example.com" },
   });
   const call = async () => {
     switch (test.operation) {

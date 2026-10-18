@@ -57,7 +57,6 @@ type Options struct {
 }
 type RequestOptions struct {
 	Headers  map[string]string
-	Origin   string
 	Retry503 bool
 }
 type Client struct{ api *sdk.KOtpApiClient }
@@ -305,9 +304,6 @@ func call(client *sdk.KOtpApiClient, request callInput, options RequestOptions, 
 		body := parsed.(*issue.IssuePostRequestBody)
 		body.SetIdempotencyKey(&key)
 		headers.Add("Idempotency-Key", key)
-		if options.Origin != "" {
-			headers.Add("Origin", options.Origin)
-		}
 		return client.Issue().PostAsIssuePostResponse(ctx, body, &issue.IssueRequestBuilderPostRequestConfiguration{Headers: headers})
 	case "verify":
 		body, err := model(request.Request, verify.CreateVerifyPostRequestBodyFromDiscriminatorValue)

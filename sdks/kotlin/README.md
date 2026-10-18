@@ -1,7 +1,7 @@
 # K-OTP server client for Kotlin/JVM
 
 Install the Java release JAR using the [Java installation guide](../java/README.md).
-Kotlin/JVM uses the same `dev.kotp:kotp-sdk:1.0.0` package and public API.
+Kotlin/JVM uses the same `dev.kotp:kotp-sdk:0.2.0` package and public API.
 
 ```kotlin
 import dev.kotp.sdk.KotpClient

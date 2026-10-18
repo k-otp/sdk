@@ -1,7 +1,7 @@
 # K-OTP server client for Go
 
 ```sh
-go get github.com/k-otp/sdk/sdks/go@v1.0.0
+go get github.com/k-otp/sdk/sdks/go@v0.2.0
 ```
 
 ```go
@@ -23,7 +23,7 @@ Issue requires a trimmed nonempty ASCII `idempotencyKey` up to 128 characters.
 The same key is sent in header and body. Automatic retries are disabled.
 `RequestOptions{Retry503:true}` permits one issue retry after an explicit HTTP
 503 response. Other operations never automatically retry. Request options also
-accept `Headers` and `Origin`; authentication and idempotency headers cannot be
+accept `Headers`; authentication and idempotency headers cannot be
 replaced.
 
 Use `errors.As` to read `*kotp.APIError`: HTTP `Status`, JSON `Envelope`,

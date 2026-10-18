@@ -296,9 +296,7 @@ Codes arrive by KakaoTalk AlimTalk (the user types or pastes them) or, after
 the automatic fallback when AlimTalk cannot be delivered, by SMS. The first
 code segment has `autocomplete="one-time-code"`, so iOS/macOS Safari and
 Android keyboards offer a code that arrives by SMS, and a multi-digit autofill
-or paste is spread across the segments. The browser WebOTP integration
-(`webOtp`, `receiveWebOtp`) was removed in 3.0.0: the API no longer appends
-the origin-bound `@<host> #<code>` line it needed.
+or paste is spread across the segments.
 
 ## SSR
 
@@ -426,9 +424,7 @@ Vue는 `<OtpForm purpose="signup" @verified="..." />`, Svelte는
 수 없을 때 자동으로 문자(SMS)로 대체 발송됩니다. 첫 번째 코드 칸에는
 `autocomplete="one-time-code"` 가 있어 iOS/macOS Safari 와 Android 키보드가
 SMS 로 온 코드를 제안하고, 여러 자리 자동 입력과 붙여넣기는 칸마다 나뉘어
-들어갑니다. 브라우저 WebOTP 연동(`webOtp`, `receiveWebOtp`)은 3.0.0 에서
-제거되었습니다. API 가 더 이상 필요한 `@<도메인> #<인증번호>` 줄을 붙이지
-않습니다.
+들어갑니다.
 
 ## SSR, Svelte 4/5
 

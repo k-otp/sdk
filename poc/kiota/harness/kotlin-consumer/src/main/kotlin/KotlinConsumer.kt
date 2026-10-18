@@ -44,7 +44,7 @@ fun call(client: KOtpApiClient, test: JsonObject): Parsable? {
             require(key.matches(Regex("[!-~]{1,128}"))) { "Invalid idempotency key before HTTP" }
             val body = model(input, IssuePostRequestBody::createFromDiscriminatorValue)
             body.idempotencyKey = key
-            client.issue().post(body) { c -> configure(c, test); c.headers.add("Idempotency-Key", key); c.headers.add("Origin", "https://poc.example.com") }
+            client.issue().post(body) { c -> configure(c, test); c.headers.add("Idempotency-Key", key) }
         }
         "verify" -> client.verify().post(model(test.get("request"), VerifyPostRequestBody::createFromDiscriminatorValue)) { c -> configure(c, test) }
         "status" -> client.status().get { c -> configure(c, test); c.queryParameters.issueId = query.get("issueId").asString }

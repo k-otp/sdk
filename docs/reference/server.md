@@ -184,10 +184,6 @@ wallet.organizationId; // set when walletScope is "organization"
 - A ledger entry's optional `appId` is its attribution: always the calling app
   for `debit` / `refund`, and on a `credit` / `clawback` only when the purchase
   was attributed to an app.
-- `walletId` and `walletScope` are typed optional (`GetBalanceResult`). An API
-  deployment older than 1.4.0 does not send them (its balance is the app's own
-  wallet), and `appId` on ledger entries is absent there too. Treat a missing
-  `walletScope` as `"app"`.
 - `PAYMENT_REQUIRED` (402) on `issue` now means the organization wallet is out
   of credit. No new error codes were added.
 - With an `sk_test_` key (API 1.9.0+) the real wallet is never read:

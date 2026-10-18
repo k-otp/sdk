@@ -41,7 +41,7 @@ const issued = await client.issue(input);
 issued.mode; // "test": nothing was sent, no credit was used
 ```
 
-`mode` is typed optional because an API older than 1.9.0 does not send it.
+`mode` is optional in the API schema: read it before relying on it.
 
 ## Test phone numbers and scenarios
 
@@ -179,6 +179,9 @@ mock.reset();  // between tests
 - Idempotency fingerprints use resolved values like the API: a retry that
   spells out a default (`channel: "alimtalk"`, `expiresInSec: 180`,
   `maxAttempts: 5`, the default `templateId`) replays instead of 409.
+- After an `alimtalk_failover` fallback delivered (4 s), `getIssue`/`listIssues`
+  and `mock.issues()` report `channel: "sms"` (`OtpDeliveredChannel`); every
+  other issue reports `"alimtalk"`.
 - Like the API, it refuses `channel: "sms"` (400 `CHANNEL_NOT_SUPPORTED`)
   and a `webOtp` other than `false` (400 `WEB_OTP_NOT_SUPPORTED`); see
   `getIssueRequestErrorCode`.

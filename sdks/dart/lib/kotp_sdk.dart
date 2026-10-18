@@ -16,11 +16,9 @@ import 'src/compatibility.dart';
 class RequestOptions {
   const RequestOptions({
     this.headers = const {},
-    this.origin,
     this.retry503 = false,
   });
   final Map<String, String> headers;
-  final String? origin;
   final bool retry503;
 }
 
@@ -183,7 +181,6 @@ class KotpClient {
       if (!RegExp(r'^[!-~]{1,128}$').hasMatch(key))
         throw ArgumentError('Invalid issue idempotency key before HTTP');
       headers['Idempotency-Key'] = key;
-      if (settings.origin != null) headers['Origin'] = settings.origin!;
     }
     void configure<T extends AbstractQueryParameters>(
       RequestConfiguration<T> config,

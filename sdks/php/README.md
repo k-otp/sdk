@@ -1,11 +1,11 @@
 # K-OTP server client for PHP
 
 Configure a Composer artifact repository pointing to the local ZIP directory,
-then require `k-otp/sdk:1.0.0`.
+then require `k-otp/sdk:0.2.0`.
 
 ```sh
 composer config repositories.kotp artifact ./packages
-composer require k-otp/sdk:1.0.0
+composer require k-otp/sdk:0.2.0
 ```
 
 Place the downloaded release ZIP in `./packages`.
@@ -27,7 +27,7 @@ Issue requires a trimmed nonempty ASCII `idempotencyKey` up to 128 characters;
 the client sends the same key in header and body. Automatic retries are
 disabled. `['retry503'=>true]` in issue options permits one retry following
 an explicit HTTP 503 response. Other operations never automatically retry.
-Options also accept `headers` and issue `origin`; authentication and
+Options also accept `headers`; authentication and
 idempotency headers cannot be replaced.
 
 Catch `KotpApiError` for HTTP `status`, JSON `envelope`, `requestId`,

@@ -10,7 +10,7 @@ class WireConsumer {
         for(JsonElement item:fixture.getAsJsonArray("cases")) {
             JsonObject test=item.getAsJsonObject(), query=test.getAsJsonObject("query"), observation=new JsonObject(); observation.add("id",test.get("id"));
             try(KotpClient client=new KotpClient(fixture.get("fakeSecretKey").getAsString(),System.getenv("POC_BASE_URL"),test.has("timeoutMs")?test.get("timeoutMs").getAsInt():10000)) {
-                KotpClient.RequestOptions options=new KotpClient.RequestOptions(Map.of("X-Poc-Case",test.get("id").getAsString()),"https://poc.example.com",test.has("explicitRetry")&&test.get("explicitRetry").getAsBoolean());
+                KotpClient.RequestOptions options=new KotpClient.RequestOptions(Map.of("X-Poc-Case",test.get("id").getAsString()),test.has("explicitRetry")&&test.get("explicitRetry").getAsBoolean());
                 try {
                     JsonElement value=switch(test.get("operation").getAsString()) {
                         case "issue" -> client.issue(test.getAsJsonObject("request"),options);

@@ -6,7 +6,7 @@ var observations = new List<object>();
 foreach(var raw in fixture["cases"]!.AsArray()) {
     var test = raw!.AsObject(); var query = test["query"]!.AsObject();
     using var client = new KotpClient(fixture["fakeSecretKey"]!.GetValue<string>(), Environment.GetEnvironmentVariable("POC_BASE_URL")!, test["timeoutMs"]?.GetValue<int>() ?? 10000);
-    var options = new RequestOptions(new Dictionary<string,string> { ["X-Poc-Case"] = test["id"]!.GetValue<string>() }, "https://poc.example.com", test["explicitRetry"]?.GetValue<bool>() == true);
+    var options = new RequestOptions(new Dictionary<string,string> { ["X-Poc-Case"] = test["id"]!.GetValue<string>() }, test["explicitRetry"]?.GetValue<bool>() == true);
     var observation = new Dictionary<string,object?> { ["id"] = test["id"]!.GetValue<string>() };
     try {
         observation["response"] = test["operation"]!.GetValue<string>() switch {

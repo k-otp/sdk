@@ -56,24 +56,24 @@ class Client
     adapter = MicrosoftKiotaFaraday::FaradayRequestAdapter.new(MicrosoftKiotaAbstractions::AnonymousAuthenticationProvider.new,nil,KotpJsonWriterFactory.new,http)
     adapter.set_base_url(base.to_s);@api = KOtpSdkGenerated::KOtpApiClient.new(adapter)
   end
-  def issue(input, headers: {}, origin: nil, retry503: false) = send_request('issue',input,{},'',headers,origin,retry503)
-  def verify(input, headers: {}) = send_request('verify',input,{},'',headers,nil,false)
-  def status(issue_id, headers: {}) = send_request('status',{}, {'issueId'=>issue_id},'',headers,nil,false)
-  def issues(query = {}, headers: {}) = send_request('issues',{},query,'',headers,nil,false)
-  def issue_detail(issue_id, headers: {}) = send_request('issueDetail',{}, {},issue_id,headers,nil,false)
-  def credit_ledger(query = {}, headers: {}) = send_request('creditLedger',{},query,'',headers,nil,false)
-  def balance(headers: {}) = send_request('balance',{}, {},'',headers,nil,false)
-  def templates(headers: {}) = send_request('templates',{}, {},'',headers,nil,false)
-  def template_detail(template_id, headers: {}) = send_request('templateDetail',{}, {},template_id,headers,nil,false)
+  def issue(input, headers: {}, retry503: false) = send_request('issue',input,{},'',headers,retry503)
+  def verify(input, headers: {}) = send_request('verify',input,{},'',headers,false)
+  def status(issue_id, headers: {}) = send_request('status',{}, {'issueId'=>issue_id},'',headers,false)
+  def issues(query = {}, headers: {}) = send_request('issues',{},query,'',headers,false)
+  def issue_detail(issue_id, headers: {}) = send_request('issueDetail',{}, {},issue_id,headers,false)
+  def credit_ledger(query = {}, headers: {}) = send_request('creditLedger',{},query,'',headers,false)
+  def balance(headers: {}) = send_request('balance',{}, {},'',headers,false)
+  def templates(headers: {}) = send_request('templates',{}, {},'',headers,false)
+  def template_detail(template_id, headers: {}) = send_request('templateDetail',{}, {},template_id,headers,false)
   private
-  def send_request(operation, input, query, path, headers, origin, retry503)
+  def send_request(operation, input, query, path, headers, retry503)
     raise ArgumentError, 'Authentication and idempotency headers are managed by the client' if headers.keys.any? { |key| %w[authorization idempotency-key].include?(key.to_s.downcase) }
     input = JSON.parse(JSON.generate(input));query = JSON.parse(JSON.generate(query));headers = headers.dup
     begin
-      value = call(operation,input,query,path,headers,origin)
+      value = call(operation,input,query,path,headers)
     rescue MicrosoftKiotaAbstractions::ApiError => error
       if operation=='issue' && retry503 && error.response_status_code==503
-        value = call(operation,input,query,path,headers,origin)
+        value = call(operation,input,query,path,headers)
       else
         raise
       end
@@ -91,7 +91,7 @@ class Client
     return nil unless value.respond_to?(:serialize)
     writer = KotpJsonWriter.new;writer.write_object_value(nil,value);JSON.parse(writer.get_serialized_content)
   end
-def call(operation, input, query, path, headers, origin)
+def call(operation, input, query, path, headers)
   config = MicrosoftKiotaAbstractions::RequestConfiguration.new
   headers.each { |name,value| config.headers.add(name.to_s,value.to_s) }
   client = @api
@@ -102,7 +102,7 @@ def call(operation, input, query, path, headers, origin)
     raise ArgumentError, 'Invalid idempotency before HTTP' unless /\A[!-~]{1,128}\z/.match?(key)
     body = model(input, KOtpSdkGenerated::Issue::IssuePostRequestBody)
     body.idempotency_key = key
-    config.headers.add('Idempotency-Key', key);config.headers.add('Origin', origin) unless origin.nil?
+    config.headers.add('Idempotency-Key', key)
     client.issue.post(body, config).resume
   when 'verify'
     client.verify.post(model(input, KOtpSdkGenerated::Verify::VerifyPostRequestBody), config).resume

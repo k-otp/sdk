@@ -22,9 +22,9 @@ import java.util.concurrent.TimeUnit;
 public final class KotpClient implements AutoCloseable {
     private final OkHttpClient http;
     private final KOtpApiClient client;
-    public record RequestOptions(Map<String,String> headers, String origin, boolean retry503) {
+    public record RequestOptions(Map<String,String> headers, boolean retry503) {
         public RequestOptions { headers = headers == null ? Map.of() : Map.copyOf(headers); }
-        public RequestOptions() { this(Map.of(), null, false); }
+        public RequestOptions() { this(Map.of(), false); }
     }
     public static final class KotpApiException extends RuntimeException {
         public final int status;
@@ -115,7 +115,7 @@ public final class KotpClient implements AutoCloseable {
                 JsonObject input = request.deepCopy();
                 IssuePostRequestBody body = model(input, IssuePostRequestBody::createFromDiscriminatorValue);
                 body.setIdempotencyKey(key);
-                return client.issue().post(body, c -> { configure(c,options); c.headers.add("Idempotency-Key", key); if(options.origin()!=null) c.headers.add("Origin", options.origin()); });
+                return client.issue().post(body, c -> { configure(c,options); c.headers.add("Idempotency-Key", key); });
             }
             case "verify": return client.verify().post(model(request, VerifyPostRequestBody::createFromDiscriminatorValue), c -> configure(c,options));
             case "status": return client.status().get(c -> { configure(c,options); c.queryParameters.issueId = q.get("issueId").getAsString(); });

@@ -8,7 +8,7 @@ fixture['cases'].each do |item|
   observation={'id'=>item['id']}
   begin
     observation['response']=case item['operation']
-    when 'issue' then client.issue(item['request'],**options,origin:'https://poc.example.com',retry503:item['explicitRetry']==true)
+    when 'issue' then client.issue(item['request'],**options,retry503:item['explicitRetry']==true)
     when 'verify' then client.verify(item['request'],**options)
     when 'status' then client.status(item['query']['issueId'],**options)
     when 'issues' then client.issues(item['query'],**options)

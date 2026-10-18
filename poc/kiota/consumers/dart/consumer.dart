@@ -15,7 +15,6 @@ Future<void> main() async {
     );
     final options = RequestOptions(
       headers: {'X-Poc-Case': test['id']},
-      origin: 'https://poc.example.com',
       retry503: test['explicitRetry'] == true,
     );
     final result = <String, dynamic>{'id': test['id']};

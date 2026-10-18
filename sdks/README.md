@@ -17,10 +17,10 @@ Keep secret keys on your server, and phone numbers and verification codes as str
 | Dart | `kotp_sdk` | [Dart](dart/README.md) | Dart 3.9, server IO |
 | TypeScript | `@k-otp/sdk/kiota` | [TypeScript](typescript/README.md) | Node 20.19 / 22 / 24 |
 
-Native SDKs have independent versions from npm (`1.0.0` follows the K-OTP API 2.0
+Native SDKs have independent versions from npm (`0.2.0` follows the K-OTP API 2.0
 release, see below). TypeScript shares the version of `@k-otp/sdk`. Download
 native packages from
-[GitHub Releases](https://github.com/k-otp/sdk/releases/tag/server-sdk-v1.0.0);
+[GitHub Releases](https://github.com/k-otp/sdk/releases/tag/server-sdk-v0.2.0);
 package manager registries other than npm are being set up. Verify downloaded
 files against the attached `SHA256SUMS`. Go is installed directly from its version tag.
 
@@ -42,7 +42,7 @@ uses the Java API; Android and Kotlin Multiplatform are not covered by this rele
 
 ## Migrating from 0.1.x
 
-Version `1.0.0` matches the K-OTP API 2.0 contract:
+Version `0.2.0` matches the K-OTP API 2.0 contract:
 
 - `channel` accepts only `"alimtalk"` (also the default). Leave it out; an
   explicit `"sms"` is rejected with a 400 whose `data.code` is
@@ -55,6 +55,10 @@ Version `1.0.0` matches the K-OTP API 2.0 contract:
   `TEMPLATE_NOT_AVAILABLE`; its `channelSupport` is empty. Templates that can be
   issued report `["alimtalk"]`.
 - `messageType` is deprecated and ignored.
+- The per-call `origin` request option is removed from every client (it only
+  bound `webOtp`): drop it from issue options, or from `RequestOptions` in
+  Java/Kotlin (constructor is now `RequestOptions(headers, retry503)`), C#
+  (`new RequestOptions(headers, retry503)`) and Go.
 
 These codes arrive in the `data` of the API error each client exposes, as
 described in its guide.

@@ -31,7 +31,6 @@ function config(string $name, array $test, $query = null) {
     $headers = ['X-Poc-Case' => $test['id']];
     if ($test['operation'] === 'issue') {
         $headers['Idempotency-Key'] = trim($test['request']['idempotencyKey'] ?? '');
-        $headers['Origin'] = 'https://poc.example.com';
     }
     $value = new $class($headers);
     if ($query !== null) $value->queryParameters = $query;

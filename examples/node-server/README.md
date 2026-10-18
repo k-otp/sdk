@@ -13,8 +13,7 @@ this server; the **`sk_` secret key never leaves it**.
 (`src/wallet.ts`) reads the credit wallet with the same `sk_` key: since API
 1.4.0 `getBalance()` returns the **organization** wallet shared by all of its
 apps (`walletScope: "organization"`), and `listCreditLedger()` shows the
-wallet's credits plus only this app's debits. `walletScope` is typed optional
-because an API older than 1.4.0 omits it.
+wallet's credits plus only this app's debits.
 
 ## Run
 

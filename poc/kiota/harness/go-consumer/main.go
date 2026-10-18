@@ -108,7 +108,6 @@ func call(client *sdk.KOtpApiClient, test TestCase, ctx context.Context) (ser.Pa
 		body := parsed.(*issue.IssuePostRequestBody)
 		body.SetIdempotencyKey(&key)
 		headers.Add("Idempotency-Key", key)
-		headers.Add("Origin", "https://poc.example.com")
 		return client.Issue().PostAsIssuePostResponse(ctx, body, &issue.IssueRequestBuilderPostRequestConfiguration{Headers: headers})
 	case "verify":
 		body, err := model(test.Request, verify.CreateVerifyPostRequestBodyFromDiscriminatorValue)

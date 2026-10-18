@@ -42,7 +42,7 @@ public class WireConsumer {
                 JsonObject input = request.deepCopy();
                 IssuePostRequestBody body = model(input, IssuePostRequestBody::createFromDiscriminatorValue);
                 body.setIdempotencyKey(key);
-                return client.issue().post(body, c -> { configure(c,test); c.headers.add("Idempotency-Key", key); c.headers.add("Origin", "https://poc.example.com"); });
+                return client.issue().post(body, c -> { configure(c,test); c.headers.add("Idempotency-Key", key); });
             }
             case "verify": return client.verify().post(model(test.get("request"), VerifyPostRequestBody::createFromDiscriminatorValue), c -> configure(c,test));
             case "status": return client.status().get(c -> { configure(c,test); c.queryParameters.issueId = q.get("issueId").getAsString(); });

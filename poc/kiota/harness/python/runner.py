@@ -63,7 +63,6 @@ async def call(client, test):
         body = model(dict(test["request"]), IssuePostRequestBody)
         body.idempotency_key = key
         config.headers.add("Idempotency-Key", key)
-        config.headers.add("Origin", "https://poc.example.com")
         return await client.issue.post(body, config)
     if operation == "verify":
         body = model(test["request"], VerifyPostRequestBody)
