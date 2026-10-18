@@ -8,8 +8,6 @@ import 'package:microsoft_kiota_abstractions/microsoft_kiota_abstractions.dart';
 import 'package:microsoft_kiota_serialization_json/microsoft_kiota_serialization_json.dart';
 import 'generated/k_otp_api_client.dart';
 import 'generated/issue/issue_post_request_body.dart';
-import 'generated/issue/issue_post_request_body_web_otp.dart';
-import 'generated/models/issue_web_otp_options.dart';
 import 'generated/verify/verify_post_request_body.dart';
 import 'generated/issues/get_verification_status_query_parameter_type.dart';
 import 'generated/creditLedger/get_entry_type_query_parameter_type.dart';
@@ -197,24 +195,10 @@ class KotpClient {
     Future<Parsable?> call() {
       switch (operation) {
         case 'issue':
-          final request = Map<String, dynamic>.from(input);
-          final web = request.remove('webOtp');
           final body = _model(
-            request,
+            Map<String, dynamic>.from(input),
             IssuePostRequestBody.createFromDiscriminatorValue,
           )..idempotencyKey = key;
-          if (web != null) {
-            final wrapper = IssuePostRequestBodyWebOtp();
-            if (web is bool) {
-              wrapper.boolean = web;
-            } else {
-              wrapper.issueWebOtpOptions = _model(
-                web,
-                IssueWebOtpOptions.createFromDiscriminatorValue,
-              );
-            }
-            body.webOtp = wrapper;
-          }
           return _api.issue.postAsync(body, configure);
         case 'verify':
           return _api.verify.postAsync(

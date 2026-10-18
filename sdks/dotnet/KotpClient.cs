@@ -84,13 +84,7 @@ public sealed class KotpClient : IDisposable {
         async Task<IParsable?> Call() {
             switch (operation) {
                 case "issue": {
-                    var request = input.DeepClone().AsObject(); var web = request["webOtp"]; request.Remove("webOtp");
-                    var body = await Model(request, IssuePostRequestBody.CreateFromDiscriminatorValue); body.IdempotencyKey = key;
-                    if (web is not null) {
-                        var wrapper = new IssuePostRequestBody.IssuePostRequestBody_webOtp();
-                        if (web is JsonValue primitive) wrapper.Boolean = primitive.GetValue<bool>(); else wrapper.IssueWebOtpOptions = await Model(web, IssueWebOtpOptions.CreateFromDiscriminatorValue);
-                        body.WebOtp = wrapper;
-                    }
+                    var body = await Model(input.DeepClone().AsObject(), IssuePostRequestBody.CreateFromDiscriminatorValue); body.IdempotencyKey = key;
                     return await api.Issue.PostAsIssuePostResponseAsync(body, c => { Configure(c.Headers, options); c.Headers.Add("Idempotency-Key", key); if (options.Origin is not null) c.Headers.Add("Origin", options.Origin); }, cancel);
                 }
                 case "verify": return await api.Verify.PostAsVerifyPostResponseAsync(await Model(input, VerifyPostRequestBody.CreateFromDiscriminatorValue), c => Configure(c.Headers, options), cancel);

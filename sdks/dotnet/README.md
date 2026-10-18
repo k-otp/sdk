@@ -1,11 +1,11 @@
 # K-OTP server client for .NET
 
 Add the release package directory as a NuGet source, then reference
-`KOtp.Sdk` version `0.1.0`.
+`KOtp.Sdk` version `1.0.0`.
 
 ```sh
 dotnet nuget add source ./packages --name kotp-local
-dotnet add package KOtp.Sdk --version 0.1.0
+dotnet add package KOtp.Sdk --version 1.0.0
 ```
 
 Place the downloaded `.nupkg` in `./packages`. Keep nuget.org enabled for the

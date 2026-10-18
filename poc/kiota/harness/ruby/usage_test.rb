@@ -5,21 +5,11 @@ def check(value, message)
   raise message unless value
 end
 
-node = MicrosoftKiotaSerializationJson::JsonParseNode.new({ 'name' => '모의 템플릿', 'channelSupport' => ['sms', 'alimtalk'] })
+node = MicrosoftKiotaSerializationJson::JsonParseNode.new({ 'name' => '모의 템플릿', 'channelSupport' => ['alimtalk'] })
 template = node.get_object_value(KOtpSdkGenerated::Models::TemplateSummary.method(:create_from_discriminator_value))
 writer = KotpJsonWriter.new
 writer.write_object_value(nil, template)
-check(JSON.parse(writer.get_serialized_content)['channelSupport'] == ['sms', 'alimtalk'], 'enum array changed')
-
-[false, true].each do |flag|
-  body = KOtpSdkGenerated::Issue::IssuePostRequestBody.new
-  union = KOtpSdkGenerated::Issue::IssuePostRequestBodyWebOtp.new
-  union.boolean = flag
-  body.web_otp = union
-  writer = KotpJsonWriter.new
-  writer.write_object_value(nil, body)
-  check(JSON.parse(writer.get_serialized_content)['webOtp'] == flag, 'union scalar changed')
-end
+check(JSON.parse(writer.get_serialized_content)['channelSupport'] == ['alimtalk'], 'enum array changed')
 
 writer = KotpJsonWriter.new
 payload = { 'value' => { 'leading' => '001', 'mixed' => [nil, false, 3] } }

@@ -8,7 +8,6 @@ import dev.kotp.sdk.generated.KOtpApiClient
 import dev.kotp.sdk.generated.issue.IssuePostRequestBody
 import dev.kotp.sdk.generated.verify.VerifyPostRequestBody
 import dev.kotp.sdk.generated.verify.VerifyPostResponse
-import dev.kotp.sdk.generated.models.IssueWebOtpOptions
 import dev.kotp.sdk.generated.issues.GetVerificationStatusQueryParameterType
 import dev.kotp.sdk.generated.creditledger.GetEntryTypeQueryParameterType
 import okhttp3.OkHttpClient
@@ -43,17 +42,8 @@ fun call(client: KOtpApiClient, test: JsonObject): Parsable? {
             val input = test.getAsJsonObject("request").deepCopy()
             val key = input.get("idempotencyKey")?.asString?.trim() ?: ""
             require(key.matches(Regex("[!-~]{1,128}"))) { "Invalid idempotency key before HTTP" }
-            val webOtp = input.remove("webOtp")
             val body = model(input, IssuePostRequestBody::createFromDiscriminatorValue)
             body.idempotencyKey = key
-            if (webOtp != null) {
-                val union = IssuePostRequestBody.IssuePostRequestBodyWebOtp()
-                if (webOtp.isJsonPrimitive) union.boolean = webOtp.asBoolean
-                else union.issueWebOtpOptions = model(webOtp, IssueWebOtpOptions::createFromDiscriminatorValue)
-                body.webOtp = union
-                if (webOtp.isJsonPrimitive) check(body.webOtp?.boolean == webOtp.asBoolean)
-                else check(body.webOtp?.issueWebOtpOptions?.origin == webOtp.asJsonObject.get("origin").asString)
-            }
             client.issue().post(body) { c -> configure(c, test); c.headers.add("Idempotency-Key", key); c.headers.add("Origin", "https://poc.example.com") }
         }
         "verify" -> client.verify().post(model(test.get("request"), VerifyPostRequestBody::createFromDiscriminatorValue)) { c -> configure(c, test) }

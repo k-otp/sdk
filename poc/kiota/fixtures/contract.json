@@ -47,8 +47,7 @@
         "phoneNumber": "00000000000",
         "purpose": "로그인 🔐",
         "idempotencyKey": "poc-key-0001",
-        "smsFallback": true,
-        "webOtp": true
+        "smsFallback": true
       },
       "response": {
         "status": 200,
@@ -59,10 +58,7 @@
           "issueId": "00000000-0000-4000-8000-000000000001",
           "expiresAt": "2026-10-07T00:03:00Z",
           "attemptsRemaining": 5,
-          "queuedAt": "2026-10-07T00:00:00Z",
-          "webOtp": {
-            "status": "fallback_only"
-          }
+          "queuedAt": "2026-10-07T00:00:00Z"
         }
       },
       "checks": [
@@ -73,10 +69,6 @@
         {
           "path": "attemptsRemaining",
           "value": 5
-        },
-        {
-          "path": "webOtp.status",
-          "value": "fallback_only"
         }
       ],
       "requestCount": 1
@@ -91,8 +83,7 @@
         "phoneNumber": "00000000000",
         "purpose": "로그인 🔐",
         "idempotencyKey": "poc-key-0001",
-        "smsFallback": false,
-        "webOtp": false
+        "smsFallback": false
       },
       "response": {
         "status": 200,
@@ -128,11 +119,8 @@
         "phoneNumber": "00000000000",
         "purpose": "로그인 🔐",
         "idempotencyKey": "poc-key-0001",
-        "channel": "sms",
+        "channel": "alimtalk",
         "smsFallback": false,
-        "webOtp": {
-          "origin": "https://poc.example.com"
-        },
         "metadata": {
           "tag": "서울 🔐",
           "leading": "001"
@@ -150,10 +138,7 @@
           "issueId": "00000000-0000-4000-8000-000000000001",
           "expiresAt": "2026-10-07T00:03:00Z",
           "attemptsRemaining": 5,
-          "queuedAt": "2026-10-07T00:00:00Z",
-          "webOtp": {
-            "status": "applied"
-          }
+          "queuedAt": "2026-10-07T00:00:00Z"
         }
       },
       "checks": [
@@ -164,10 +149,6 @@
         {
           "path": "attemptsRemaining",
           "value": 5
-        },
-        {
-          "path": "webOtp.status",
-          "value": "applied"
         }
       ],
       "requestCount": 1
@@ -562,7 +543,7 @@
             {
               "templateId": "otp_default_kr",
               "name": "가입 템플릿",
-              "channelSupport": ["alimtalk", "sms"],
+              "channelSupport": ["alimtalk"],
               "body": "인증번호 #{code}",
               "isDefault": true,
               "providerTemplateCode": "poc-template"
@@ -574,7 +555,7 @@
       "checks": [
         {
           "path": "templates.0.channelSupport",
-          "value": ["alimtalk", "sms"]
+          "value": ["alimtalk"]
         },
         {
           "path": "templates.0.name",
@@ -598,7 +579,7 @@
         "body": {
           "templateId": "otp_default_kr",
           "name": "가입 템플릿",
-          "channelSupport": ["alimtalk", "sms"],
+          "channelSupport": ["alimtalk"],
           "body": "인증번호 #{code}",
           "variables": {
             "required": ["name"],

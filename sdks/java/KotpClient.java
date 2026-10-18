@@ -7,7 +7,6 @@ import com.microsoft.kiota.http.OkHttpRequestAdapter;
 import com.microsoft.kiota.serialization.*;
 import dev.kotp.sdk.generated.KOtpApiClient;
 import dev.kotp.sdk.generated.issue.IssuePostRequestBody;
-import dev.kotp.sdk.generated.models.IssueWebOtpOptions;
 import dev.kotp.sdk.generated.verify.VerifyPostRequestBody;
 import dev.kotp.sdk.generated.issues.GetVerificationStatusQueryParameterType;
 import dev.kotp.sdk.generated.creditledger.GetEntryTypeQueryParameterType;
@@ -114,14 +113,7 @@ public final class KotpClient implements AutoCloseable {
                 String key = request.has("idempotencyKey") ? request.get("idempotencyKey").getAsString().trim() : "";
                 if (!key.matches("[!-~]{1,128}")) throw new IllegalArgumentException("Invalid issue idempotency key before HTTP");
                 JsonObject input = request.deepCopy();
-                JsonElement webOtp = input.remove("webOtp");
                 IssuePostRequestBody body = model(input, IssuePostRequestBody::createFromDiscriminatorValue);
-                if (webOtp != null) {
-                    IssuePostRequestBody.IssuePostRequestBodyWebOtp wrapper = new IssuePostRequestBody.IssuePostRequestBodyWebOtp();
-                    if (webOtp.isJsonPrimitive()) wrapper.setBoolean(webOtp.getAsBoolean());
-                    else wrapper.setIssueWebOtpOptions(model(webOtp, IssueWebOtpOptions::createFromDiscriminatorValue));
-                    body.setWebOtp(wrapper);
-                }
                 body.setIdempotencyKey(key);
                 return client.issue().post(body, c -> { configure(c,options); c.headers.add("Idempotency-Key", key); if(options.origin()!=null) c.headers.add("Origin", options.origin()); });
             }

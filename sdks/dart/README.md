@@ -1,7 +1,7 @@
 # K-OTP server client for Dart
 
-Extract the local `kotp-sdk-dart-0.1.0.tar.gz` archive and add its directory as
-a Pub path dependency named `kotp_sdk` (version `0.1.0`).
+Extract the local `kotp-sdk-dart-1.0.0.tar.gz` archive and add its directory as
+a Pub path dependency named `kotp_sdk` (version `1.0.0`).
 
 ```dart
 import 'package:kotp_sdk/kotp_sdk.dart';

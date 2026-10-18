@@ -17,8 +17,6 @@ from kiota_serialization_json.json_serialization_writer import JsonSerialization
 
 from kotp_sdk_generated.k_otp_api_client import KOtpApiClient
 from kotp_sdk_generated.issue.issue_post_request_body import IssuePostRequestBody
-from kotp_sdk_generated.issue.issue_post_request_body_web_otp import IssuePostRequestBody_webOtp
-from kotp_sdk_generated.models.issue_web_otp_options import IssueWebOtpOptions
 from kotp_sdk_generated.verify.verify_post_request_body import VerifyPostRequestBody
 from kotp_sdk_generated.status.status_request_builder import StatusRequestBuilder
 from kotp_sdk_generated.issues.issues_request_builder import IssuesRequestBuilder
@@ -62,19 +60,7 @@ async def call(client, test):
         key = raw_key.strip()
         if not re.fullmatch(r"[!-~]{1,128}", key):
             raise TypeError("Invalid issue idempotency key (before HTTP)")
-        request = dict(test["request"])
-        web_otp = request.pop("webOtp", None)
-        body = model(request, IssuePostRequestBody)
-        if web_otp is not None:
-            wrapper = IssuePostRequestBody_webOtp()
-            if isinstance(web_otp, bool): wrapper.boolean = web_otp
-            else: wrapper.issue_web_otp_options = model(web_otp, IssueWebOtpOptions)
-            body.web_otp = wrapper
-            # Kiota 1.35 Python composed writer tests truthiness and drops false.
-            # The supported AdditionalData channel preserves the exact primitive.
-            if web_otp is False:
-                body.web_otp = None
-                body.additional_data["webOtp"] = False
+        body = model(dict(test["request"]), IssuePostRequestBody)
         body.idempotency_key = key
         config.headers.add("Idempotency-Key", key)
         config.headers.add("Origin", "https://poc.example.com")

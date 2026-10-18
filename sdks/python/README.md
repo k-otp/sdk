@@ -3,7 +3,7 @@
 Install the release wheel:
 
 ```sh
-python -m pip install ./kotp_sdk-0.1.0-py3-none-any.whl
+python -m pip install ./kotp_sdk-1.0.0-py3-none-any.whl
 ```
 
 ```python

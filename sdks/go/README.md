@@ -1,7 +1,7 @@
 # K-OTP server client for Go
 
 ```sh
-go get github.com/k-otp/sdk/sdks/go@v0.1.0
+go get github.com/k-otp/sdk/sdks/go@v1.0.0
 ```
 
 ```go

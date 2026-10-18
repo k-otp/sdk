@@ -1,12 +1,12 @@
 # K-OTP server client for Java and Kotlin/JVM
 
-Install the local `dev.kotp:kotp-sdk:0.1.0` JAR and reference
+Install the local `dev.kotp:kotp-sdk:1.0.0` JAR and reference
 it as a Maven dependency. Java 17 bytecode is supplied.
 
 Download the JAR, POM, sources and Javadoc from the release, then install them:
 
 ```sh
-mvn install:install-file -Dfile=kotp-sdk-0.1.0.jar -DpomFile=kotp-sdk-0.1.0.pom -Dsources=kotp-sdk-0.1.0-sources.jar -Djavadoc=kotp-sdk-0.1.0-javadoc.jar
+mvn install:install-file -Dfile=kotp-sdk-1.0.0.jar -DpomFile=kotp-sdk-1.0.0.pom -Dsources=kotp-sdk-1.0.0-sources.jar -Djavadoc=kotp-sdk-1.0.0-javadoc.jar
 ```
 
 Add this dependency to your application's POM:
@@ -15,7 +15,7 @@ Add this dependency to your application's POM:
 <dependency>
   <groupId>dev.kotp</groupId>
   <artifactId>kotp-sdk</artifactId>
-  <version>0.1.0</version>
+  <version>1.0.0</version>
 </dependency>
 ```
 

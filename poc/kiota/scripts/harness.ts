@@ -495,7 +495,6 @@ try {
     );
     result.usageLayer = {
       workarounds: [
-        "Python composed writer drops false: use official AdditionalData for webOtp=false",
         "Read dynamic error data from actual deserialized AdditionalData; mixed-list reserialization is a runtime limitation",
       ],
       retry:

@@ -8,8 +8,6 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Utils;
 use KOtp\Sdk\Generated\KOtpApiClient;
 use KOtp\Sdk\Generated\Issue\IssuePostRequestBody;
-use KOtp\Sdk\Generated\Issue\IssuePostRequestBody_webOtp;
-use KOtp\Sdk\Generated\Models\IssueWebOtpOptions;
 use KOtp\Sdk\Generated\Verify\VerifyPostRequestBody;
 use Microsoft\Kiota\Abstractions\ApiException;
 use Microsoft\Kiota\Abstractions\Authentication\AnonymousAuthenticationProvider;
@@ -46,14 +44,7 @@ function callClient(KOtpApiClient $client, array $test) {
             $input = $test['request'];
             $key = trim($input['idempotencyKey'] ?? '');
             if (preg_match('/^[!-~]{1,128}$/D', $key) !== 1) throw new InvalidArgumentException('Invalid idempotency key before HTTP');
-            $hasWebOtp = array_key_exists('webOtp', $input); $webOtp = $input['webOtp'] ?? null; unset($input['webOtp']);
             $body = model($input, IssuePostRequestBody::class); $body->setIdempotencyKey($key);
-            if ($hasWebOtp) {
-                $wrapper = new IssuePostRequestBody_webOtp();
-                if (is_bool($webOtp)) $wrapper->setBoolean($webOtp);
-                else $wrapper->setIssueWebOtpOptions(model($webOtp, IssueWebOtpOptions::class));
-                $body->setWebOtp($wrapper);
-            }
             return $client->issue()->post($body, config('Issue\\IssueRequestBuilderPostRequestConfiguration', $test))->wait();
         case 'verify': return $client->verify()->post(model($test['request'], VerifyPostRequestBody::class), config('Verify\\VerifyRequestBuilderPostRequestConfiguration', $test))->wait();
         case 'status':

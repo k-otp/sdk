@@ -3,7 +3,7 @@
 Install the release gem:
 
 ```sh
-gem install --local kotp_sdk-0.1.0.gem
+gem install --local kotp_sdk-1.0.0.gem
 ```
 
 ```ruby
