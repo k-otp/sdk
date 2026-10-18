@@ -3,7 +3,7 @@
 [English](./README.md) | [한국어](./README_ko.md)
 
 [K-OTP](https://api.k-otp.dev) 한국형 OTP API의 공식 JavaScript/TypeScript SDK입니다.
-일회용 인증번호를 발급(issue)하고 검증(verify)합니다. 인증번호는 기본적으로 카카오 알림톡으로 보내며,
+일회용 인증번호를 발급(issue)하고 검증(verify)합니다. 인증번호는 카카오 알림톡으로 보내며,
 알림톡을 받을 수 없으면 자동으로 문자(SMS)로 대체 발송합니다.
 npm 패키지는 [`@k-otp/sdk`](./packages/sdk) 하나이며, 용도별 서브패스로 나뉩니다.
 
@@ -16,7 +16,7 @@ npm 패키지는 [`@k-otp/sdk`](./packages/sdk) 하나이며, 용도별 서브�
 | [`@k-otp/sdk/svelte`](./docs/reference/svelte.md) | Svelte 4/5 스토어: `createOtpStores`, 플로우 스토어, `use:otpForm`. |
 | [`@k-otp/sdk/ui/react`, `/ui/vue`, `/ui/svelte`](./docs/ui.md#ui-컴포넌트-한국어) | 헤드리스 UI 컴포넌트: 한 줄짜리 `<OtpForm />` 과 조합 가능한 파트(번호 입력, 인증번호 받기/재전송, 인증번호 자동 입력을 지원하는 분할 인증번호 입력, 확인, 카운트다운, 메시지), 한국어/영어. |
 | [`@k-otp/sdk/ui/theme.css`](./docs/ui.md#테마) | UI 컴포넌트용 선택적 기본 테마(라이트/다크, 토큰). |
-| [`@k-otp/sdk/ui`](./docs/reference/ui.md#k-otpsdkui) | 프레임워크 무관 UI 모델: 번호 정규화, 인증번호 입력, 폼 상태 머신, 메시지, WebOTP. |
+| [`@k-otp/sdk/ui`](./docs/reference/ui.md#k-otpsdkui) | 프레임워크 무관 UI 모델: 번호 정규화, 인증번호 입력, 폼 상태 머신, 메시지. |
 | [`@k-otp/sdk/headless`](./packages/sdk/README.md#headless-flow-k-otpsdkheadless) | 어댑터들이 공유하는 프레임워크 무관 발급 -> 검증 플로우. |
 | [`@k-otp/sdk/contract`](./packages/sdk/README.md#advanced-entry-points) | oRPC 계약과 생성된 OpenAPI 타입. |
 | [`@k-otp/sdk/testing`](./docs/test-mode.md#unit-tests-without-the-network-k-otpsdktesting) | `createMockTransport()`: 단위 테스트용 메모리 내 테스트 모드 API(네트워크 없음). |
@@ -67,7 +67,7 @@ import "@k-otp/sdk/ui/theme.css"; // 선택: 기본 테마
 ```
 
 휴대폰 번호는 전송 전에 정규화되고(`+82 10-...` -> `010...`),
-인증번호 입력은 붙여넣기, 자동 입력(`one-time-code`, WebOTP), 키보드 이동을
+인증번호 입력은 붙여넣기, 자동 입력(`one-time-code`), 키보드 이동을
 지원하며, 포커스가 흐름을 따라 이동합니다. 모든 파트가 `data-*` 상태를
 노출하므로 직접 스타일을 입히거나 `OtpForm.Root`, `OtpForm.PhoneField` 등으로
 완전히 헤드리스하게 조합할 수 있습니다. [UI 가이드](./docs/ui.md#ui-컴포넌트-한국어)를

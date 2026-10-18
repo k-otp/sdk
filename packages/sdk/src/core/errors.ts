@@ -39,14 +39,68 @@ export type OtpPaymentRequiredData = {
 };
 
 /**
+ * `data.code` values of a 400 BAD_REQUEST `issue` error about an option the
+ * API no longer offers (the same code is the first token of `message`):
+ *
+ * - `CHANNEL_NOT_SUPPORTED`: `channel` was `"sms"`. Only `"alimtalk"` (the
+ *   default) is accepted; SMS is only the automatic fallback.
+ * - `TEMPLATE_NOT_AVAILABLE`: the template has no approved AlimTalk code
+ *   (`channelSupport` of `listTemplates`/`getTemplate` is empty for it).
+ * - `WEB_OTP_NOT_SUPPORTED`: `webOtp` was set to anything but `false`.
+ */
+export const ISSUE_REQUEST_ERROR_CODES: readonly [
+  "CHANNEL_NOT_SUPPORTED",
+  "TEMPLATE_NOT_AVAILABLE",
+  "WEB_OTP_NOT_SUPPORTED",
+] = [
+  "CHANNEL_NOT_SUPPORTED",
+  "TEMPLATE_NOT_AVAILABLE",
+  "WEB_OTP_NOT_SUPPORTED",
+];
+
+export type OtpIssueRequestErrorCode =
+  (typeof ISSUE_REQUEST_ERROR_CODES)[number];
+
+/**
+ * The issue-request code of an `issue` error, or `undefined` for any other
+ * error. `OtpApiError.code` stays `"BAD_REQUEST"`; the specific code is in
+ * `error.data.code`.
+ *
+ * ```ts
+ * if (getIssueRequestErrorCode(error) === "TEMPLATE_NOT_AVAILABLE") {
+ *   // pick another template (see `channelSupport` of `listTemplates`)
+ * }
+ * ```
+ */
+export const getIssueRequestErrorCode = (
+  error: OtpApiError | unknown,
+): OtpIssueRequestErrorCode | undefined => {
+  if (typeof error !== "object" || error === null) return undefined;
+  const { status, data } = error as { status?: unknown; data?: unknown };
+  if (status !== 400 || typeof data !== "object" || data === null) {
+    return undefined;
+  }
+  const code = (data as { code?: unknown }).code;
+  return (ISSUE_REQUEST_ERROR_CODES as readonly unknown[]).includes(code)
+    ? (code as OtpIssueRequestErrorCode)
+    : undefined;
+};
+
+/**
  * `data` of a 400 BAD_REQUEST error, when the API names the cause. From API
  * 1.9.0 `issue` sets `code` to `TEST_NUMBER_REQUIRED` (a `pk_test_`/`sk_test_`
  * key with a real phone number) or `TEST_NUMBER_IN_LIVE_MODE` (a live key
- * with a test phone number); see `getTestNumberErrorCode`. Other 400 errors
+ * with a test phone number); see `getTestNumberErrorCode`. From API 2.0.0 it
+ * is also `CHANNEL_NOT_SUPPORTED`, `TEMPLATE_NOT_AVAILABLE` or
+ * `WEB_OTP_NOT_SUPPORTED`; see `getIssueRequestErrorCode`. Other 400 errors
  * have no `data`.
  */
 export type OtpBadRequestData = {
-  code: "TEST_NUMBER_REQUIRED" | "TEST_NUMBER_IN_LIVE_MODE" | (string & {});
+  code:
+    | "TEST_NUMBER_REQUIRED"
+    | "TEST_NUMBER_IN_LIVE_MODE"
+    | OtpIssueRequestErrorCode
+    | (string & {});
 };
 
 /**

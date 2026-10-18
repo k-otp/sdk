@@ -18,6 +18,7 @@
 export {
   DEFAULT_BASE_URL,
   DEFAULT_TIMEOUT_MS,
+  ISSUE_REQUEST_ERROR_CODES,
   OTP_API_ERROR_CODES,
   TEST_KEY_PREFIXES,
   TEST_NUMBER_ERROR_CODES,
@@ -42,6 +43,9 @@ export const paginatePages: Stub = serverOnly("paginatePages");
 export const createIdempotencyKey: Stub = serverOnly("createIdempotencyKey");
 export const isOtpApiError: Stub = serverOnly("isOtpApiError");
 export const isTestKey: Stub = serverOnly("isTestKey");
+export const getIssueRequestErrorCode: Stub = serverOnly(
+  "getIssueRequestErrorCode",
+);
 export const getTestNumberErrorCode: Stub = serverOnly(
   "getTestNumberErrorCode",
 );

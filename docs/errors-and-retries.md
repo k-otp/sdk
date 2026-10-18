@@ -10,14 +10,14 @@ All SDK methods reject with `OtpApiError`:
 | `status` | HTTP status, or `0` when no HTTP response was received (timeout, network, abort, opaque redirect). |
 | `message` | Server message, or a descriptive client message. |
 | `requestId` | `X-Request-Id` response header (sent on every API response, exposed to allowed browser origins), else `request-id` / `cf-ray`. Include it in support requests. |
-| `data` | Error payload. For a test-mode 400: `{ code: "TEST_NUMBER_REQUIRED" \| "TEST_NUMBER_IN_LIVE_MODE" }` (`OtpBadRequestData`). For 402: `{ code: "INSUFFICIENT_CREDIT" \| "OVERDRAFT_LIMIT_EXCEEDED" \| "TRIAL_DAILY_LIMIT_EXCEEDED", resetAt? }`. For 429: `{ limit: "perKey" \| "perIp" \| "perPhone" \| "perKeyDaily" \| "perOrgDaily" \| "testModeDaily", policy: "key" \| "platform", retryAfterMs }` (`OtpRateLimitedData`). |
+| `data` | Error payload. For some 400s: `{ code: "TEST_NUMBER_REQUIRED" \| "TEST_NUMBER_IN_LIVE_MODE" \| "CHANNEL_NOT_SUPPORTED" \| "TEMPLATE_NOT_AVAILABLE" \| "WEB_OTP_NOT_SUPPORTED" }` (`OtpBadRequestData`). For 402: `{ code: "INSUFFICIENT_CREDIT" \| "OVERDRAFT_LIMIT_EXCEEDED" \| "TRIAL_DAILY_LIMIT_EXCEEDED", resetAt? }`. For 429: `{ limit: "perKey" \| "perIp" \| "perPhone" \| "perKeyDaily" \| "perOrgDaily" \| "testModeDaily", policy: "key" \| "platform", retryAfterMs }` (`OtpRateLimitedData`). |
 | `retryAfterMs` | Wait before retrying, in ms: the body's `data.retryAfterMs` (exact), else the `Retry-After` header (seconds or HTTP date), else `data.retryAfter` (seconds). Set on every 429 and on 503 when the server sends a wait. |
 | `retryable` | `true` for the codes marked below. |
 | `cause` | The underlying error (e.g. the fetch `TypeError`). |
 
 | Code | HTTP | Retryable | Typical cause |
 | --- | --- | --- | --- |
-| `BAD_REQUEST` | 400 | no | Invalid input, missing/invalid idempotency key (also raised client-side before any request), header/body key mismatch. A test key with a real number (`data.code: "TEST_NUMBER_REQUIRED"`) or a live key with a test number (`"TEST_NUMBER_IN_LIVE_MODE"`); see [test mode](./test-mode.md#errors-specific-to-test-mode). |
+| `BAD_REQUEST` | 400 | no | Invalid input, missing/invalid idempotency key (also raised client-side before any request), header/body key mismatch. A test key with a real number (`data.code: "TEST_NUMBER_REQUIRED"`) or a live key with a test number (`"TEST_NUMBER_IN_LIVE_MODE"`); see [test mode](./test-mode.md#errors-specific-to-test-mode). `channel: "sms"` (`"CHANNEL_NOT_SUPPORTED"`), a template without an approved AlimTalk code (`"TEMPLATE_NOT_AVAILABLE"`) or a `webOtp` other than `false` (`"WEB_OTP_NOT_SUPPORTED"`); read it with `getIssueRequestErrorCode(error)`. |
 | `UNAUTHORIZED` | 401 | no | Missing, malformed, revoked or unknown key. |
 | `PAYMENT_REQUIRED` | 402 | no | Not enough credit in your wallet (`data.code`; from API 1.4.0 the wallet is shared by every app of your organization). Top up, then issue again. |
 | `FORBIDDEN` | 403 | no | Missing scope, `pk_` key on a server-only operation, or `Origin` not in the key's allowlist. |

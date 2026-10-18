@@ -62,7 +62,6 @@ describe("UI subpaths without a DOM", () => {
     const { client: c, calls } = client();
     const form = ui.createOtpForm(c, { purpose: "ssr" });
     expect(form.getState().phase).toBe("phone");
-    expect(ui.isWebOtpSupported()).toBe(false);
     expect(calls).toHaveLength(0);
   });
 

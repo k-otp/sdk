@@ -67,7 +67,7 @@ fixed code `TEST_OTP_CODE` (`"000000"`), except scenario `05`.
 | `07` | `insufficient_credit` | 402 `PAYMENT_REQUIRED` (`INSUFFICIENT_CREDIT`) | - |
 | `08` | `trial_daily_limit` | 402 `PAYMENT_REQUIRED` (`TRIAL_DAILY_LIMIT_EXCEEDED`) | - |
 | `09` | `service_unavailable` | 503 `SERVICE_UNAVAILABLE` (`Retry-After: 2`) | - |
-| `10` | `alimtalk_failover` | 200; on AlimTalk the AlimTalk send fails and the SMS fallback is `delivered` after 4 s (`failed` after 3 s with `smsFallback: false`) | `000000` verifies |
+| `10` | `alimtalk_failover` | 200; the AlimTalk send fails and the SMS fallback is `delivered` after 4 s (`failed` after 3 s with `smsFallback: false`) | `000000` verifies |
 | `11`-`99` | | reserved; behave like `00` | `000000` verifies |
 
 ```ts
@@ -179,9 +179,13 @@ mock.reset();  // between tests
 - Idempotency fingerprints use resolved values like the API: a retry that
   spells out a default (`channel: "alimtalk"`, `expiresInSec: 180`,
   `maxAttempts: 5`, the default `templateId`) replays instead of 409.
+- Like the API, it refuses `channel: "sms"` (400 `CHANNEL_NOT_SUPPORTED`)
+  and a `webOtp` other than `false` (400 `WEB_OTP_NOT_SUPPORTED`); see
+  `getIssueRequestErrorCode`.
 - Not simulated: `Origin` checks, rate limits and daily budgets (scenario
   `06` still answers 429), template variables (any `templateId` is accepted;
-  `listTemplates` returns only the default template `otp_default_kr`).
+  `listTemplates` returns only the default template `otp_default_kr`, and
+  `TEMPLATE_NOT_AVAILABLE` never occurs).
 - The scenario table, test number ranges and timings mirror the API's test
   mode and are updated together with it: an SDK release that matches a new
   API contract version also updates the mock.

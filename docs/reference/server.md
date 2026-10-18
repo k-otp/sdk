@@ -136,7 +136,7 @@ export default {
 | `listCreditLedger(query?)` | `GET /v1/credit-ledger` | One page of the wallet ledger. Filters: `limit`, `cursor`, `entryType`, `createdFrom`, `createdTo`. See [Credit wallet](#credit-wallet-organization-wide). |
 | `iterateCreditLedger(query?, options?)` | `GET /v1/credit-ledger` | `AsyncGenerator` over all entries. |
 | `getBalance()` | `GET /v1/balance` | Credit balance (`currency: "CREDIT"`) plus `walletId`, `walletScope`, `organizationId?`. See [Credit wallet](#credit-wallet-organization-wide). |
-| `listTemplates()` | `GET /v1/templates` | Whitelisted templates + `defaultTemplateId`. |
+| `listTemplates()` | `GET /v1/templates` | Whitelisted templates + `defaultTemplateId`. `channelSupport` is `["alimtalk"]`, or `[]` while the template has no approved AlimTalk code (then `issue` rejects it with `TEMPLATE_NOT_AVAILABLE`). |
 | `getTemplate({ templateId })` | `GET /v1/templates/{templateId}` | Includes the `variables` schema for `templateVariables`. |
 
 Every method takes an optional last argument `{ signal?, timeoutMs? }`; the
@@ -205,7 +205,11 @@ retryable), `retryAfterMs` and `data: { limit, policy, retryAfterMs }`
 operation (`perKeyDaily`) and by daily test issue budgets (`perOrgDaily`,
 `testModeDaily`). A test key with a real phone number, or a live key with a
 test number, rejects with `BAD_REQUEST` and `data.code`
-(`getTestNumberErrorCode`). See
+(`getTestNumberErrorCode`). A request for direct SMS (`channel: "sms"`), a
+template without an approved AlimTalk code or a `webOtp` option rejects with
+`BAD_REQUEST` and `data.code` `CHANNEL_NOT_SUPPORTED`,
+`TEMPLATE_NOT_AVAILABLE` or `WEB_OTP_NOT_SUPPORTED`
+(`getIssueRequestErrorCode`). See
 [errors and retries](../errors-and-retries.md).
 
 ## Runtime notes

@@ -4,6 +4,8 @@ export {
   type OtpClientOptions,
 } from "./client";
 export {
+  getIssueRequestErrorCode,
+  ISSUE_REQUEST_ERROR_CODES,
   isAmbiguousIssueError,
   isOtpApiError,
   normalizeOtpApiError,
@@ -12,6 +14,7 @@ export {
   type OtpApiErrorCode,
   type OtpApiErrorOptions,
   type OtpBadRequestData,
+  type OtpIssueRequestErrorCode,
   type OtpPaymentRequiredData,
   type OtpRateLimitedData,
   otpErrorCodeFromStatus,

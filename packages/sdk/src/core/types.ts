@@ -28,9 +28,10 @@ import type {
  * `idempotencyKey` (see `createIdempotencyKey`) and sends it both as the body
  * field and the `Idempotency-Key` header.
  *
- * The code is delivered by KakaoTalk AlimTalk by default, with automatic SMS
- * fallback when AlimTalk cannot be delivered: leave `channel` out. Pass
- * `smsFallback: false` (API 1.8.0+) to deliver by AlimTalk only.
+ * The code is always delivered by KakaoTalk AlimTalk, with automatic SMS
+ * fallback when AlimTalk cannot be delivered: leave `channel` out (it only
+ * accepts `"alimtalk"`). Pass `smsFallback: false` to deliver by AlimTalk
+ * only. A template without an approved AlimTalk code cannot be issued.
  */
 export type IssueInput = Omit<IssueOtpInput, "idempotencyKey"> & {
   /** 1-128 visible ASCII characters. Reuse the same key when retrying. */
@@ -47,11 +48,18 @@ export type VerifyResult = VerifyOtpOutput;
 /** Verification failure reason (returned with HTTP 200 and `verified: false`). */
 export type VerifyReasonCode = NonNullable<VerifyOtpOutput["reasonCode"]>;
 /**
- * Delivery channel of an issue. Codes are delivered by KakaoTalk AlimTalk by
- * default, with automatic SMS fallback (`smsFallback: false` turns it off);
- * `issue` callers leave `channel` out.
+ * The `channel` an `issue` request may name: only `"alimtalk"` (KakaoTalk
+ * AlimTalk, also the default). Direct SMS was removed in 3.0.0; SMS is only the
+ * automatic fallback of a failed AlimTalk delivery (`smsFallback: false` turns
+ * it off), and an explicit `"sms"` is refused with 400 `CHANNEL_NOT_SUPPORTED`.
  */
 export type OtpChannel = NonNullable<IssueOtpInput["channel"]>;
+/**
+ * Channel a delivered issue reports in `listIssues`/`getIssue` (`channel` of
+ * {@link OtpIssue}): `"alimtalk"`, or `"sms"` after the automatic SMS fallback
+ * took over. Not a value you can request.
+ */
+export type OtpDeliveredChannel = OtpDashboardIssue["channel"];
 export type PaymentRequiredData = IssueOtpPaymentErrorData;
 /** `data` of a 429 TOO_MANY_REQUESTS error from `issue`/`verify` (1.3.1+). */
 export type RateLimitedData = OtpRateLimitErrorData;

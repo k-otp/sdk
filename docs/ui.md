@@ -12,7 +12,7 @@ control. A clean default theme is an optional stylesheet.
 
 | Import | What |
 | --- | --- |
-| `@k-otp/sdk/ui` | The framework-agnostic model: phone parsing and canonicalization, the code input model, the form state machine (`createOtpForm`), the KO/EN messages, countdown formatting, WebOTP. |
+| `@k-otp/sdk/ui` | The framework-agnostic model: phone parsing and canonicalization, the code input model, the form state machine (`createOtpForm`), the KO/EN messages, countdown formatting. |
 | `@k-otp/sdk/ui/react` | React 18/19 components (`"use client"`). |
 | `@k-otp/sdk/ui/vue` | Vue 3.3+ components. |
 | `@k-otp/sdk/ui/svelte` | Svelte 4 and 5 components. |
@@ -72,8 +72,7 @@ Every form takes the same settings: `purpose` (required), `issue` (other
 `issue` fields: `templateId`, `templateVariables`, `metadata`, ...),
 `codeLength` (6), `resendCooldownMs` (30 s, see [cooldowns](#cooldowns)),
 `idempotencyKeyPrefix`,
-`autoSubmit` (verify once all digits are in, `true`), `webOtp` (`true`, see
-[WebOTP](#webotp-sms-autofill-on-android-chrome)), `clearCodeOnMismatch`
+`autoSubmit` (verify once all digits are in, `true`), `clearCodeOnMismatch`
 (`true`), `allowInternational` (`false`), `defaultPhoneNumber`, `locale`
 (`"ko"` (default), `"en"` or `"auto"`, see [locale](#messages-and-locale)),
 `messages` (overrides) and `id` (root id; part ids derive from it).
@@ -291,30 +290,15 @@ The same number is therefore always sent the same way, whatever the user
 typed (from API 1.4.0 the server also canonicalizes the key of its per-phone
 rate limit). The input formats as you type (`010-1234-5678`).
 
-## WebOTP (SMS autofill on Android Chrome)
+## Code autofill
 
-K-OTP delivers codes by KakaoTalk AlimTalk by default; WebOTP and
-`one-time-code` autofill only apply when the code arrives by SMS, the
-automatic fallback when AlimTalk cannot be delivered. After a send, the form
-calls `navigator.credentials.get({ otp: { transport: ["sms"] } })` when the
-browser supports it (feature-detected, aborted on
-verify, "change number" and unmount; nothing runs on the server). Chrome
-fills the code after a one-tap consent **only if the SMS ends with an
-origin-bound line**:
-
-```text
-[K-OTP] 인증번호는 123456입니다.
-
-@www.example.com #123456
-```
-
-The last line must be `@<host of the page> #<code>`. Check whether the SMS
-your users receive (the template of `templateId`) ends with such a line for
-your domain; the default K-OTP templates do not. Without it the request
-simply never resolves, so leaving `webOtp` on is harmless: it is aborted on
-verify, "change number" and unmount. iOS/macOS Safari and Android keyboards
-offer the code through `autocomplete="one-time-code"` either way. Turn
-WebOTP off with `webOtp={false}`.
+Codes arrive by KakaoTalk AlimTalk (the user types or pastes them) or, after
+the automatic fallback when AlimTalk cannot be delivered, by SMS. The first
+code segment has `autocomplete="one-time-code"`, so iOS/macOS Safari and
+Android keyboards offer a code that arrives by SMS, and a multi-digit autofill
+or paste is spread across the segments. The browser WebOTP integration
+(`webOtp`, `receiveWebOtp`) was removed in 3.0.0: the API no longer appends
+the origin-bound `@<host> #<code>` line it needed.
 
 ## SSR
 
@@ -368,7 +352,7 @@ React, Vue, Svelte용 휴대폰 인증 폼입니다. 휴대폰 번호 입력, �
 
 | 임포트 | 내용 |
 | --- | --- |
-| `@k-otp/sdk/ui` | 프레임워크 독립 모델: 번호 파싱/정규화, 인증번호 입력 모델, 폼 상태 머신(`createOtpForm`), 한국어/영어 메시지, 카운트다운, WebOTP |
+| `@k-otp/sdk/ui` | 프레임워크 독립 모델: 번호 파싱/정규화, 인증번호 입력 모델, 폼 상태 머신(`createOtpForm`), 한국어/영어 메시지, 카운트다운 |
 | `@k-otp/sdk/ui/react` | React 18/19 컴포넌트 (`"use client"`) |
 | `@k-otp/sdk/ui/vue` | Vue 3.3+ 컴포넌트 |
 | `@k-otp/sdk/ui/svelte` | Svelte 4, 5 컴포넌트 |
@@ -436,17 +420,15 @@ Vue는 `<OtpForm purpose="signup" @verified="..." />`, Svelte는
 레이트 리밋 키를 정규화합니다). 유선 번호는 거부되고, 해외 번호(E.164)는
 `allowInternational` 일 때만 허용됩니다.
 
-## WebOTP
+## 코드 자동 입력
 
-K-OTP 는 인증번호를 기본적으로 카카오 알림톡으로 보내며, WebOTP 와
-`one-time-code` 자동 입력은 알림톡을 받을 수 없어 자동으로 문자(SMS)로 대체
-발송된 경우에만 동작합니다. 전송 후 브라우저가 지원하면 `navigator.credentials.get({ otp })` 를
-호출합니다(기능 감지, 서버에서는 실행되지 않음). Android Chrome 은 SMS
-마지막 줄이 `@<페이지 도메인> #<인증번호>` 형식일 때만 자동 입력합니다.
-사용하는 템플릿의 SMS 가 도메인 줄로 끝나는지 확인하세요(기본 K-OTP 템플릿에는
-없습니다). 이 줄이 없으면 요청이 그냥 완료되지 않을 뿐이므로 `webOtp` 를 켜
-두어도 무해합니다(확인, 번호 변경, 언마운트 시 중단). iOS/Android 키보드의
-`autocomplete="one-time-code"` 자동 입력은 그대로 동작합니다.
+인증번호는 카카오 알림톡으로 전달되며(직접 입력하거나 붙여넣기), 알림톡을 받을
+수 없을 때 자동으로 문자(SMS)로 대체 발송됩니다. 첫 번째 코드 칸에는
+`autocomplete="one-time-code"` 가 있어 iOS/macOS Safari 와 Android 키보드가
+SMS 로 온 코드를 제안하고, 여러 자리 자동 입력과 붙여넣기는 칸마다 나뉘어
+들어갑니다. 브라우저 WebOTP 연동(`webOtp`, `receiveWebOtp`)은 3.0.0 에서
+제거되었습니다. API 가 더 이상 필요한 `@<도메인> #<인증번호>` 줄을 붙이지
+않습니다.
 
 ## SSR, Svelte 4/5
 

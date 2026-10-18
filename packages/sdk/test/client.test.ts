@@ -85,7 +85,7 @@ describe("issue", () => {
     const result = await client.issue({
       ...issueInput,
       idempotencyKey: "  signup-0001  ",
-      channel: "sms",
+      channel: "alimtalk",
       templateVariables: { name: "Kim" },
     });
 
@@ -101,7 +101,7 @@ describe("issue", () => {
       phoneNumber: "01012345678",
       purpose: "signup",
       idempotencyKey: "signup-0001",
-      channel: "sms",
+      channel: "alimtalk",
       templateVariables: { name: "Kim" },
     });
   });

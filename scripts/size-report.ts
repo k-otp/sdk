@@ -56,7 +56,7 @@ const BUDGETS = {
   // framework external). Every re-exported core API is measured.
   adapterWithCore: 15 * 1024,
   // The UI model (phone, code input, form state machine, both KO/EN
-  // catalogs, part attributes, WebOTP, locale detection), headless flow
+  // catalogs, part attributes, locale detection), headless flow
   // included. Raised from 11 kB for the per-number cooldown, retained
   // idempotency keys and locale: "auto".
   ui: 12 * 1024,

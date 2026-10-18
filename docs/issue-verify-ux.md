@@ -120,7 +120,7 @@ It is not the end user's fault:
   success when the outcome of the first attempt was unknown.
 - Use `autocomplete="one-time-code"` and `inputmode="numeric"` on the code
   input so mobile keyboards can autofill the code when it arrives by SMS
-  (the fallback when AlimTalk cannot be delivered).
+  (the automatic fallback when AlimTalk cannot be delivered).
 - **Trust:** a browser-direct `verify` only tells the browser that the code
   matched. If your backend grants access based on it, verify on the backend
   (see [`examples/node-server`](../examples/node-server)) or confirm with

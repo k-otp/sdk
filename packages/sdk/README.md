@@ -1,8 +1,8 @@
 # @k-otp/sdk
 
 The official JavaScript/TypeScript SDK for the [K-OTP](https://api.k-otp.dev)
-Korean OTP API: issue and verify one-time passwords (delivered by KakaoTalk AlimTalk by
-default, with automatic SMS fallback) from browsers, SSR frameworks, edge
+Korean OTP API: issue and verify one-time passwords (delivered by KakaoTalk AlimTalk,
+with automatic SMS fallback) from browsers, SSR frameworks, edge
 runtimes and servers. One package, with a subpath per use:
 
 | Import | Use it for | Key | Reference |
@@ -15,7 +15,7 @@ runtimes and servers. One package, with a subpath per use:
 | `@k-otp/sdk/svelte` | `createOtpStores`, flow store, `use:otpForm` (Svelte 4/5, ESM-only) | `pk_` | [svelte](../../docs/reference/svelte.md) |
 | `@k-otp/sdk/ui/react`, `/ui/vue`, `/ui/svelte` | Headless UI components: `<OtpForm />` preset and composable parts (React 18/19, Vue >= 3.3, Svelte 4/5) | `pk_` | [ui](../../docs/reference/ui.md) |
 | `@k-otp/sdk/ui/theme.css` | Optional default theme for the UI components | | [theme](../../docs/ui.md#theme) |
-| `@k-otp/sdk/ui` | The framework-agnostic UI model (phone, code input, form state machine, messages, WebOTP) | | [ui](../../docs/reference/ui.md#k-otpsdkui) |
+| `@k-otp/sdk/ui` | The framework-agnostic UI model (phone, code input, form state machine, messages) | | [ui](../../docs/reference/ui.md#k-otpsdkui) |
 | `@k-otp/sdk/contract` | The oRPC contract and generated OpenAPI types, for custom oRPC clients | | [below](#advanced-entry-points) |
 | `@k-otp/sdk/testing` | `createMockTransport()`: an in-memory test-mode API for unit tests (no network) | `pk_test_` / `sk_test_` | [below](#test-mode) |
 | `@k-otp/sdk/k-otp.iife.min.js` | `<script>` bundle exposing `window.KOtp` (also `k-otp.iife.js`) | `pk_` | [below](#cdn--static-sites) |
@@ -137,11 +137,15 @@ key in a browser, no `fetch`) throw a `TypeError`.
 ### `client.issue(input, options?)` - `POST /v1/issue`
 
 `input`: `phoneNumber`, `purpose`, **`idempotencyKey` (required)**, and optional
-`templateId`, `templateVariables`, `from`, `messageType`, `metadata`,
-`expiresInSec`, `maxAttempts`, `smsFallback`. The code is delivered by KakaoTalk
-AlimTalk by default, with automatic SMS fallback when AlimTalk cannot be
-delivered; leave `channel` out. `smsFallback: false` (API 1.8.0+) sends by
-AlimTalk only, at the same price. `cost` is still accepted but deprecated: the API decides the
+`templateId`, `templateVariables`, `from`, `metadata`, `expiresInSec`,
+`maxAttempts`, `smsFallback`. The code is always delivered by KakaoTalk
+AlimTalk, with automatic SMS fallback when AlimTalk cannot be delivered;
+leave `channel` out (it only accepts `"alimtalk"`, and `"sms"` is refused with
+400 `CHANNEL_NOT_SUPPORTED`). `smsFallback: false` sends by AlimTalk only, at
+the same price. A template without an approved AlimTalk code cannot be issued
+(400 `TEMPLATE_NOT_AVAILABLE`; check `channelSupport` of `listTemplates`).
+`messageType` is deprecated and ignored, and `webOtp` was removed (any value
+but `false` is 400 `WEB_OTP_NOT_SUPPORTED`). `cost` is still accepted but deprecated: the API decides the
 charged credit from the delivery channel and message type and ignores it for
 billing.
 Resolves `{ issueId, expiresAt, attemptsRemaining, queuedAt }`.
@@ -179,6 +183,8 @@ class OtpApiError extends Error {
   data?: unknown;          // e.g. { code: "INSUFFICIENT_CREDIT" } for 402,
                            // { limit, policy, retryAfterMs } for 429,
                            // { code: "TEST_NUMBER_REQUIRED" } for some 400s
+                           // (also CHANNEL_NOT_SUPPORTED, TEMPLATE_NOT_AVAILABLE,
+                           // WEB_OTP_NOT_SUPPORTED: getIssueRequestErrorCode)
   retryAfterMs?: number;   // data.retryAfterMs, else Retry-After (429, some 503s)
   retryable: boolean;      // TOO_MANY_REQUESTS, INTERNAL_SERVER_ERROR, SERVICE_UNAVAILABLE, TIMEOUT, NETWORK_ERROR
 }
@@ -192,6 +198,16 @@ Codes: `BAD_REQUEST`, `UNAUTHORIZED`, `PAYMENT_REQUIRED`, `FORBIDDEN`,
 SDK (the ESM and CommonJS builds loaded side by side, the CDN bundle and an
 npm install): every `OtpApiError` carries a shared `Symbol.for` brand, which
 `instanceof` and `isOtpApiError(error)` check.
+
+A 400 from `issue` can carry `data.code` (also the first token of `message`)
+for a request the API no longer accepts. `getIssueRequestErrorCode(error)`
+returns it, and `ISSUE_REQUEST_ERROR_CODES` lists the values:
+
+| `data.code` | Cause |
+| --- | --- |
+| `CHANNEL_NOT_SUPPORTED` | `channel: "sms"`. Only `"alimtalk"` (the default) is accepted. |
+| `TEMPLATE_NOT_AVAILABLE` | The template has no approved AlimTalk code (its `channelSupport` is empty). |
+| `WEB_OTP_NOT_SUPPORTED` | `webOtp` was set to anything but `false`. |
 
 ### Test mode
 
@@ -308,7 +324,7 @@ import "@k-otp/sdk/ui/theme.css"; // optional
 
 A phone field (Korean mobiles canonicalized before sending), send/resend with
 the cooldown, a segmented code input (paste, `one-time-code` autofill,
-WebOTP, keyboard navigation), verify, an expiry countdown and a live status
+keyboard navigation), verify, an expiry countdown and a live status
 message, in Korean or English. Headless parts (`OtpForm.Root`,
 `OtpForm.PhoneField`, ...) expose `data-*` state and render props / slots.
 Guide: [UI components](../../docs/ui.md); API:

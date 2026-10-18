@@ -19,8 +19,6 @@
   /** @type {boolean | undefined} */
   export let autoSubmit = undefined;
   /** @type {boolean | undefined} */
-  export let webOtp = undefined;
-  /** @type {boolean | undefined} */
   export let clearCodeOnMismatch = undefined;
   /** @type {boolean | undefined} */
   export let allowInternational = undefined;
@@ -54,7 +52,6 @@
     purpose,
     issue,
     autoSubmit,
-    webOtp,
     clearCodeOnMismatch,
     allowInternational,
     codeLength,
@@ -76,7 +73,6 @@
     purpose,
     issue,
     autoSubmit,
-    webOtp,
     clearCodeOnMismatch,
     allowInternational,
     locale,

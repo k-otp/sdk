@@ -174,7 +174,7 @@ bun run check                                      # full local gate
 ## Native server SDKs
 
 `sdks/packages.json` owns the native coordinates and independent version
-(currently 0.1.0). npm remains one Sampo package; its `/kiota` subpath shares
+(currently 1.0.0). npm remains one Sampo package; its `/kiota` subpath shares
 the existing npm version. Do not publish the raw or fixture-only packages.
 
 1. Change wrappers under `sdks/` and add a Sampo changeset when `/kiota` changes.
@@ -185,12 +185,12 @@ the existing npm version. Do not publish the raw or fixture-only packages.
    (`gh workflow run kiota-poc.yml --ref main`) and wait for it to succeed.
 5. Dispatch `release-sdks.yml` on main with that validation run ID. It rejects
    stale, failed, PR or unrelated workflow evidence, validates all nine installed
-   consumers and artifact hashes, then publishes `server-sdk-v0.1.0` with native
+   consumers and artifact hashes, then publishes `server-sdk-v1.0.0` with native
    packages, checksums and validation records. It never re-builds release assets.
 
 Go needs committed source for module discovery. The release workflow adds the
 exact verified module ZIP contents to a separate snapshot commit under
-`sdks/go` and tags it `sdks/go/v0.1.0`. The main branch keeps generated code in
+`sdks/go` and tags it `sdks/go/v1.0.0`. The main branch keeps generated code in
 `.cache`. Go proxy installation must be verified after publishing the tag.
 The release is created as a draft, uploaded completely, and then published.
 An existing published release is never overwritten.

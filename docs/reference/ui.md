@@ -1,7 +1,7 @@
 # `@k-otp/sdk/ui*` reference
 
 The UI subpaths of [`@k-otp/sdk`](../../packages/sdk/README.md). Guide,
-theming, accessibility and WebOTP: [docs/ui.md](../ui.md).
+theming, accessibility and code autofill: [docs/ui.md](../ui.md).
 
 - [`@k-otp/sdk/ui`](#k-otpsdkui): the framework-agnostic model
 - [`@k-otp/sdk/ui/react`](#k-otpsdkuireact)
@@ -25,10 +25,9 @@ keys, the resend cooldown and the 429/503 retry hints).
 | Option | Default | |
 | --- | --- | --- |
 | `purpose` | required | `issue` purpose label |
-| `issue` | | other `issue` fields (`templateId`, `templateVariables`, `messageType`, `metadata`, `expiresInSec`, `maxAttempts`, `from`, `smsFallback`); delivery is KakaoTalk AlimTalk by default with automatic SMS fallback (`smsFallback: false` turns it off) |
+| `issue` | | other `issue` fields (`templateId`, `templateVariables`, `metadata`, `expiresInSec`, `maxAttempts`, `from`, `smsFallback`); delivery is KakaoTalk AlimTalk with automatic SMS fallback (`smsFallback: false` turns it off) |
 | `codeLength` | `6` | digits per code |
 | `autoSubmit` | `true` | verify once every digit is entered |
-| `webOtp` | `true` | WebOTP after a send, when supported |
 | `clearCodeOnMismatch` | `true` | clear the code after `MISMATCH` |
 | `allowInternational` | `false` | accept non-Korean E.164 numbers |
 | `defaultPhoneNumber` | | initial phone input |
@@ -48,7 +47,7 @@ and `flow` (read its state; send and verify through the form, since a flow
 the form created has `resendCooldownMs: 0` and the form keeps the
 cooldown). A request that is in flight when `abort()`, `reset()` or
 `editPhoneNumber()` is called, or that a newer send supersedes, is dropped:
-no `onError` (`ABORTED`), `onSent`, `onVerified` or WebOTP for it, and the
+no `onError` (`ABORTED`), `onSent` or `onVerified` for it, and the
 next send of the same input reuses its idempotency key. `getState()`
 returns the same object until something visible changes, also while nobody
 is subscribed.
@@ -108,12 +107,10 @@ valid (the matching error is then shown); they never reject for API errors.
 - Types: `OtpLocale`, `OtpMessageKey`, `OtpMessageOverrides`,
   `OtpTranslator`.
 
-### Countdown and WebOTP
+### Countdown
 
 - `formatOtpCountdown(ms)` (`m:ss`, `h:mm:ss` from one hour, rounds up),
   `otpSecondsLeft(ms)`.
-- `isWebOtpSupported()`, `receiveWebOtp({ signal, length })`: resolves the
-  code or `undefined`, never rejects.
 
 ### Parts
 
@@ -155,7 +152,7 @@ React 18 and 19, marked `"use client"`, ESM + CJS.
 - Dot-notation parts (`OtpForm.Root`) need a client component; a Server
   Component can render the named exports with serializable props.
 - `OtpCodeInput`: `value` / `defaultValue`, `onValueChange`, `onComplete`,
-  `length`, `readOnly`, `invalid`, `id`, `autoFocus`, `webOtp`, `name`
+  `length`, `readOnly`, `invalid`, `id`, `autoFocus`, `name`
   (hidden input), `locale`, `messages`, `aria-labelledby` /
   `aria-describedby` and `<div>` attributes.
 - `useOtpFormContext()`: `{ form, state, parts, t }` inside a root.
@@ -205,7 +202,7 @@ SvelteKit) and compiled by your Svelte, over a compiled runtime.
   which wires the handlers and keeps `readonly` in sync.
 - `OtpCodeInput`: `bind:value`, `onValueChange`, `onComplete` /
   `on:complete`, `length`, `readOnly`, `invalid`, `id`, `autoFocus`,
-  `webOtp`, `name`, `locale`, `messages`.
+  `name`, `locale`, `messages`.
 - Runtime helpers for custom components: `createOtpFormRoot`,
   `getOtpFormContext`, `createOtpCodeInputModel`, `attrs`.
 

@@ -117,7 +117,7 @@ describe("code input handlers: IME", () => {
     handlers.sync();
     handlers.compositionstart();
     segment(2).value = "ａ";
-    // The code changes meanwhile (WebOTP, reset, a controlled parent).
+    // The code changes meanwhile (a reset, a controlled parent).
     state.setValue("");
     handlers.sync();
     expect(segment(0).value).toBe("1");

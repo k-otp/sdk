@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   createOtpClient,
+  getIssueRequestErrorCode,
   getTestNumberErrorCode,
   isOtpApiError,
   isTestKey,
@@ -476,8 +477,32 @@ describe("createMockTransport", () => {
       server.issue({ ...input, maxAttempts: 3 }),
     );
     expect(conflict.code).toBe("CONFLICT");
-    const sms = await rejection(server.issue({ ...input, channel: "sms" }));
-    expect(sms.code).toBe("CONFLICT");
+    const noFallback = await rejection(
+      server.issue({ ...input, smsFallback: false }),
+    );
+    expect(noFallback.code).toBe("CONFLICT");
+  });
+
+  test("direct SMS and WebOTP are refused like the API does", async () => {
+    const { server, issue, mock } = setup();
+    const sms = await rejection(issue("success", { channel: "sms" }));
+    expect(sms).toMatchObject({ code: "BAD_REQUEST", status: 400 });
+    expect(sms.message.startsWith("CHANNEL_NOT_SUPPORTED")).toBe(true);
+    expect(getIssueRequestErrorCode(sms)).toBe("CHANNEL_NOT_SUPPORTED");
+    for (const webOtp of [true, { origin: "https://example.com" }]) {
+      const refused = await rejection(issue("success", { webOtp }));
+      expect(getIssueRequestErrorCode(refused)).toBe("WEB_OTP_NOT_SUPPORTED");
+    }
+    expect(mock.issues()).toHaveLength(0);
+    // `false` is the same as leaving it out; the result has no `webOtp`.
+    const issued = await server.issue({
+      phoneNumber: TEST_PHONE_NUMBERS.success,
+      purpose: "login",
+      idempotencyKey: "web-otp-false",
+      channel: "alimtalk",
+      webOtp: false,
+    } as never);
+    expect(issued).not.toHaveProperty("webOtp");
   });
 
   test("the default template is the API's otp_default_kr", async () => {

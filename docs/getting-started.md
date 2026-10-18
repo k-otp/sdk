@@ -1,7 +1,7 @@
 # Getting started
 
-K-OTP issues 6-digit one-time passwords, delivered by KakaoTalk AlimTalk by
-default with automatic SMS fallback, and verifies them. Everything ships in one package, `@k-otp/sdk`
+K-OTP issues 6-digit one-time passwords, delivered by KakaoTalk AlimTalk
+with automatic SMS fallback, and verifies them. Everything ships in one package, `@k-otp/sdk`
 (`npm install @k-otp/sdk`), with one subpath per use:
 
 | Import | Where | Key | Operations |
@@ -103,6 +103,13 @@ Without a bundler:
 message templates. Pass `templateId` to `issue` to choose one and
 `templateVariables` for its declared variables; the `code` variable is always
 filled in by the server.
+
+A template whose AlimTalk template is not approved yet (`channelSupport` is
+`[]`) cannot be issued: `issue` rejects it with `TEMPLATE_NOT_AVAILABLE`. If
+your app has an approved service name in the console, messages read
+`[K-OTP] <service name> 인증번호는 ...` for every template; the name belongs to
+your app, so there is no request field for it (`templateVariables.service` is
+rejected with a 400).
 
 ## Configuration reference
 
