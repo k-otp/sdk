@@ -17,6 +17,7 @@ import type {
   GetStatusResult,
   IssueResult,
   OtpChannel,
+  OtpDeliveredChannel,
   OtpDeliveryStatus,
   OtpIssue,
   OtpOverallStatus,
@@ -87,7 +88,8 @@ export type MockTestIssue = {
   /** Canonical digits of the test number. */
   testNumber: string;
   purpose: string;
-  channel: OtpChannel;
+  /** `"sms"` once the `alimtalk_failover` fallback has delivered, else `"alimtalk"`. */
+  channel: OtpDeliveredChannel;
   templateId: string;
   /** The code that verifies this issue, or `null` for `mismatch`. */
   code: string | null;
@@ -254,6 +256,20 @@ const deliveryStatus = (
   return fails ? "failed" : "delivered";
 };
 
+/**
+ * Channel `GET /v1/issues` reports: AlimTalk, or SMS once the automatic
+ * fallback of the `alimtalk_failover` scenario has delivered the code.
+ */
+const deliveredChannel = (
+  issue: StoredIssue,
+  elapsedMs: number,
+): OtpDeliveredChannel =>
+  issue.scenario === "alimtalk_failover" &&
+  issue.smsFallback &&
+  elapsedMs >= TEST_MODE_TIMINGS.failoverDeliveredAfterMs
+    ? "sms"
+    : issue.channel;
+
 const effectiveStatus = (
   issue: StoredIssue,
   nowMs: number,
@@ -330,7 +346,7 @@ const dashboardOutput = (issue: StoredIssue, nowMs: number): OtpIssue => {
     issueId: issue.issueId,
     purpose: issue.purpose,
     templateId: issue.templateId,
-    channel: issue.channel,
+    channel: deliveredChannel(issue, nowMs - issue.issuedAtMs),
     verificationStatus: status.verificationStatus,
     deliveryStatus: status.deliveryStatus,
     overallStatus: status.overallStatus,
@@ -571,7 +587,8 @@ export const createMockTransport = (
       typeof body.templateId === "string" && body.templateId.trim()
         ? body.templateId.trim()
         : DEFAULT_TEMPLATE_ID;
-    const { idempotencyKey: _key, ...payload } = body;
+    // `webOtp: false` (the only accepted value) is the same as omitting it.
+    const { idempotencyKey: _key, webOtp: _webOtp, ...payload } = body;
     // Like the API, the fingerprint uses resolved values: spelling out a
     // default (`channel: "alimtalk"`, `expiresInSec: 180`, `maxAttempts: 5`,
     // the default `templateId`) on a retry is the same request.
@@ -910,7 +927,7 @@ export const createMockTransport = (
           region: issue.region,
           testNumber: issue.testNumber,
           purpose: issue.purpose,
-          channel: issue.channel,
+          channel: deliveredChannel(issue, nowMs - issue.issuedAtMs),
           templateId: issue.templateId,
           code: issue.scenario === "mismatch" ? null : TEST_OTP_CODE,
           deliveryStatus: deliveryStatus(issue, nowMs - issue.issuedAtMs),

@@ -505,6 +505,42 @@ describe("createMockTransport", () => {
     expect(issued).not.toHaveProperty("webOtp");
   });
 
+  test("a spelled-out webOtp: false replays like an omitted one", async () => {
+    const { server, issue } = setup();
+    const first = await issue("success", { idempotencyKey: "same" });
+    const again = await server.issue({
+      phoneNumber: TEST_PHONE_NUMBERS.success,
+      purpose: "login",
+      idempotencyKey: "same",
+      webOtp: false,
+    } as never);
+    expect(again).toEqual(first);
+  });
+
+  test("issue listings report sms once the failover fallback delivered", async () => {
+    const { mock, server, issue } = setup();
+    const failover = await issue("alimtalk_failover", { purpose: "failover" });
+    const plain = await issue("success", { purpose: "plain" });
+    const noFallback = await issue("alimtalk_failover", {
+      purpose: "no-fallback",
+      smsFallback: false,
+    });
+    const channel = async (issueId: string) =>
+      (await server.getIssue({ issueId })).channel;
+    expect(await channel(failover.issueId)).toBe("alimtalk");
+    mock.advance(TEST_MODE_TIMINGS.failoverDeliveredAfterMs);
+    expect(await channel(failover.issueId)).toBe("sms");
+    expect(await channel(plain.issueId)).toBe("alimtalk");
+    expect(await channel(noFallback.issueId)).toBe("alimtalk");
+    const listed = (await server.listIssues()).items.find(
+      (item) => item.issueId === failover.issueId,
+    );
+    expect(listed?.channel).toBe("sms");
+    expect(
+      mock.issues().find((item) => item.issueId === failover.issueId)?.channel,
+    ).toBe("sms");
+  });
+
   test("the default template is the API's otp_default_kr", async () => {
     const { server, issue } = setup();
     const templates = await server.listTemplates();

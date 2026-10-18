@@ -64,6 +64,20 @@ describe("openapi generator", () => {
     expect(rendered).not.toMatch(/Used\.\s*\*\s*\n\s*\*\s*@deprecated/);
   });
 
+  test("a deprecated property without a description still gets @deprecated", () => {
+    const rendered = renderOpenApiTypes(
+      doc({
+        schemas: {
+          Input: {
+            type: "object",
+            properties: { old: { type: "string", deprecated: true } },
+          },
+        },
+      }),
+    );
+    expect(rendered).toContain("/** @deprecated */\n  old?: string;");
+  });
+
   test("an operationId ending with '.' is rejected by render and summary", () => {
     const spec = doc({
       paths: { "/ping": { get: { operationId: "otp.", responses: ok } } },

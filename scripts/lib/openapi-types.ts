@@ -165,14 +165,18 @@ const docComment = (
   indent: string,
   deprecated = false,
 ): string => {
-  if (typeof text !== "string" || text.trim() === "") return "";
-  const lines = text
-    .replaceAll("*/", "*\\/")
-    .trim()
-    .split("\n")
-    .map((line) => line.trimEnd());
-  // `deprecated: true` in the schema becomes a TSDoc tag editors strike through.
-  if (deprecated) lines.push("", "@deprecated");
+  const lines =
+    typeof text === "string" && text.trim() !== ""
+      ? text
+          .replaceAll("*/", "*\\/")
+          .trim()
+          .split("\n")
+          .map((line) => line.trimEnd())
+      : [];
+  // `deprecated: true` in the schema becomes a TSDoc tag editors strike
+  // through, with or without a description.
+  if (deprecated) lines.push(...(lines.length ? [""] : []), "@deprecated");
+  if (lines.length === 0) return "";
   if (lines.length === 1) return `${indent}/** ${lines[0]} */\n`;
   return `${indent}/**\n${lines
     .map((line) => (line ? `${indent} * ${line}` : `${indent} *`))

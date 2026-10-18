@@ -39,6 +39,24 @@ export type OtpPaymentRequiredData = {
 };
 
 /**
+ * The `data.code` of a 400 error when it is one of `codes`, else `undefined`
+ * (internal; shared by the code-family helpers such as
+ * {@link getIssueRequestErrorCode}).
+ */
+export const badRequestDataCode = <T extends string>(
+  error: unknown,
+  codes: readonly T[],
+): T | undefined => {
+  if (typeof error !== "object" || error === null) return undefined;
+  const { status, data } = error as { status?: unknown; data?: unknown };
+  if (status !== 400 || typeof data !== "object" || data === null) {
+    return undefined;
+  }
+  const code = (data as { code?: unknown }).code;
+  return (codes as readonly unknown[]).includes(code) ? (code as T) : undefined;
+};
+
+/**
  * `data.code` values of a 400 BAD_REQUEST `issue` error about an option the
  * API no longer offers (the same code is the first token of `message`):
  *
@@ -74,17 +92,8 @@ export type OtpIssueRequestErrorCode =
  */
 export const getIssueRequestErrorCode = (
   error: OtpApiError | unknown,
-): OtpIssueRequestErrorCode | undefined => {
-  if (typeof error !== "object" || error === null) return undefined;
-  const { status, data } = error as { status?: unknown; data?: unknown };
-  if (status !== 400 || typeof data !== "object" || data === null) {
-    return undefined;
-  }
-  const code = (data as { code?: unknown }).code;
-  return (ISSUE_REQUEST_ERROR_CODES as readonly unknown[]).includes(code)
-    ? (code as OtpIssueRequestErrorCode)
-    : undefined;
-};
+): OtpIssueRequestErrorCode | undefined =>
+  badRequestDataCode(error, ISSUE_REQUEST_ERROR_CODES);
 
 /**
  * `data` of a 400 BAD_REQUEST error, when the API names the cause. From API

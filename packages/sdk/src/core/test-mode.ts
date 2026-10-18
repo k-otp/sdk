@@ -7,13 +7,13 @@
  * Pure constants and helpers: no I/O, no clock reads. The in-memory API
  * simulator for unit tests is `createMockTransport()` in `@k-otp/sdk/testing`.
  */
-import type { OtpApiError } from "./errors";
+import { badRequestDataCode, type OtpApiError } from "./errors";
 import type { IssueOtpOutput } from "./generated/openapi";
 
 /**
  * Mode of the API key that produced a response: `"live"`, or `"test"` for a
  * `pk_test_`/`sk_test_` key. Sent as `mode` on issue, verify, status, issue
- * list/detail and balance results by API 1.9.0+ (absent from older APIs).
+ * list/detail and balance results.
  */
 export type OtpApiMode = NonNullable<IssueOtpOutput["mode"]>;
 
@@ -198,14 +198,5 @@ export type OtpTestNumberErrorCode = (typeof TEST_NUMBER_ERROR_CODES)[number];
  */
 export const getTestNumberErrorCode = (
   error: OtpApiError | unknown,
-): OtpTestNumberErrorCode | undefined => {
-  if (typeof error !== "object" || error === null) return undefined;
-  const { status, data } = error as { status?: unknown; data?: unknown };
-  if (status !== 400 || typeof data !== "object" || data === null) {
-    return undefined;
-  }
-  const code = (data as { code?: unknown }).code;
-  return (TEST_NUMBER_ERROR_CODES as readonly unknown[]).includes(code)
-    ? (code as OtpTestNumberErrorCode)
-    : undefined;
-};
+): OtpTestNumberErrorCode | undefined =>
+  badRequestDataCode(error, TEST_NUMBER_ERROR_CODES);
