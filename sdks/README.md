@@ -18,7 +18,7 @@ Keep secret keys on your server, and phone numbers and verification codes as str
 | TypeScript | `@k-otp/sdk/kiota` | [TypeScript](typescript/README.md) | Node 20.19 / 22 / 24 |
 
 Native SDKs have independent versions from npm (`0.2.0` requires K-OTP API
-2.0.0, see below). TypeScript shares the version of `@k-otp/sdk`. Download
+2.0.0 or later, see below). TypeScript shares the version of `@k-otp/sdk`. Download
 native packages from
 [GitHub Releases](https://github.com/k-otp/sdk/releases/tag/server-sdk-v0.2.0);
 package manager registries other than npm are being set up. Verify downloaded
@@ -42,7 +42,7 @@ uses the Java API; Android and Kotlin Multiplatform are not covered by this rele
 
 ## Migrating from 0.1.x
 
-Version `0.2.0` requires K-OTP API 2.0.0:
+Version `0.2.0` requires K-OTP API 2.0.0 or later:
 
 - `channel` accepts only `"alimtalk"` (also the default). Leave it out; an
   explicit `"sms"` is rejected with a 400 whose `data.code` is

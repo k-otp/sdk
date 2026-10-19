@@ -2,7 +2,7 @@
 npm/@k-otp/sdk: minor
 ---
 
-Support K-OTP API 2.x, where codes are delivered by KakaoTalk AlimTalk only (SMS remains the automatic fallback of a failed AlimTalk delivery) and WebOTP is no longer offered. The vendored OpenAPI spec is synced to API 2.0.0. Nothing is removed: code written for 2.0.0 keeps compiling, and options the API no longer accepts are still sent as given, so they fail with the API's clear 400 instead of being dropped silently.
+Support K-OTP API 2.x, where codes are delivered by KakaoTalk AlimTalk only (SMS remains the automatic fallback of a failed AlimTalk delivery) and WebOTP is no longer offered. The vendored OpenAPI spec is synced to API 2.1.0. Nothing is removed: code written for 2.0.0 keeps compiling, and options the API no longer accepts are still sent as given, so they fail with the API's clear 400 instead of being dropped silently.
 
 Added:
 
@@ -10,7 +10,7 @@ Added:
 - `OtpDeliveredChannel`: the channel `listIssues`/`getIssue` report, `"sms"` after the automatic fallback.
 - `OtpPaymentRequiredData` now includes `resetAt` of `TRIAL_DAILY_LIMIT_EXCEEDED`.
 - `createMockTransport()` in `@k-otp/sdk/testing` follows API 2.x: it refuses `channel: "sms"` and `webOtp` with the same 400 codes, lists the default template as `["alimtalk"]`, and reports `channel: "sms"` once the `alimtalk_failover` fallback has delivered.
-- `@k-otp/sdk/kiota` is generated from the API 2.0.0 spec. If your app has an approved service name in the console, messages read `[K-OTP] <service name> ...`; there is no request field for it.
+- `@k-otp/sdk/kiota` is generated from the API 2.1.0 spec. If your app has an approved service name in the console, messages read `[K-OTP] <service name> ...`; there is no request field for it.
 
 Deprecated (removed in the next major version):
 
