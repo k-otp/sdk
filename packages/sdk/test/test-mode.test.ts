@@ -13,7 +13,10 @@ import {
   TEST_PHONE_NUMBERS,
   TEST_SCENARIOS,
 } from "../src/core";
-import { createOtpServerClient } from "../src/server";
+import {
+  createOtpServerClient,
+  type OtpPaymentRequiredData,
+} from "../src/server";
 import {
   createMockTransport,
   TEST_MODE_SIMULATED_BALANCE,
@@ -286,6 +289,9 @@ describe("createMockTransport", () => {
         resetAt: "2026-10-11T15:00:00.000Z",
       },
     });
+    // The public data type keeps the wire fields next to the open `code`.
+    const paymentData = (trial as { data: OtpPaymentRequiredData }).data;
+    expect(paymentData.resetAt).toBe("2026-10-11T15:00:00.000Z");
     const unavailable = await rejection(issue("service_unavailable"));
     expect(unavailable).toMatchObject({
       code: "SERVICE_UNAVAILABLE",

@@ -31,10 +31,11 @@ export const OTP_API_ERROR_CODES = [
 export type OtpApiErrorCode = (typeof OTP_API_ERROR_CODES)[number];
 
 /**
- * `data` of a 402 PAYMENT_REQUIRED error from `issue`: the generated wire type,
- * open to reasons a newer API version may add.
+ * `data` of a 402 PAYMENT_REQUIRED error from `issue`: the generated wire type
+ * (including `resetAt` of `TRIAL_DAILY_LIMIT_EXCEEDED`), with `code` open to
+ * reasons a newer API version may add.
  */
-export type OtpPaymentRequiredData = {
+export type OtpPaymentRequiredData = Omit<IssueOtpPaymentErrorData, "code"> & {
   code: IssueOtpPaymentErrorData["code"] | (string & {});
 };
 
