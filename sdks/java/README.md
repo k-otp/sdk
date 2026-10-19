@@ -1,12 +1,12 @@
 # K-OTP server client for Java and Kotlin/JVM
 
-Install the local `dev.kotp:kotp-sdk:0.1.0` JAR and reference
+Install the local `dev.kotp:kotp-sdk:0.2.0` JAR and reference
 it as a Maven dependency. Java 17 bytecode is supplied.
 
 Download the JAR, POM, sources and Javadoc from the release, then install them:
 
 ```sh
-mvn install:install-file -Dfile=kotp-sdk-0.1.0.jar -DpomFile=kotp-sdk-0.1.0.pom -Dsources=kotp-sdk-0.1.0-sources.jar -Djavadoc=kotp-sdk-0.1.0-javadoc.jar
+mvn install:install-file -Dfile=kotp-sdk-0.2.0.jar -DpomFile=kotp-sdk-0.2.0.pom -Dsources=kotp-sdk-0.2.0-sources.jar -Djavadoc=kotp-sdk-0.2.0-javadoc.jar
 ```
 
 Add this dependency to your application's POM:
@@ -15,7 +15,7 @@ Add this dependency to your application's POM:
 <dependency>
   <groupId>dev.kotp</groupId>
   <artifactId>kotp-sdk</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
@@ -42,7 +42,7 @@ List queries accept `limit`, `cursor`, ISO 8601 `createdFrom`/`createdTo`, and
 
 Issue requires a trimmed nonempty ASCII `idempotencyKey`, at most 128 characters.
 The same key is sent in header and body. Automatic retries are disabled.
-`new KotpClient.RequestOptions(headers, origin, true)` allows one issue retry
+`new KotpClient.RequestOptions(headers, true)` allows one issue retry
 after an explicit HTTP 503 response. Other operations never automatically retry.
 Authentication and idempotency headers cannot be replaced.
 

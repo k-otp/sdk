@@ -124,7 +124,6 @@ for (const test of fixture.cases) {
         config.headers = {
           ...config.headers,
           "Idempotency-Key": key,
-          Origin: "https://poc.example.com",
         };
         return client.issue.post(body, config);
       }

@@ -12,7 +12,7 @@ fun main() {
         val query=test.getAsJsonObject("query")
         val observation=JsonObject().apply { add("id",test.get("id")) }
         KotpClient(fixture.get("fakeSecretKey").asString,System.getenv("POC_BASE_URL"),test.get("timeoutMs")?.asInt ?: 10000).use { client ->
-            val options=KotpClient.RequestOptions(mapOf("X-Poc-Case" to test.get("id").asString),"https://poc.example.com",test.get("explicitRetry")?.asBoolean == true)
+            val options=KotpClient.RequestOptions(mapOf("X-Poc-Case" to test.get("id").asString),test.get("explicitRetry")?.asBoolean == true)
             try {
                 val value=when(test.get("operation").asString) {
                     "issue" -> client.issue(test.getAsJsonObject("request"),options)

@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "k-otp API",
-    "version": "1.9.1",
+    "version": "2.1.0",
     "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Test mode.** `pk_test_`/`sk_test_` keys use the same security schemes; the prefix selects test mode. Test keys never send a message and never use\ncredits: they only accept test phone numbers, simulate delivery from a fixed scenario table (see `POST /issue`), and their data never mixes with live data.\nResponses of issue, verify, status, issues and balance carry `mode` (`live` or `test`).\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`.\n\n**Rate limits.** `POST /issue` and `POST /verify` enforce the API key's rate-limit policy, a platform default for `pk_` keys and a platform ceiling.\nAn exceeded limit returns 429 `TOO_MANY_REQUESTS` with a `Retry-After` header (seconds) and `data.retryAfterMs`.\n\n**Request id.** Every response carries `X-Request-Id` (also exposed to allowed browser origins via CORS).\nA request `X-Request-Id` matching `^[A-Za-z0-9._:-]{8,128}$` is echoed; otherwise the API generates one.\nQuote it when contacting support."
   },
   "servers": [
@@ -55,19 +55,12 @@
             "example": "login"
           },
           "channel": {
-            "oneOf": [
-              {
-                "const": "alimtalk"
-              },
-              {
-                "const": "sms"
-              }
-            ],
-            "description": "Delivery channel. When omitted, the OTP is delivered by KakaoTalk AlimTalk\nwith an automatic SMS fallback if AlimTalk delivery fails (included in the\nAlimTalk price; turn it off with `smsFallback: false`)."
+            "const": "alimtalk",
+            "description": "Delivery channel: only `alimtalk` (KakaoTalk AlimTalk), which is also the\ndefault when omitted. If AlimTalk delivery fails the same OTP text is sent by\nSMS automatically (included in the AlimTalk price; turn it off with\n`smsFallback: false`). Direct SMS (`sms`) is no longer offered: an explicit\n`sms` is refused with 400 `CHANNEL_NOT_SUPPORTED` (in `data.code`). A template\nwithout an approved AlimTalk code cannot be issued (400 `TEMPLATE_NOT_AVAILABLE`).\n`GET /v1/issues` items and delivery records still report `sms` as the\ndelivered channel after a fallback (`GET /v1/status` has no channel field)."
           },
           "smsFallback": {
             "type": "boolean",
-            "description": "Automatic SMS fallback of AlimTalk delivery. Omitted or `true` (the\ndefault): when AlimTalk delivery fails the same OTP text is sent by SMS.\n`false`: AlimTalk only; a failed AlimTalk delivery is not re-sent by SMS\n(and `webOtp`, carried only by that SMS, reports `skipped` with\n`channel_alimtalk`). The price is the AlimTalk price either way. Has no\neffect on SMS delivery (`channel: 'sms'` or an SMS-only template). On\nAlimTalk delivery an explicit `false` is part of the idempotency\nfingerprint (reusing a key with a different value is a 409); omitted and\n`true` are the same request, and on SMS delivery the field is not\nfingerprinted at all."
+            "description": "Automatic SMS fallback of AlimTalk delivery. Omitted or `true` (the\ndefault): when AlimTalk delivery fails the same OTP text is sent by SMS.\n`false`: AlimTalk only; a failed AlimTalk delivery is not re-sent by SMS.\nThe price is the AlimTalk price either way. Has no\neffect on the idempotency fingerprint unless `false`: an explicit `false` is\npart of it (reusing a key with a different value is a 409); omitted and\n`true` are the same request."
           },
           "templateId": {
             "type": "string",
@@ -91,7 +84,8 @@
                 "const": "SMS"
               }
             ],
-            "description": "Message type option; AlimTalk delivery and its SMS fallback ignore it."
+            "description": "Ignored: AlimTalk delivery and its SMS fallback do not use it, and direct SMS is\nno longer offered. Still accepted for compatibility.",
+            "deprecated": true
           },
           "cost": {
             "type": "number",
@@ -114,17 +108,6 @@
             "type": "string",
             "description": "Idempotency key; alternative to the `Idempotency-Key` header. One of the two\nis required, and they must match when both are sent. 1-128 visible ASCII\ncharacters without spaces after trimming. Reuse the same key when retrying.",
             "example": "signup-3f2a9c1e-0001"
-          },
-          "webOtp": {
-            "oneOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "$ref": "#/components/schemas/IssueWebOtpOptions"
-              }
-            ],
-            "description": "Opt in to WebOTP (SMS code auto-fill on Android Chrome): the SMS fallback of\nthe AlimTalk message ends with the origin-bound line `@<host> #<code>`, so\n`navigator.credentials.get({ otp })` on that origin can read it when the code\narrives by SMS. `true` binds the request `Origin` header (any key\ntype that sends one, typically a `pk_` browser call); `{ origin }` names it\nexplicitly (for `sk_` server calls; with a `pk_` key it must equal the request\n`Origin`). The origin must be `https` without a path or port, and must be\nlisted in the key's `allowedOrigins`: a key without `allowedOrigins` cannot\nuse WebOTP (`http://localhost` and unlisted origins work only in local\ndevelopment). `false` or omitted: no WebOTP line.\n\nThe KakaoTalk message itself never carries the line (KakaoTalk is not\nreadable by the OS), so `webOtp.status` is `fallback_only`: auto-fill works\nwhen AlimTalk delivery fails and the SMS fallback is sent. WebOTP never\nchanges the price or the SMS type: the SMS fallback uses a compact template,\nand when the compact body plus the line would exceed one SMS (90 bytes; ASCII\n1, line break and other characters 2) the line is left out and the normal\ntext is sent. The response field `webOtp` reports the outcome. Part of the\nidempotency fingerprint (as the bound host)."
           }
         },
         "required": [
@@ -139,22 +122,6 @@
           "type": "string"
         },
         "description": "String-to-string map."
-      },
-      "IssueWebOtpOptions": {
-        "type": "object",
-        "properties": {
-          "origin": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 300,
-            "description": "Origin of the page that reads the code, exactly as the browser serializes\nit (scheme and host, no path or trailing slash).",
-            "example": "https://app.example.com"
-          }
-        },
-        "required": [
-          "origin"
-        ],
-        "description": "Explicit WebOTP binding for `POST /v1/issue`."
       },
       "IssueOtpOutput": {
         "type": "object",
@@ -175,10 +142,6 @@
             "type": "string",
             "description": "When delivery was queued (RFC 3339)."
           },
-          "webOtp": {
-            "$ref": "#/components/schemas/IssueWebOtpResult",
-            "description": "Present only when the request set `webOtp`."
-          },
           "mode": {
             "oneOf": [
               {
@@ -198,40 +161,6 @@
           "queuedAt"
         ],
         "description": "Result of `POST /v1/issue`. The OTP code itself is never returned."
-      },
-      "IssueWebOtpResult": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "oneOf": [
-              {
-                "const": "applied"
-              },
-              {
-                "const": "fallback_only"
-              },
-              {
-                "const": "skipped"
-              }
-            ],
-            "description": "`fallback_only`: AlimTalk delivery (the default); the KakaoTalk message\ncannot carry the line, only the SMS fallback sent if AlimTalk delivery fails\ndoes, so auto-fill works only in that case. `applied`: the SMS carries\n`@<host> #<code>`. `skipped`: sent without the line (see `reason`)."
-          },
-          "reason": {
-            "oneOf": [
-              {
-                "const": "channel_alimtalk"
-              },
-              {
-                "const": "host_too_long"
-              }
-            ],
-            "description": "Why it was skipped. `host_too_long`: the compact SMS plus the WebOTP line\nwould exceed one SMS, so the normal text was sent instead (the message type\nand price never change because of WebOTP). `channel_alimtalk`: AlimTalk\ndelivery while the SMS fallback is unavailable (`smsFallback: false`, or\nthe fallback is turned off service-wide)."
-          }
-        },
-        "required": [
-          "status"
-        ],
-        "description": "WebOTP outcome of an issue that asked for it (`webOtp` on the request)."
       },
       "OtpRateLimitErrorData": {
         "type": "object",
@@ -1177,7 +1106,7 @@
                 }
               ]
             },
-            "description": "Channels this template can be sent on."
+            "description": "Channels this template can be sent on: `['alimtalk']` when the template has an\napproved AlimTalk code, otherwise `[]` (such a template cannot be issued: 400\n`TEMPLATE_NOT_AVAILABLE`). SMS is only the automatic fallback of a failed\nAlimTalk delivery. `'sms'` stays in the item type only for compatibility: it is\ndeprecated, has not been returned since 2.0.0, and will be removed from the type\nin the next major version."
           },
           "body": {
             "type": "string",
@@ -1227,7 +1156,7 @@
                 }
               ]
             },
-            "description": "Channels this template can be sent on."
+            "description": "Channels this template can be sent on: `['alimtalk']` when the template has an\napproved AlimTalk code, otherwise `[]` (such a template cannot be issued: 400\n`TEMPLATE_NOT_AVAILABLE`). SMS is only the automatic fallback of a failed\nAlimTalk delivery. `'sms'` stays in the item type only for compatibility: it is\ndeprecated, has not been returned since 2.0.0, and will be removed from the type\nin the next major version."
           },
           "body": {
             "type": "string",
@@ -1332,7 +1261,7 @@
       "post": {
         "operationId": "otp.issue",
         "summary": "Issue OTP and queue outbound delivery",
-        "description": "Generates a 6-digit OTP, applies quota admission, records the issue, and queues delivery by KakaoTalk AlimTalk with an automatic SMS fallback when AlimTalk delivery fails. The plaintext code is never returned; only `issueId`, expiry, and attempt metadata are.\n\n**SMS fallback.** The SMS fallback is on by default (omitted or `smsFallback: true`): when AlimTalk delivery fails, the same OTP text is sent by SMS at no extra charge. Set `smsFallback: false` for AlimTalk only: a failed AlimTalk delivery is then not re-sent by SMS, and the price stays the AlimTalk price. It has no effect on SMS delivery (`channel: 'sms'` or an SMS-only template) and is then not part of the idempotency fingerprint. On AlimTalk delivery an explicit `false` is part of the fingerprint (omitted and `true` are the same request).\n\n**Idempotency.** An idempotency key is required, either in the `Idempotency-Key` header or the body `idempotencyKey` field (both must match when both are sent). A retry with the same key and payload returns the original response without re-sending or re-debiting. When the outcome of the first attempt is unknown (timeout, 503), retry only with the same key.\n\n**Replacement.** Issuing again for the same phone number and purpose (with a new key) marks the previous `issued` OTP as `replaced`. Phone numbers are compared in canonical form: a Korean mobile number is the same number in any spelling (`010-1234-5678`, `01012345678`, `+82 10 1234 5678`); other numbers are compared by their digits only (`+1 415-555-2671` = `14155552671`).\n\n**WebOTP.** With `webOtp` the SMS fallback ends with `@<host> #<code>` so Android Chrome can auto-fill the code on that origin when it arrives by SMS. `true` binds the request `Origin` header (any key type that sends one); `{ origin }` names it (server `sk_` calls; a `pk_` key may only name its own `Origin`). The origin must be `https` without a path or port and must be listed in the key's `allowedOrigins`; a key without `allowedOrigins` cannot use WebOTP (`http://localhost` and unlisted origins are accepted only in local development). It uses a compact template and never changes the message type or price: when the compact SMS with the line would exceed 90 bytes (line breaks counted as 2), the normal text is sent without it. The KakaoTalk message never carries the line, so the response `webOtp` reports `fallback_only` (or `skipped` with a `reason`; `channel_alimtalk` with `smsFallback: false`).\n\n**Billing.** Credit is reserved at admission and finalized asynchronously after send processing; the response does not include balance or debit amounts. The charged amount is decided server-side per delivery channel (the SMS fallback is included in the AlimTalk price); the deprecated `cost` field is ignored for billing for every key type. Quota rejection returns 402 with `data.code`.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.\n\n**Test mode.** A `pk_test_`/`sk_test_` key never sends a message and never uses credits: the issue is simulated and kept for 7 days, separately from live data (idempotency keys, issue ids and rate limits of test and live keys never mix; a live key cannot read a test issue and vice versa). Test keys only accept test phone numbers (anything else is 400 `TEST_NUMBER_REQUIRED`), and live keys reject them (400 `TEST_NUMBER_IN_LIVE_MODE`); both codes are the first token of `message` and are also in `data.code`. Test numbers: Korean `010-0000-00xx` (`+82 10-0000-00xx`), UK `+44 7700 9000xx` and US `+1 NXX 555-01xx`; the last two digits `xx` pick the scenario. Every test issue that is created verifies with the fixed code `000000` (except `05`), and responses carry `mode: 'test'`.\n\n| `xx` | Issue response and delivery (`GET /status`) | Verify |\n| --- | --- | --- |\n| `00` | 200; `sent` after 1s, `delivered` after 2s | `000000` verifies |\n| `01` | 200; `sent` after 1s, `failed` after 3s | `000000` verifies (delivery and verification are independent) |\n| `02` | 200; `queued`/`sent` until 30s, then `delivered` (polling) | `000000` verifies |\n| `03` | 200; stays `sent` with `providerOutcomeAmbiguous: true` (provider outcome unknown) | `000000` verifies |\n| `04` | 200 with `expiresAt` = issue + 10s; `delivered` | `EXPIRED` after that |\n| `05` | 200; `delivered` | every code is `MISMATCH`; the last attempt is `MAX_ATTEMPTS` |\n| `06` | 429 `TOO_MANY_REQUESTS` (`perPhone`, `Retry-After: 60`) | - |\n| `07` | 402 `INSUFFICIENT_CREDIT` | - |\n| `08` | 402 `TRIAL_DAILY_LIMIT_EXCEEDED` | - |\n| `09` | 503 `SERVICE_UNAVAILABLE` (`Retry-After: 2`) | - |\n| `10` | 200; with AlimTalk delivery the AlimTalk send fails and the SMS fallback is `delivered` after 4s | `000000` verifies |\n| `11-99` | reserved; behave like `00` | `000000` verifies |\n\nTest keys use a fixed platform rate limit instead of the key policy: `perKey` 120 requests per minute and `perKeyDaily` 5,000 requests per day, counted per key and separately for issue, verify and reads (status, issues, balance, credit ledger). New test issues also share daily budgets per organization (`perOrgDaily`, 10,000 by default) and platform-wide (`testModeDaily`), reset at 00:00 UTC; an exhausted budget returns 429 with `Retry-After`.\n\n**Rate limits.** The key's `perKey`, `perIp` and `perPhone` rules are enforced after validation. For `pk_` keys the platform default covers `perKey`/`perIp` the key does not set and its `perPhone` default always applies; `perKey`/`perIp` never exceed the platform ceiling. An exceeded rule returns 429 with `Retry-After` and `data.retryAfterMs`.",
+        "description": "Generates a 6-digit OTP, applies quota admission, records the issue, and queues delivery by KakaoTalk AlimTalk with an automatic SMS fallback when AlimTalk delivery fails. The plaintext code is never returned; only `issueId`, expiry, and attempt metadata are.\n\n**SMS fallback.** The SMS fallback is on by default (omitted or `smsFallback: true`): when AlimTalk delivery fails, the same OTP text is sent by SMS at no extra charge. Set `smsFallback: false` for AlimTalk only: a failed AlimTalk delivery is then not re-sent by SMS, and the price stays the AlimTalk price. An explicit `false` is part of the idempotency fingerprint (omitted and `true` are the same request).\n\n**Delivery channel.** An issue is always delivered by KakaoTalk AlimTalk; `channel` accepts only `alimtalk` (also the default). Direct SMS was removed: `channel: \"sms\"` is 400 `CHANNEL_NOT_SUPPORTED`. A template without an approved AlimTalk code cannot be issued (400 `TEMPLATE_NOT_AVAILABLE`; `channelSupport` of `GET /v1/templates` is empty for it). SMS remains only as the automatic fallback of a failed AlimTalk delivery, and the `channel` of `GET /v1/issues` items (and delivery records) still reports `sms` as the delivered channel after a fallback; `GET /v1/status` has no channel field. **Service name.** If your app has an approved service name, the message reads `[K-OTP] <service name> 인증번호는 ...` instead of `[K-OTP] 인증번호는 ...`. You keep passing the same `templateId`; the named text is used once its AlimTalk template is approved and otherwise the plain text is sent. The name is a property of your app (set in the console, never a request field) and a change applies within about a minute.\n\n**Idempotency.** An idempotency key is required, either in the `Idempotency-Key` header or the body `idempotencyKey` field (both must match when both are sent). A retry with the same key and payload returns the original response without re-sending or re-debiting. When the outcome of the first attempt is unknown (timeout, 503), retry only with the same key.\n\n**Replacement.** Issuing again for the same phone number and purpose (with a new key) marks the previous `issued` OTP as `replaced`. Phone numbers are compared in canonical form: a Korean mobile number is the same number in any spelling (`010-1234-5678`, `01012345678`, `+82 10 1234 5678`); other numbers are compared by their digits only (`+1 415-555-2671` = `14155552671`).\n\n**Removed options.** `webOtp` (WebOTP needed a direct SMS) is no longer supported: a request that sets it to anything but `false` is 400 `WEB_OTP_NOT_SUPPORTED`; the response no longer carries `webOtp`.\n\n**Billing.** Credit is reserved at admission and finalized asynchronously after send processing; the response does not include balance or debit amounts. The charged amount is decided server-side per delivery channel (the SMS fallback is included in the AlimTalk price); the deprecated `cost` field is ignored for billing for every key type. Quota rejection returns 402 with `data.code`.\n\nAccepts `pk_` public keys (browser, `Origin` must exactly match an allowed origin) or `sk_` secret keys.\n\n**Test mode.** A `pk_test_`/`sk_test_` key never sends a message and never uses credits: the issue is simulated and kept for 7 days, separately from live data (idempotency keys, issue ids and rate limits of test and live keys never mix; a live key cannot read a test issue and vice versa). Test keys only accept test phone numbers (anything else is 400 `TEST_NUMBER_REQUIRED`), and live keys reject them (400 `TEST_NUMBER_IN_LIVE_MODE`); both codes are the first token of `message` and are also in `data.code`. Test numbers: Korean `010-0000-00xx` (`+82 10-0000-00xx`), UK `+44 7700 9000xx` and US `+1 NXX 555-01xx`; the last two digits `xx` pick the scenario. Every test issue that is created verifies with the fixed code `000000` (except `05`), and responses carry `mode: 'test'`.\n\n| `xx` | Issue response and delivery (`GET /status`) | Verify |\n| --- | --- | --- |\n| `00` | 200; `sent` after 1s, `delivered` after 2s | `000000` verifies |\n| `01` | 200; `sent` after 1s, `failed` after 3s | `000000` verifies (delivery and verification are independent) |\n| `02` | 200; `queued`/`sent` until 30s, then `delivered` (polling) | `000000` verifies |\n| `03` | 200; stays `sent` with `providerOutcomeAmbiguous: true` (provider outcome unknown) | `000000` verifies |\n| `04` | 200 with `expiresAt` = issue + 10s; `delivered` | `EXPIRED` after that |\n| `05` | 200; `delivered` | every code is `MISMATCH`; the last attempt is `MAX_ATTEMPTS` |\n| `06` | 429 `TOO_MANY_REQUESTS` (`perPhone`, `Retry-After: 60`) | - |\n| `07` | 402 `INSUFFICIENT_CREDIT` | - |\n| `08` | 402 `TRIAL_DAILY_LIMIT_EXCEEDED` | - |\n| `09` | 503 `SERVICE_UNAVAILABLE` (`Retry-After: 2`) | - |\n| `10` | 200; with AlimTalk delivery the AlimTalk send fails and the SMS fallback is `delivered` after 4s | `000000` verifies |\n| `11-99` | reserved; behave like `00` | `000000` verifies |\n\nTest keys use a fixed platform rate limit instead of the key policy: `perKey` 120 requests per minute and `perKeyDaily` 5,000 requests per day, counted per key and separately for issue, verify and reads (status, issues, balance, credit ledger). New test issues also share daily budgets per organization (`perOrgDaily`, 10,000 by default) and platform-wide (`testModeDaily`), reset at 00:00 UTC; an exhausted budget returns 429 with `Retry-After`.\n\n**Rate limits.** The key's `perKey`, `perIp` and `perPhone` rules are enforced after validation. For `pk_` keys the platform default covers `perKey`/`perIp` the key does not set and its `perPhone` default always applies; `perKey`/`perIp` never exceed the platform ceiling. An exceeded rule returns 429 with `Retry-After` and `data.retryAfterMs`.",
         "tags": [
           "otp"
         ],
@@ -1354,19 +1283,12 @@
                     "example": "login"
                   },
                   "channel": {
-                    "oneOf": [
-                      {
-                        "const": "alimtalk"
-                      },
-                      {
-                        "const": "sms"
-                      }
-                    ],
-                    "description": "Delivery channel. When omitted, the OTP is delivered by KakaoTalk AlimTalk\nwith an automatic SMS fallback if AlimTalk delivery fails (included in the\nAlimTalk price; turn it off with `smsFallback: false`)."
+                    "const": "alimtalk",
+                    "description": "Delivery channel: only `alimtalk` (KakaoTalk AlimTalk), which is also the\ndefault when omitted. If AlimTalk delivery fails the same OTP text is sent by\nSMS automatically (included in the AlimTalk price; turn it off with\n`smsFallback: false`). Direct SMS (`sms`) is no longer offered: an explicit\n`sms` is refused with 400 `CHANNEL_NOT_SUPPORTED` (in `data.code`). A template\nwithout an approved AlimTalk code cannot be issued (400 `TEMPLATE_NOT_AVAILABLE`).\n`GET /v1/issues` items and delivery records still report `sms` as the\ndelivered channel after a fallback (`GET /v1/status` has no channel field)."
                   },
                   "smsFallback": {
                     "type": "boolean",
-                    "description": "Automatic SMS fallback of AlimTalk delivery. Omitted or `true` (the\ndefault): when AlimTalk delivery fails the same OTP text is sent by SMS.\n`false`: AlimTalk only; a failed AlimTalk delivery is not re-sent by SMS\n(and `webOtp`, carried only by that SMS, reports `skipped` with\n`channel_alimtalk`). The price is the AlimTalk price either way. Has no\neffect on SMS delivery (`channel: 'sms'` or an SMS-only template). On\nAlimTalk delivery an explicit `false` is part of the idempotency\nfingerprint (reusing a key with a different value is a 409); omitted and\n`true` are the same request, and on SMS delivery the field is not\nfingerprinted at all."
+                    "description": "Automatic SMS fallback of AlimTalk delivery. Omitted or `true` (the\ndefault): when AlimTalk delivery fails the same OTP text is sent by SMS.\n`false`: AlimTalk only; a failed AlimTalk delivery is not re-sent by SMS.\nThe price is the AlimTalk price either way. Has no\neffect on the idempotency fingerprint unless `false`: an explicit `false` is\npart of it (reusing a key with a different value is a 409); omitted and\n`true` are the same request."
                   },
                   "templateId": {
                     "type": "string",
@@ -1390,7 +1312,8 @@
                         "const": "SMS"
                       }
                     ],
-                    "description": "Message type option; AlimTalk delivery and its SMS fallback ignore it."
+                    "description": "Ignored: AlimTalk delivery and its SMS fallback do not use it, and direct SMS is\nno longer offered. Still accepted for compatibility.",
+                    "deprecated": true
                   },
                   "cost": {
                     "type": "number",
@@ -1413,17 +1336,6 @@
                     "type": "string",
                     "description": "Idempotency key; alternative to the `Idempotency-Key` header. One of the two\nis required, and they must match when both are sent. 1-128 visible ASCII\ncharacters without spaces after trimming. Reuse the same key when retrying.",
                     "example": "signup-3f2a9c1e-0001"
-                  },
-                  "webOtp": {
-                    "oneOf": [
-                      {
-                        "type": "boolean"
-                      },
-                      {
-                        "$ref": "#/components/schemas/IssueWebOtpOptions"
-                      }
-                    ],
-                    "description": "Opt in to WebOTP (SMS code auto-fill on Android Chrome): the SMS fallback of\nthe AlimTalk message ends with the origin-bound line `@<host> #<code>`, so\n`navigator.credentials.get({ otp })` on that origin can read it when the code\narrives by SMS. `true` binds the request `Origin` header (any key\ntype that sends one, typically a `pk_` browser call); `{ origin }` names it\nexplicitly (for `sk_` server calls; with a `pk_` key it must equal the request\n`Origin`). The origin must be `https` without a path or port, and must be\nlisted in the key's `allowedOrigins`: a key without `allowedOrigins` cannot\nuse WebOTP (`http://localhost` and unlisted origins work only in local\ndevelopment). `false` or omitted: no WebOTP line.\n\nThe KakaoTalk message itself never carries the line (KakaoTalk is not\nreadable by the OS), so `webOtp.status` is `fallback_only`: auto-fill works\nwhen AlimTalk delivery fails and the SMS fallback is sent. WebOTP never\nchanges the price or the SMS type: the SMS fallback uses a compact template,\nand when the compact body plus the line would exceed one SMS (90 bytes; ASCII\n1, line break and other characters 2) the line is left out and the normal\ntext is sent. The response field `webOtp` reports the outcome. Part of the\nidempotency fingerprint (as the bound host)."
                   }
                 },
                 "required": [
@@ -1459,10 +1371,6 @@
                       "type": "string",
                       "description": "When delivery was queued (RFC 3339)."
                     },
-                    "webOtp": {
-                      "$ref": "#/components/schemas/IssueWebOtpResult",
-                      "description": "Present only when the request set `webOtp`."
-                    },
                     "mode": {
                       "oneOf": [
                         {
@@ -1492,7 +1400,7 @@
             }
           },
           "400": {
-            "description": "BAD_REQUEST: `TEST_NUMBER_REQUIRED` (a test key with a real number) or `TEST_NUMBER_IN_LIVE_MODE` (a live key with a test number), as the first token of `message` and in `data.code`; invalid payload, missing/blank idempotency key, header/body key mismatch, a `phoneNumber` without digits, unknown template or template variables, a `channel` the template does not support, `expiresInSec`/`maxAttempts`/`cost` out of range (`cost` is still range-checked though it no longer affects billing), or a `webOtp` origin the key may not bind (not listed in the key `allowedOrigins` or the key has none, not https, has a path or a port, not a domain, missing request `Origin` for `true`, or a `pk_` origin other than the request `Origin`).",
+            "description": "BAD_REQUEST: `TEST_NUMBER_REQUIRED` (a test key with a real number) or `TEST_NUMBER_IN_LIVE_MODE` (a live key with a test number), as the first token of `message` and in `data.code`; invalid payload, missing/blank idempotency key, header/body key mismatch, a `phoneNumber` without digits, unknown template or template variables, `expiresInSec`/`maxAttempts`/`cost` out of range (`cost` is still range-checked though it no longer affects billing), `CHANNEL_NOT_SUPPORTED` (`channel: \"sms\"`), `TEMPLATE_NOT_AVAILABLE` (a template without an approved AlimTalk code) or `WEB_OTP_NOT_SUPPORTED` (`webOtp`), each as the first token of `message` and in `data.code`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6727,7 +6635,7 @@
                           }
                         ]
                       },
-                      "description": "Channels this template can be sent on."
+                      "description": "Channels this template can be sent on: `['alimtalk']` when the template has an\napproved AlimTalk code, otherwise `[]` (such a template cannot be issued: 400\n`TEMPLATE_NOT_AVAILABLE`). SMS is only the automatic fallback of a failed\nAlimTalk delivery. `'sms'` stays in the item type only for compatibility: it is\ndeprecated, has not been returned since 2.0.0, and will be removed from the type\nin the next major version."
                     },
                     "body": {
                       "type": "string",

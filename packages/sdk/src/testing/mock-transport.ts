@@ -17,6 +17,7 @@ import type {
   GetStatusResult,
   IssueResult,
   OtpChannel,
+  OtpDeliveredChannel,
   OtpDeliveryStatus,
   OtpIssue,
   OtpOverallStatus,
@@ -87,7 +88,8 @@ export type MockTestIssue = {
   /** Canonical digits of the test number. */
   testNumber: string;
   purpose: string;
-  channel: OtpChannel;
+  /** `"sms"` once the `alimtalk_failover` fallback has delivered, else `"alimtalk"`. */
+  channel: OtpDeliveredChannel;
   templateId: string;
   /** The code that verifies this issue, or `null` for `mismatch`. */
   code: string | null;
@@ -124,7 +126,6 @@ type StoredIssue = {
   channel: OtpChannel;
   smsFallback: boolean;
   templateId: string;
-  webOtp: IssueResult["webOtp"];
   issuedAtMs: number;
   expiresAtMs: number;
   attemptsUsed: number;
@@ -142,7 +143,7 @@ const DEFAULT_TEMPLATE_ID = "otp_default_kr";
 const DEFAULT_TEMPLATE = {
   templateId: DEFAULT_TEMPLATE_ID,
   name: "기본 인증",
-  channelSupport: ["sms", "alimtalk"] as OtpChannel[],
+  channelSupport: ["alimtalk"] as OtpChannel[],
   body: "[K-OTP] 인증번호는 #{code}입니다. 3분 내에 입력해주세요.",
 };
 
@@ -233,12 +234,9 @@ const deliveryFinalAfterMs = (issue: StoredIssue): number => {
     case "ambiguous":
       return TEST_MODE_TIMINGS.sentAfterMs;
     case "alimtalk_failover":
-      if (issue.channel === "alimtalk") {
-        return issue.smsFallback
-          ? TEST_MODE_TIMINGS.failoverDeliveredAfterMs
-          : TEST_MODE_TIMINGS.failedAfterMs;
-      }
-      return TEST_MODE_TIMINGS.deliveredAfterMs;
+      return issue.smsFallback
+        ? TEST_MODE_TIMINGS.failoverDeliveredAfterMs
+        : TEST_MODE_TIMINGS.failedAfterMs;
     default:
       return TEST_MODE_TIMINGS.deliveredAfterMs;
   }
@@ -254,11 +252,23 @@ const deliveryStatus = (
   if (elapsedMs < deliveryFinalAfterMs(issue)) return "sent";
   const fails =
     issue.scenario === "delivery_failed" ||
-    (issue.scenario === "alimtalk_failover" &&
-      issue.channel === "alimtalk" &&
-      !issue.smsFallback);
+    (issue.scenario === "alimtalk_failover" && !issue.smsFallback);
   return fails ? "failed" : "delivered";
 };
+
+/**
+ * Channel `GET /v1/issues` reports: AlimTalk, or SMS once the automatic
+ * fallback of the `alimtalk_failover` scenario has delivered the code.
+ */
+const deliveredChannel = (
+  issue: StoredIssue,
+  elapsedMs: number,
+): OtpDeliveredChannel =>
+  issue.scenario === "alimtalk_failover" &&
+  issue.smsFallback &&
+  elapsedMs >= TEST_MODE_TIMINGS.failoverDeliveredAfterMs
+    ? "sms"
+    : issue.channel;
 
 const effectiveStatus = (
   issue: StoredIssue,
@@ -297,7 +307,6 @@ const issueOutput = (issue: StoredIssue): IssueResult => ({
   expiresAt: iso(issue.expiresAtMs),
   attemptsRemaining: remaining(issue),
   queuedAt: iso(issue.issuedAtMs),
-  ...(issue.webOtp === undefined ? {} : { webOtp: issue.webOtp }),
   mode: MODE,
 });
 
@@ -337,7 +346,7 @@ const dashboardOutput = (issue: StoredIssue, nowMs: number): OtpIssue => {
     issueId: issue.issueId,
     purpose: issue.purpose,
     templateId: issue.templateId,
-    channel: issue.channel,
+    channel: deliveredChannel(issue, nowMs - issue.issuedAtMs),
     verificationStatus: status.verificationStatus,
     deliveryStatus: status.deliveryStatus,
     overallStatus: status.overallStatus,
@@ -379,21 +388,6 @@ const nextKstMidnight = (nowMs: number): string => {
   return iso(Math.floor((nowMs + offset) / day + 1) * day - offset);
 };
 
-const webOtpResult = (
-  requested: unknown,
-  channel: OtpChannel,
-  smsFallback: boolean,
-): IssueResult["webOtp"] => {
-  if (requested === undefined || requested === false) return undefined;
-  if (requested !== true && !isRecord(requested)) {
-    return badRequest("webOtp must be a boolean or { origin }");
-  }
-  if (channel === "sms") return { status: "applied" };
-  return smsFallback
-    ? { status: "fallback_only" }
-    : { status: "skipped", reason: "channel_alimtalk" };
-};
-
 /**
  * Creates an in-memory simulator of the K-OTP test mode, for unit and
  * component tests that must not reach the network:
@@ -422,9 +416,13 @@ const webOtpResult = (
  * `TEST_NUMBER_IN_LIVE_MODE` for a test number and 401 otherwise: live
  * delivery is never simulated.
  *
+ * Like the API, it refuses `channel: "sms"` (400 `CHANNEL_NOT_SUPPORTED`) and
+ * a `webOtp` other than `false` (400 `WEB_OTP_NOT_SUPPORTED`).
+ *
  * Not simulated: `Origin` checks, rate limits and daily test budgets (the
- * `rate_limited` scenario still answers 429), template variables (any
- * `templateId` is accepted) and request ids.
+ * `rate_limited` scenario still answers 429), template variables and template
+ * availability (any `templateId` is accepted, so `TEMPLATE_NOT_AVAILABLE` never
+ * occurs) and request ids.
  */
 export const createMockTransport = (
   options: MockTransportOptions = {},
@@ -502,18 +500,24 @@ export const createMockTransport = (
         "Idempotency-Key header and body idempotencyKey differ",
       );
     }
-    if (
-      body.channel !== undefined &&
-      body.channel !== "alimtalk" &&
-      body.channel !== "sms"
-    ) {
-      return badRequest("channel must be alimtalk or sms");
+    if (body.channel !== undefined && body.channel !== "alimtalk") {
+      return badRequest(
+        'CHANNEL_NOT_SUPPORTED: channel accepts only "alimtalk" (SMS is only the automatic fallback)',
+        { code: "CHANNEL_NOT_SUPPORTED" },
+      );
     }
-    const channel: OtpChannel = body.channel === "sms" ? "sms" : "alimtalk";
+    if (body.webOtp !== undefined && body.webOtp !== false) {
+      return badRequest(
+        "WEB_OTP_NOT_SUPPORTED: webOtp is no longer supported",
+        {
+          code: "WEB_OTP_NOT_SUPPORTED",
+        },
+      );
+    }
+    const channel: OtpChannel = "alimtalk";
     const smsFallback = body.smsFallback !== false;
     const expiresInSec = integerField(body, "expiresInSec", 30, 600, 180);
     const maxAttempts = integerField(body, "maxAttempts", 1, 10, 5);
-    const webOtp = webOtpResult(body.webOtp, channel, smsFallback);
 
     const match = matchTestPhoneNumber(phoneNumber);
     if (live) {
@@ -583,7 +587,8 @@ export const createMockTransport = (
       typeof body.templateId === "string" && body.templateId.trim()
         ? body.templateId.trim()
         : DEFAULT_TEMPLATE_ID;
-    const { idempotencyKey: _key, ...payload } = body;
+    // `webOtp: false` (the only accepted value) is the same as omitting it.
+    const { idempotencyKey: _key, webOtp: _webOtp, ...payload } = body;
     // Like the API, the fingerprint uses resolved values: spelling out a
     // default (`channel: "alimtalk"`, `expiresInSec: 180`, `maxAttempts: 5`,
     // the default `templateId`) on a retry is the same request.
@@ -595,8 +600,8 @@ export const createMockTransport = (
       expiresInSec,
       maxAttempts,
       templateId,
-      // Only an explicit `false` on AlimTalk is fingerprinted.
-      smsFallback: channel === "alimtalk" && !smsFallback ? false : undefined,
+      // Only an explicit `false` is fingerprinted.
+      smsFallback: smsFallback ? undefined : false,
     });
     const claim = claims.get(idempotencyKey);
     if (claim) {
@@ -627,7 +632,6 @@ export const createMockTransport = (
       channel,
       smsFallback,
       templateId,
-      webOtp,
       issuedAtMs: nowMs,
       expiresAtMs:
         nowMs +
@@ -923,7 +927,7 @@ export const createMockTransport = (
           region: issue.region,
           testNumber: issue.testNumber,
           purpose: issue.purpose,
-          channel: issue.channel,
+          channel: deliveredChannel(issue, nowMs - issue.issuedAtMs),
           templateId: issue.templateId,
           code: issue.scenario === "mismatch" ? null : TEST_OTP_CODE,
           deliveryStatus: deliveryStatus(issue, nowMs - issue.issuedAtMs),

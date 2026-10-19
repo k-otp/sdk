@@ -44,16 +44,9 @@ def call(client, test)
     input = test['request'].dup
     key = (input['idempotencyKey'] || '').strip
     raise ArgumentError, 'Invalid idempotency before HTTP' unless /\A[!-~]{1,128}\z/.match?(key)
-    web = input.delete('webOtp')
     body = model(input, KOtpSdkGenerated::Issue::IssuePostRequestBody)
     body.idempotency_key = key
-    unless web.nil?
-      wrapper = KOtpSdkGenerated::Issue::IssuePostRequestBodyWebOtp.new
-      if web == true || web == false then wrapper.boolean = web
-      else wrapper.issue_web_otp_options = model(web, KOtpSdkGenerated::Models::IssueWebOtpOptions) end
-      body.web_otp = wrapper
-    end
-    config.headers.add('Idempotency-Key', key);config.headers.add('Origin', 'https://poc.example.com')
+    config.headers.add('Idempotency-Key', key)
     client.issue.post(body, config).resume
   when 'verify'
     client.verify.post(model(test['request'], KOtpSdkGenerated::Verify::VerifyPostRequestBody), config).resume

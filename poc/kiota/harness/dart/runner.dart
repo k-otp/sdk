@@ -10,8 +10,6 @@ import 'package:microsoft_kiota_bundle/microsoft_kiota_bundle.dart';
 import 'package:microsoft_kiota_serialization_json/microsoft_kiota_serialization_json.dart';
 import 'lib/generated/k_otp_api_client.dart';
 import 'lib/generated/issue/issue_post_request_body.dart';
-import 'lib/generated/issue/issue_post_request_body_web_otp.dart';
-import 'lib/generated/models/issue_web_otp_options.dart';
 import 'lib/generated/verify/verify_post_request_body.dart';
 import 'usage.dart';
 
@@ -41,9 +39,8 @@ Future<Parsable?> call(KOtpApiClient client,Map<String,dynamic> test) {
     case 'issue':
       final input=Map<String,dynamic>.from(test['request']);final key=(input['idempotencyKey']??'').toString().trim();
       if(!RegExp(r'^[!-~]{1,128}$').hasMatch(key))throw ArgumentError('Invalid idempotency before HTTP');
-      final web=input.remove('webOtp');final body=model(input,IssuePostRequestBody.createFromDiscriminatorValue)..idempotencyKey=key;
-      if(web!=null){final wrapper=IssuePostRequestBodyWebOtp();if(web is bool){wrapper.boolean=web;}else{wrapper.issueWebOtpOptions=model(web,IssueWebOtpOptions.createFromDiscriminatorValue);}body.webOtp=wrapper;}
-      return client.issue.postAsync(body,(c){c.headers['X-Poc-Case']={id};c.headers['Idempotency-Key']={key};c.headers['Origin']={'https://poc.example.com'};});
+      final body=model(input,IssuePostRequestBody.createFromDiscriminatorValue)..idempotencyKey=key;
+      return client.issue.postAsync(body,(c){c.headers['X-Poc-Case']={id};c.headers['Idempotency-Key']={key};});
     case 'verify':return client.verify.postAsync(model(test['request'],VerifyPostRequestBody.createFromDiscriminatorValue),(c){c.headers['X-Poc-Case']={id};});
     case 'status':return client.status.getAsync((c){c.headers['X-Poc-Case']={id};c.queryParameters.issueId=query['issueId'];});
     case 'issues':return client.issues.getAsync((c){c.headers['X-Poc-Case']={id};c.queryParameters.limit=query['limit'];c.queryParameters.cursor=query['cursor'];c.queryParameters.verificationStatus=query['verificationStatus'];});

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   createOtpClient,
+  getIssueRequestErrorCode,
   getTestNumberErrorCode,
   isOtpApiError,
   isTestKey,
@@ -12,7 +13,10 @@ import {
   TEST_PHONE_NUMBERS,
   TEST_SCENARIOS,
 } from "../src/core";
-import { createOtpServerClient } from "../src/server";
+import {
+  createOtpServerClient,
+  type OtpPaymentRequiredData,
+} from "../src/server";
 import {
   createMockTransport,
   TEST_MODE_SIMULATED_BALANCE,
@@ -285,6 +289,9 @@ describe("createMockTransport", () => {
         resetAt: "2026-10-11T15:00:00.000Z",
       },
     });
+    // The public data type keeps the wire fields next to the open `code`.
+    const paymentData = (trial as { data: OtpPaymentRequiredData }).data;
+    expect(paymentData.resetAt).toBe("2026-10-11T15:00:00.000Z");
     const unavailable = await rejection(issue("service_unavailable"));
     expect(unavailable).toMatchObject({
       code: "SERVICE_UNAVAILABLE",
@@ -476,8 +483,68 @@ describe("createMockTransport", () => {
       server.issue({ ...input, maxAttempts: 3 }),
     );
     expect(conflict.code).toBe("CONFLICT");
-    const sms = await rejection(server.issue({ ...input, channel: "sms" }));
-    expect(sms.code).toBe("CONFLICT");
+    const noFallback = await rejection(
+      server.issue({ ...input, smsFallback: false }),
+    );
+    expect(noFallback.code).toBe("CONFLICT");
+  });
+
+  test("direct SMS and WebOTP are refused like the API does", async () => {
+    const { server, issue, mock } = setup();
+    const sms = await rejection(issue("success", { channel: "sms" }));
+    expect(sms).toMatchObject({ code: "BAD_REQUEST", status: 400 });
+    expect(sms.message.startsWith("CHANNEL_NOT_SUPPORTED")).toBe(true);
+    expect(getIssueRequestErrorCode(sms)).toBe("CHANNEL_NOT_SUPPORTED");
+    for (const webOtp of [true, { origin: "https://example.com" }]) {
+      const refused = await rejection(issue("success", { webOtp }));
+      expect(getIssueRequestErrorCode(refused)).toBe("WEB_OTP_NOT_SUPPORTED");
+    }
+    expect(mock.issues()).toHaveLength(0);
+    // `false` is the same as leaving it out; the result has no `webOtp`.
+    const issued = await server.issue({
+      phoneNumber: TEST_PHONE_NUMBERS.success,
+      purpose: "login",
+      idempotencyKey: "web-otp-false",
+      channel: "alimtalk",
+      webOtp: false,
+    } as never);
+    expect(issued).not.toHaveProperty("webOtp");
+  });
+
+  test("a spelled-out webOtp: false replays like an omitted one", async () => {
+    const { server, issue } = setup();
+    const first = await issue("success", { idempotencyKey: "same" });
+    const again = await server.issue({
+      phoneNumber: TEST_PHONE_NUMBERS.success,
+      purpose: "login",
+      idempotencyKey: "same",
+      webOtp: false,
+    } as never);
+    expect(again).toEqual(first);
+  });
+
+  test("issue listings report sms once the failover fallback delivered", async () => {
+    const { mock, server, issue } = setup();
+    const failover = await issue("alimtalk_failover", { purpose: "failover" });
+    const plain = await issue("success", { purpose: "plain" });
+    const noFallback = await issue("alimtalk_failover", {
+      purpose: "no-fallback",
+      smsFallback: false,
+    });
+    const channel = async (issueId: string) =>
+      (await server.getIssue({ issueId })).channel;
+    expect(await channel(failover.issueId)).toBe("alimtalk");
+    mock.advance(TEST_MODE_TIMINGS.failoverDeliveredAfterMs);
+    expect(await channel(failover.issueId)).toBe("sms");
+    expect(await channel(plain.issueId)).toBe("alimtalk");
+    expect(await channel(noFallback.issueId)).toBe("alimtalk");
+    const listed = (await server.listIssues()).items.find(
+      (item) => item.issueId === failover.issueId,
+    );
+    expect(listed?.channel).toBe("sms");
+    expect(
+      mock.issues().find((item) => item.issueId === failover.issueId)?.channel,
+    ).toBe("sms");
   });
 
   test("the default template is the API's otp_default_kr", async () => {

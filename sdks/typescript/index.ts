@@ -30,6 +30,13 @@ import { jsonValue, KotpJsonParseNodeFactory, model } from "./compatibility";
 
 export interface RequestOptions {
   headers?: Record<string, string>;
+  /**
+   * `Origin` header of an `issue` request; it only bound `webOtp`.
+   *
+   * @deprecated WebOTP is no longer offered by K-OTP API 2.x, so there is
+   * nothing left to bind. Still sent as the `Origin` header of `issue` when
+   * set; remove it.
+   */
   origin?: string;
   retry503?: boolean;
 }
@@ -227,6 +234,7 @@ export class KotpClient {
       if (!/^[!-~]{1,128}$/.test(key))
         throw new TypeError("Invalid issue idempotency key before HTTP");
       headers["Idempotency-Key"] = key;
+      // Deprecated (see `RequestOptions.origin`), kept for compatibility.
       if (options.origin) headers.Origin = options.origin;
     }
     const call = () => {

@@ -18,7 +18,10 @@
   export let issue = undefined;
   /** @type {boolean | undefined} */
   export let autoSubmit = undefined;
-  /** @type {boolean | undefined} */
+  /**
+   * @type {boolean | undefined}
+   * @deprecated K-OTP API 2.x no longer sends the WebOTP SMS line.
+   */
   export let webOtp = undefined;
   /** @type {boolean | undefined} */
   export let clearCodeOnMismatch = undefined;

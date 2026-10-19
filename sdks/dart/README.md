@@ -1,7 +1,7 @@
 # K-OTP server client for Dart
 
-Extract the local `kotp-sdk-dart-0.1.0.tar.gz` archive and add its directory as
-a Pub path dependency named `kotp_sdk` (version `0.1.0`).
+Extract the local `kotp-sdk-dart-0.2.0.tar.gz` archive and add its directory as
+a Pub path dependency named `kotp_sdk` (version `0.2.0`).
 
 ```dart
 import 'package:kotp_sdk/kotp_sdk.dart';
@@ -23,7 +23,7 @@ Issue requires a trimmed nonempty ASCII `idempotencyKey` up to 128 characters.
 The same key is sent in header and body. Automatic retries are disabled.
 `RequestOptions(retry503:true)` permits one issue retry following an explicit
 HTTP 503 response. Other operations never automatically retry. Options accept
-custom `headers` and issue `origin`; authentication and idempotency headers
+custom `headers`; authentication and idempotency headers
 cannot be replaced. List methods take options as their second positional
 argument; other methods use the named `options` argument.
 

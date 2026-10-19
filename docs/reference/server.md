@@ -136,7 +136,7 @@ export default {
 | `listCreditLedger(query?)` | `GET /v1/credit-ledger` | One page of the wallet ledger. Filters: `limit`, `cursor`, `entryType`, `createdFrom`, `createdTo`. See [Credit wallet](#credit-wallet-organization-wide). |
 | `iterateCreditLedger(query?, options?)` | `GET /v1/credit-ledger` | `AsyncGenerator` over all entries. |
 | `getBalance()` | `GET /v1/balance` | Credit balance (`currency: "CREDIT"`) plus `walletId`, `walletScope`, `organizationId?`. See [Credit wallet](#credit-wallet-organization-wide). |
-| `listTemplates()` | `GET /v1/templates` | Whitelisted templates + `defaultTemplateId`. |
+| `listTemplates()` | `GET /v1/templates` | Whitelisted templates + `defaultTemplateId`. `channelSupport` is `["alimtalk"]`, or `[]` while the template has no approved AlimTalk code (then `issue` rejects it with `TEMPLATE_NOT_AVAILABLE`). |
 | `getTemplate({ templateId })` | `GET /v1/templates/{templateId}` | Includes the `variables` schema for `templateVariables`. |
 
 Every method takes an optional last argument `{ signal?, timeoutMs? }`; the
@@ -184,10 +184,11 @@ wallet.organizationId; // set when walletScope is "organization"
 - A ledger entry's optional `appId` is its attribution: always the calling app
   for `debit` / `refund`, and on a `credit` / `clawback` only when the purchase
   was attributed to an app.
-- `walletId` and `walletScope` are typed optional (`GetBalanceResult`). An API
-  deployment older than 1.4.0 does not send them (its balance is the app's own
-  wallet), and `appId` on ledger entries is absent there too. Treat a missing
-  `walletScope` as `"app"`.
+- `walletId`, `walletScope`, `promoBalance` and `promoNextExpiry` are always
+  sent by the current API but stay typed optional in `GetBalanceResult` (an
+  API older than 1.4.0 did not send the wallet fields) until the next major
+  version of the SDK; `OtpBalanceOutput` from `@k-otp/sdk/contract` has them
+  required.
 - `PAYMENT_REQUIRED` (402) on `issue` now means the organization wallet is out
   of credit. No new error codes were added.
 - With an `sk_test_` key (API 1.9.0+) the real wallet is never read:
@@ -205,7 +206,12 @@ retryable), `retryAfterMs` and `data: { limit, policy, retryAfterMs }`
 operation (`perKeyDaily`) and by daily test issue budgets (`perOrgDaily`,
 `testModeDaily`). A test key with a real phone number, or a live key with a
 test number, rejects with `BAD_REQUEST` and `data.code`
-(`getTestNumberErrorCode`). See
+(`getTestNumberErrorCode`). A request for direct SMS (`channel: "sms"`), a
+template without an approved AlimTalk code or a `webOtp` option (the first and
+the last are deprecated in the SDK types) rejects with
+`BAD_REQUEST` and `data.code` `CHANNEL_NOT_SUPPORTED`,
+`TEMPLATE_NOT_AVAILABLE` or `WEB_OTP_NOT_SUPPORTED`
+(`getIssueRequestErrorCode`). See
 [errors and retries](../errors-and-retries.md).
 
 ## Runtime notes

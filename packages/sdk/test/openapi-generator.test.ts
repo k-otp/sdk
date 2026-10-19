@@ -42,6 +42,42 @@ describe("openapi generator", () => {
     expect(renderOpenApiTypes(doc())).toContain("ping: {");
   });
 
+  test("a deprecated property gets a @deprecated tag", () => {
+    const rendered = renderOpenApiTypes(
+      doc({
+        schemas: {
+          Input: {
+            type: "object",
+            properties: {
+              old: {
+                type: "string",
+                description: "Ignored.",
+                deprecated: true,
+              },
+              current: { type: "string", description: "Used." },
+            },
+          },
+        },
+      }),
+    );
+    expect(rendered).toContain("   * Ignored.\n   *\n   * @deprecated\n");
+    expect(rendered).not.toMatch(/Used\.\s*\*\s*\n\s*\*\s*@deprecated/);
+  });
+
+  test("a deprecated property without a description still gets @deprecated", () => {
+    const rendered = renderOpenApiTypes(
+      doc({
+        schemas: {
+          Input: {
+            type: "object",
+            properties: { old: { type: "string", deprecated: true } },
+          },
+        },
+      }),
+    );
+    expect(rendered).toContain("/** @deprecated */\n  old?: string;");
+  });
+
   test("an operationId ending with '.' is rejected by render and summary", () => {
     const spec = doc({
       paths: { "/ping": { get: { operationId: "otp.", responses: ok } } },

@@ -64,15 +64,8 @@ static async Task<IParsable?> Call(KOtpApiClient client, JsonObject test, Cancel
             var input = test["request"]!.DeepClone().AsObject();
             var key = input["idempotencyKey"]?.GetValue<string>().Trim() ?? "";
             if (!System.Text.RegularExpressions.Regex.IsMatch(key,"^[!-~]{1,128}$")) throw new ArgumentException("Invalid idempotency before HTTP");
-            var webOtp = input["webOtp"]; input.Remove("webOtp");
             var body = await Model(input, IssuePostRequestBody.CreateFromDiscriminatorValue); body.IdempotencyKey = key;
-            if (webOtp is not null) {
-                var wrapper = new IssuePostRequestBody.IssuePostRequestBody_webOtp();
-                if (webOtp is JsonValue primitive) wrapper.Boolean = primitive.GetValue<bool>();
-                else wrapper.IssueWebOtpOptions = await Model(webOtp, IssueWebOtpOptions.CreateFromDiscriminatorValue);
-                body.WebOtp = wrapper;
-            }
-            return await client.Issue.PostAsIssuePostResponseAsync(body,c => {c.Headers.Add("X-Poc-Case",id);c.Headers.Add("Idempotency-Key",key);c.Headers.Add("Origin","https://poc.example.com");},cancel);
+            return await client.Issue.PostAsIssuePostResponseAsync(body,c => {c.Headers.Add("X-Poc-Case",id);c.Headers.Add("Idempotency-Key",key);},cancel);
         }
         case "verify": return await client.Verify.PostAsVerifyPostResponseAsync(await Model(test["request"]!,VerifyPostRequestBody.CreateFromDiscriminatorValue),c => c.Headers.Add("X-Poc-Case",id),cancel);
         case "status": return await client.Status.GetAsStatusGetResponseAsync(c => {c.Headers.Add("X-Poc-Case",id);c.QueryParameters.IssueId=query["issueId"]!.GetValue<string>();},cancel);

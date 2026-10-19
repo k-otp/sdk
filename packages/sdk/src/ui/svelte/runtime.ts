@@ -392,10 +392,6 @@ export const buttonHandlers = (
   };
 };
 
-/** The digit shown by each segment. */
-export const codeDigits = (value: string, length: number): string[] =>
-  otpCodeSegments(value, length);
-
 /**
  * `use:` action on a code input group: writes the code into the
  * (uncontrolled) segments whenever it changes, never while an IME is
@@ -439,8 +435,12 @@ export type OtpCodeInputProps = {
   /** Focus the first empty segment on mount. */
   autoFocus?: boolean | undefined;
   /**
-   * Fill the code with WebOTP when supported (only when it arrives by SMS,
-   * the fallback when AlimTalk cannot be delivered).
+   * `true`: fill the code with WebOTP when the browser supports it (see
+   * `receiveWebOtp`). Default `false`.
+   *
+   * @deprecated K-OTP API 2.x no longer adds the WebOTP line to the SMS
+   * fallback, so no code arrives this way; `autocomplete="one-time-code"`
+   * still lets the OS suggest the code. Remove the prop.
    */
   webOtp?: boolean | undefined;
   /** Renders a hidden input with this name and the value, for form posts. */
@@ -473,7 +473,10 @@ type CodeInputModel = {
   }) => { group: OtpAttrs; segments: OtpAttrs[]; digits: string[] };
   /** The `<html lang>` locale for `locale: "auto"` (after mount). */
   detectedLocale: Readable<OtpLocale>;
-  /** `use:` action on the group: autofocus, WebOTP and `locale: "auto"`. */
+  /**
+   * `use:` action on the group: autofocus, the deprecated WebOTP and
+   * `locale: "auto"`.
+   */
   group: (
     node: HTMLElement,
     options: { autoFocus: boolean; webOtp: boolean; locale?: unknown },

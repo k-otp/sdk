@@ -87,12 +87,6 @@ export function startContractServer() {
           (body as Record<string, unknown>).idempotencyKey
       )
         violations.push(`${id}: idempotency header/body mismatch`);
-      if (
-        test.operation === "issue" &&
-        (test.request as { webOtp?: unknown }).webOtp === true &&
-        request.headers.get("origin") !== "https://poc.example.com"
-      )
-        violations.push(`${id}: missing Origin for boolean webOtp`);
       if (typeof test.delayMs === "number") await Bun.sleep(test.delayMs);
       if ("explicitRetry" in test && count === 1)
         return Response.json(

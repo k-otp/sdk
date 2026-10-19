@@ -79,7 +79,7 @@ const ledgerEntry = (n: number) => ({
 const templateDetail: GetTemplateResult = {
   templateId: "otp_login_kr",
   name: "Login",
-  channelSupport: ["alimtalk", "sms"],
+  channelSupport: ["alimtalk"],
   body: "[K-OTP] 로그인 인증번호는 #{code}입니다.",
   variables: { required: [], properties: {}, additionalProperties: false },
 };
@@ -442,7 +442,7 @@ describe("key guards", () => {
   });
 });
 
-describe("organization wallet (API 1.4.0)", () => {
+describe("organization wallet", () => {
   const updatedAt = issueOutput.queuedAt;
   // Exactly what an API older than 1.4.0 sends: no wallet fields at all.
   const legacyBalance = {

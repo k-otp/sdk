@@ -7,7 +7,6 @@ import com.microsoft.kiota.http.OkHttpRequestAdapter;
 import com.microsoft.kiota.serialization.*;
 import dev.kotp.sdk.generated.KOtpApiClient;
 import dev.kotp.sdk.generated.issue.IssuePostRequestBody;
-import dev.kotp.sdk.generated.models.IssueWebOtpOptions;
 import dev.kotp.sdk.generated.verify.VerifyPostRequestBody;
 import dev.kotp.sdk.generated.issues.GetVerificationStatusQueryParameterType;
 import dev.kotp.sdk.generated.creditledger.GetEntryTypeQueryParameterType;
@@ -23,9 +22,9 @@ import java.util.concurrent.TimeUnit;
 public final class KotpClient implements AutoCloseable {
     private final OkHttpClient http;
     private final KOtpApiClient client;
-    public record RequestOptions(Map<String,String> headers, String origin, boolean retry503) {
+    public record RequestOptions(Map<String,String> headers, boolean retry503) {
         public RequestOptions { headers = headers == null ? Map.of() : Map.copyOf(headers); }
-        public RequestOptions() { this(Map.of(), null, false); }
+        public RequestOptions() { this(Map.of(), false); }
     }
     public static final class KotpApiException extends RuntimeException {
         public final int status;
@@ -114,16 +113,9 @@ public final class KotpClient implements AutoCloseable {
                 String key = request.has("idempotencyKey") ? request.get("idempotencyKey").getAsString().trim() : "";
                 if (!key.matches("[!-~]{1,128}")) throw new IllegalArgumentException("Invalid issue idempotency key before HTTP");
                 JsonObject input = request.deepCopy();
-                JsonElement webOtp = input.remove("webOtp");
                 IssuePostRequestBody body = model(input, IssuePostRequestBody::createFromDiscriminatorValue);
-                if (webOtp != null) {
-                    IssuePostRequestBody.IssuePostRequestBodyWebOtp wrapper = new IssuePostRequestBody.IssuePostRequestBodyWebOtp();
-                    if (webOtp.isJsonPrimitive()) wrapper.setBoolean(webOtp.getAsBoolean());
-                    else wrapper.setIssueWebOtpOptions(model(webOtp, IssueWebOtpOptions::createFromDiscriminatorValue));
-                    body.setWebOtp(wrapper);
-                }
                 body.setIdempotencyKey(key);
-                return client.issue().post(body, c -> { configure(c,options); c.headers.add("Idempotency-Key", key); if(options.origin()!=null) c.headers.add("Origin", options.origin()); });
+                return client.issue().post(body, c -> { configure(c,options); c.headers.add("Idempotency-Key", key); });
             }
             case "verify": return client.verify().post(model(request, VerifyPostRequestBody::createFromDiscriminatorValue), c -> configure(c,options));
             case "status": return client.status().get(c -> { configure(c,options); c.queryParameters.issueId = q.get("issueId").getAsString(); });

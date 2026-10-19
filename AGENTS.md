@@ -42,7 +42,8 @@ Public, MIT-licensed SDK for the K-OTP Korean OTP API (`https://api.k-otp.dev/v1
     live in the root `devDependencies`); svelte is ESM-only.
   - `src/ui` -> `@k-otp/sdk/ui`: the framework-agnostic UI model (phone
     canonicalization, code input model, `createOtpForm` state machine over
-    the headless flow, KO/EN messages, WebOTP, part attributes). Put shared
+    the headless flow, KO/EN messages, part attributes, the deprecated
+    WebOTP helpers). Put shared
     UI behavior there, never in one framework's components.
   - `src/ui/react|vue` -> `@k-otp/sdk/ui/react|vue`: headless components
     (`createElement` / `h` render functions, no JSX/SFC build).

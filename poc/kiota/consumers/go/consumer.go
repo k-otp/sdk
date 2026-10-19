@@ -39,7 +39,7 @@ func main() {
 		if e != nil {
 			panic(e)
 		}
-		options := kotp.RequestOptions{Headers: map[string]string{"X-Poc-Case": test.ID}, Origin: "https://poc.example.com", Retry503: test.ExplicitRetry}
+		options := kotp.RequestOptions{Headers: map[string]string{"X-Poc-Case": test.ID}, Retry503: test.ExplicitRetry}
 		ctx := context.Background()
 		var value any
 		switch test.Operation {

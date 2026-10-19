@@ -14,7 +14,8 @@ this server; the **`sk_` secret key never leaves it**.
 1.4.0 `getBalance()` returns the **organization** wallet shared by all of its
 apps (`walletScope: "organization"`), and `listCreditLedger()` shows the
 wallet's credits plus only this app's debits. `walletScope` is typed optional
-because an API older than 1.4.0 omits it.
+(the current API always sends it; the type stays optional until the next
+major version of the SDK).
 
 ## Run
 

@@ -1,11 +1,11 @@
 # K-OTP server client for .NET
 
 Add the release package directory as a NuGet source, then reference
-`KOtp.Sdk` version `0.1.0`.
+`KOtp.Sdk` version `0.2.0`.
 
 ```sh
 dotnet nuget add source ./packages --name kotp-local
-dotnet add package KOtp.Sdk --version 0.1.0
+dotnet add package KOtp.Sdk --version 0.2.0
 ```
 
 Place the downloaded `.nupkg` in `./packages`. Keep nuget.org enabled for the
@@ -28,7 +28,7 @@ include `limit`, `cursor`, ISO 8601 `createdFrom`/`createdTo` and
 same key in header and body. It must be nonempty ASCII, at most 128 characters.
 Automatic retries are disabled. `new RequestOptions(Retry503: true)` permits
 one issue retry after an explicit HTTP 503 response. Other operations do not
-automatically retry. Request options also accept `Origin` and custom `Headers`;
+automatically retry. Request options also accept custom `Headers`;
 authentication and idempotency headers are managed by the client.
 
 `KotpApiException` exposes HTTP `Status`, JSON `Envelope`, `RequestId`,

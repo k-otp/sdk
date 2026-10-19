@@ -72,8 +72,8 @@ setup-kiota v0.5.0은 commit
 다른 항목이다. [공식 action 입력](https://github.com/microsoft/setup-kiota/blob/v0.5.0/action.yml).
 
 입력은 저장소의 `spec/openapi.json`이며 운영 URL에서 갱신하지 않는다.
-OpenAPI 규격 버전은 **3.1.1**, 서비스 계약 버전은 **1.9.0**,
-SHA-256은 `534cc399e6edf2748c3da15b504caed5f1e08b361abf1300416c3bddeb341340`다.
+OpenAPI 규격 버전은 **3.1.1**, 서비스 계약 버전은 **2.1.0**,
+SHA-256은 `ece6075cf416ea4d3fecae383e221510f1896fe405a86b64f9c2a034074750ef`다.
 각 JSON에 commit/run/attempt/spec/fixture/input hash, 실제 도구·OS/architecture,
 action SHA, dependency lock hash, 단계별 상태, 경고·차단 요인·증거 경로를 남긴다.
 
@@ -214,7 +214,7 @@ HTTP 테스트가 mapping 유무의 런타임 영향을 보완한다.
 [Kiota 오류 처리 문서](https://learn.microsoft.com/en-us/openapi/kiota/errors)를 참고한다.
 
 변환은 `poc/kiota/overlays/compat.ts`에만 있고 generated 파일은 수정하지 않는다.
-원본 OpenAPI 3.1.1, 9개 operation, nullable 및 boolean/object `webOtp` union은
+원본 OpenAPI 3.1.1, 9개 operation, nullable union(예: 잔액의 `promoNextExpiry`)은
 유지한다. `overlay-changes.json`은 JSON pointer와 전후 schema/사유를 저장한다.
 
 | 변환 | 개수 | 의미와 손실 |
@@ -246,7 +246,7 @@ writer 문제를 피하며 null/false/object/list를 보존한다. 전후 schema
 관측한다. `issue`/`verify` 메서드 stub은 없다.
 
 검증 범위는 문자열 전화번호/선행 0 OTP/Unicode, `smsFallback` 생략·true·false,
-`webOtp` 생략·false·true·object, metadata/templateVariables map, enum/const,
+`channel` alimtalk, metadata/templateVariables map, enum/const,
 200 `verified:false`, 400/401/403/404/409/402/429/500/503 및 `defined:false`,
 중첩 object/list/null/false 오류 data, request id와 Retry-After 초 및 body ms,
 조직 지갑·promo nullable expiry, path/query encoding, 두 cursor 페이지 및 종료다.
@@ -303,8 +303,7 @@ fixture I/O와 관측도 포함되므로 제품 wrapper의 순수 크기로 읽�
 운영 wrapper로 추출할 때는 client factory·issue guard·오류 view·retry 정책의
 크기와 public API를 별도로 측정해야 한다.
 
-특별 관리가 필요한 부분은 Python serializer의 false-valued `webOtp` 처리
-(official additional-data 경로로 false 보존), Python 동적 오류 data의 직접 읽기,
+특별 관리가 필요한 부분은 Python 동적 오류 data의 직접 읽기,
 Go abstractions 1.9.3의 nil optional date query panic(1.11.1로 해결),
 원본/overlay 사이 enum query 소비자 타입 차이, 오류 data의 schema 완화다.
 Go 최소 fixture는 두 runtime 버전에서 panic/fix를 모두 실행한다.

@@ -7,7 +7,7 @@ $fixture=json_decode(file_get_contents(getenv('POC_FIXTURE')),true,512,JSON_THRO
 $observations=[];
 foreach($fixture['cases'] as $case) {
     $client=new KotpClient($fixture['fakeSecretKey'],getenv('POC_BASE_URL'),$case['timeoutMs'] ?? 10000);
-    $options=['headers'=>['X-Poc-Case'=>$case['id']],'origin'=>'https://poc.example.com','retry503'=>$case['explicitRetry'] ?? false];
+    $options=['headers'=>['X-Poc-Case'=>$case['id']],'retry503'=>$case['explicitRetry'] ?? false];
     $observation=['id'=>$case['id']];
     try {
         $observation['response']=match($case['operation']) {

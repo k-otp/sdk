@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   createOtpClient,
+  getIssueRequestErrorCode,
+  ISSUE_REQUEST_ERROR_CODES,
   isOtpApiError,
   normalizeOtpApiError,
   OtpApiError,
@@ -320,5 +322,40 @@ describe("OtpApiError", () => {
     expect(otpErrorCodeFromStatus(502)).toBe("SERVICE_UNAVAILABLE");
     expect(otpErrorCodeFromStatus(507)).toBe("INTERNAL_SERVER_ERROR");
     expect(otpErrorCodeFromStatus(302)).toBe("UNKNOWN");
+  });
+
+  test("getIssueRequestErrorCode reads data.code of a 400 only", async () => {
+    expect(ISSUE_REQUEST_ERROR_CODES).toEqual([
+      "CHANNEL_NOT_SUPPORTED",
+      "TEMPLATE_NOT_AVAILABLE",
+      "WEB_OTP_NOT_SUPPORTED",
+    ]);
+    for (const code of ISSUE_REQUEST_ERROR_CODES) {
+      const { fetch } = mockFetch(() =>
+        errorEnvelope(400, "BAD_REQUEST", `${code}: rejected`, { code }),
+      );
+      const client = createOtpClient({ apiKey: "pk_test", fetch });
+      const error = await client
+        .issue({
+          phoneNumber: "01012345678",
+          purpose: "signup",
+          idempotencyKey: "k1",
+        })
+        .catch((reason: unknown) => reason);
+      expect(isOtpApiError(error)).toBe(true);
+      expect((error as OtpApiError).code).toBe("BAD_REQUEST");
+      expect(getIssueRequestErrorCode(error)).toBe(code);
+    }
+    expect(
+      getIssueRequestErrorCode({ status: 400, data: { code: "OTHER" } }),
+    ).toBeUndefined();
+    expect(
+      getIssueRequestErrorCode({
+        status: 402,
+        data: { code: "CHANNEL_NOT_SUPPORTED" },
+      }),
+    ).toBeUndefined();
+    expect(getIssueRequestErrorCode(new Error("x"))).toBeUndefined();
+    expect(getIssueRequestErrorCode(undefined)).toBeUndefined();
   });
 });

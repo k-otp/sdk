@@ -16,7 +16,6 @@ import (
 	"github.com/k-otp/sdk/sdks/go/generated/creditledger"
 	"github.com/k-otp/sdk/sdks/go/generated/issue"
 	"github.com/k-otp/sdk/sdks/go/generated/issues"
-	"github.com/k-otp/sdk/sdks/go/generated/models"
 	"github.com/k-otp/sdk/sdks/go/generated/status"
 	"github.com/k-otp/sdk/sdks/go/generated/templates"
 	"github.com/k-otp/sdk/sdks/go/generated/verify"
@@ -101,8 +100,6 @@ func call(client *sdk.KOtpApiClient, test TestCase, ctx context.Context) (ser.Pa
 		if !valid {
 			return nil, configurationError{errors.New("invalid idempotency key before HTTP")}
 		}
-		web, hasWeb := input["webOtp"]
-		delete(input, "webOtp")
 		data, _ := json.Marshal(input)
 		parsed, err := model(data, issue.CreateIssuePostRequestBodyFromDiscriminatorValue)
 		if err != nil {
@@ -110,22 +107,7 @@ func call(client *sdk.KOtpApiClient, test TestCase, ctx context.Context) (ser.Pa
 		}
 		body := parsed.(*issue.IssuePostRequestBody)
 		body.SetIdempotencyKey(&key)
-		if hasWeb {
-			wrapper := issue.NewIssuePostRequestBody_IssuePostRequestBody_webOtp()
-			var flag bool
-			if json.Unmarshal(web, &flag) == nil {
-				wrapper.SetBoolean(&flag)
-			} else {
-				value, err := model(web, models.CreateIssueWebOtpOptionsFromDiscriminatorValue)
-				if err != nil {
-					return nil, err
-				}
-				wrapper.SetIssueWebOtpOptions(value.(models.IssueWebOtpOptionsable))
-			}
-			body.SetWebOtp(wrapper)
-		}
 		headers.Add("Idempotency-Key", key)
-		headers.Add("Origin", "https://poc.example.com")
 		return client.Issue().PostAsIssuePostResponse(ctx, body, &issue.IssueRequestBuilderPostRequestConfiguration{Headers: headers})
 	case "verify":
 		body, err := model(test.Request, verify.CreateVerifyPostRequestBodyFromDiscriminatorValue)

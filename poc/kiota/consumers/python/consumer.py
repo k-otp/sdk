@@ -13,7 +13,7 @@ async def main():
         async with KotpClient(fixture["fakeSecretKey"], base_url=os.environ["POC_BASE_URL"], timeout_ms=case.get("timeoutMs", 10000)) as client:
             try:
                 operation = case["operation"]
-                if operation == "issue": value = await client.issue(case["request"], origin="https://poc.example.com", retry503=case.get("explicitRetry", False), **options)
+                if operation == "issue": value = await client.issue(case["request"], retry503=case.get("explicitRetry", False), **options)
                 elif operation == "verify": value = await client.verify(case["request"], **options)
                 elif operation == "status": value = await client.status(case["query"]["issueId"], **options)
                 elif operation == "issues": value = await client.issues(case["query"], **options)

@@ -643,8 +643,12 @@ export type OtpCodeInputProps = Omit<
   /** Focus the first empty segment on mount. */
   autoFocus?: boolean | undefined;
   /**
-   * Fill the code with WebOTP when supported (only when it arrives by SMS,
-   * the fallback when AlimTalk cannot be delivered).
+   * `true`: fill the code with WebOTP when the browser supports it (see
+   * `receiveWebOtp`). Default `false`.
+   *
+   * @deprecated K-OTP API 2.x no longer adds the WebOTP line to the SMS
+   * fallback, so no code arrives this way; `autocomplete="one-time-code"`
+   * still lets the OS suggest the code. Remove the prop.
    */
   webOtp?: boolean | undefined;
   /** Renders a hidden input with this name and the value, for form posts. */
@@ -657,7 +661,8 @@ export type OtpCodeInputProps = Omit<
 /**
  * A standalone segmented one-time-code input (`autocomplete="one-time-code"`,
  * `inputmode="numeric"`, paste across segments, Backspace/arrow navigation,
- * optional WebOTP). Controlled (`value` + `onValueChange`) or uncontrolled.
+ * deprecated opt-in WebOTP). Controlled (`value` + `onValueChange`) or
+ * uncontrolled.
  */
 export const OtpCodeInput = ({
   value: valueProp,

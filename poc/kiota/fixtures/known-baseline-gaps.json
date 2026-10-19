@@ -1,8 +1,8 @@
 {
   "metadata": {
     "kiotaVersion": "1.35.0+114aa7ee609262d892fd9ceb02b2d9f7ecb84190",
-    "specSha256": "534cc399e6edf2748c3da15b504caed5f1e08b361abf1300416c3bddeb341340",
-    "fixtureSha256": "293bbdccd8d4d50e8684dc00960a5e46b50a7bef3c4b2b662ed94a5ef954a399",
+    "specSha256": "ece6075cf416ea4d3fecae383e221510f1896fe405a86b64f9c2a034074750ef",
+    "fixtureSha256": "ddf1b7a9dc72dfe19bf078b8db2fc4c0c1f9b193b51162f5c19be4befe405170",
     "sourceRunId": "37515801223",
     "sourceHeadCommit": "ffda3fb092f9b8a0795ccbb759a4fd936ba656b2",
     "note": "Core/HTTP/existing comparison observed in sourceRunId; Ruby/Dart/TypeScript raw cases re-observed locally after the reviewed runtime/usage fixes. CI never updates this file."
@@ -831,8 +831,7 @@
         "issue-1": {
           "failures": [
             "response field attemptsRemaining differs",
-            "response field issueId differs",
-            "response field webOtp.status differs"
+            "response field issueId differs"
           ],
           "received": 1,
           "exception": "NameError",
@@ -852,8 +851,7 @@
         "issue-3": {
           "failures": [
             "response field attemptsRemaining differs",
-            "response field issueId differs",
-            "response field webOtp.status differs"
+            "response field issueId differs"
           ],
           "received": 1,
           "exception": "NameError",

@@ -1,11 +1,16 @@
 /**
  * WebOTP (`navigator.credentials.get({ otp })`): lets Chrome on Android read
  * the code from the incoming SMS after a one-tap consent, without leaving the
- * page. K-OTP delivers codes by KakaoTalk AlimTalk by default, so this only
- * applies when the code arrives by SMS (the automatic fallback when AlimTalk
- * cannot be delivered); otherwise the request simply never resolves.
+ * page.
  *
- * It only works when the SMS ends with an origin-bound line, on its own last
+ * Deprecated: K-OTP API 2.x delivers codes by KakaoTalk AlimTalk and no longer
+ * adds the origin-bound WebOTP line to the SMS fallback, so these helpers
+ * never receive a K-OTP code (the request stays pending until aborted). They
+ * keep working as generic browser helpers until the next major version.
+ * `autocomplete="one-time-code"`, which the code inputs set, still lets the OS
+ * suggest a code that arrives by SMS.
+ *
+ * WebOTP only works when the SMS ends with an origin-bound line, on its own last
  * line, naming the page's host and the code:
  *
  * ```text
@@ -24,13 +29,19 @@
  */
 import { DEFAULT_OTP_CODE_LENGTH, sanitizeOtpCode } from "./code";
 
-/** `true` in browsers that implement WebOTP (`OTPCredential`). */
+/**
+ * `true` in browsers that implement WebOTP (`OTPCredential`).
+ *
+ * @deprecated K-OTP API 2.x no longer sends the WebOTP SMS line; see
+ * `receiveWebOtp`.
+ */
 export const isWebOtpSupported = (): boolean =>
   typeof window !== "undefined" &&
   "OTPCredential" in window &&
   typeof navigator !== "undefined" &&
   typeof navigator.credentials?.get === "function";
 
+/** @deprecated Options of the deprecated `receiveWebOtp`. */
 export type ReceiveWebOtpOptions = {
   /** Abort the request (e.g. on unmount or when the code was typed). */
   signal?: AbortSignal;
@@ -39,9 +50,13 @@ export type ReceiveWebOtpOptions = {
 };
 
 /**
- * Waits for a code delivered by SMS (the AlimTalk fallback) through WebOTP. Resolves the sanitized code, or
- * `undefined` when WebOTP is unsupported, the request was aborted, the user
- * declined, or anything else failed. Never rejects and never throws.
+ * Waits for a code delivered by SMS through WebOTP. Resolves the sanitized
+ * code, or `undefined` when WebOTP is unsupported, the request was aborted,
+ * the user declined, or anything else failed. Never rejects and never throws.
+ *
+ * @deprecated K-OTP API 2.x no longer adds the WebOTP line to the SMS
+ * fallback, so a K-OTP code never arrives this way: the request stays pending
+ * until aborted. Rely on `autocomplete="one-time-code"` instead.
  */
 export const receiveWebOtp = async (
   options: ReceiveWebOtpOptions = {},

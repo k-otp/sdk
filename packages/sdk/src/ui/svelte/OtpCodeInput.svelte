@@ -1,7 +1,7 @@
 <!--
   Standalone segmented one-time-code input: bind:value, autocomplete
   "one-time-code", inputmode "numeric", paste across segments,
-  Backspace/arrow navigation and optional WebOTP.
+  Backspace/arrow navigation and the deprecated opt-in WebOTP.
 -->
 <script>
   import { attrs, createOtpCodeInputModel, syncSegments } from "./runtime.js";
@@ -18,7 +18,10 @@
   export let id = undefined;
   /** @type {boolean} */
   export let autoFocus = false;
-  /** @type {boolean} */
+  /**
+   * @type {boolean}
+   * @deprecated K-OTP API 2.x no longer sends the WebOTP SMS line.
+   */
   export let webOtp = false;
   /** @type {string | undefined} */
   export let name = undefined;

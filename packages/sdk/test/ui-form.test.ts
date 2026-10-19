@@ -138,7 +138,6 @@ const setup = (options: Partial<OtpFormOptions> = {}) => {
     purpose: "signup",
     now: () => clock,
     onPhaseChange: (phase) => phases.push(phase),
-    webOtp: false,
     ...options,
   });
   return {
@@ -204,7 +203,7 @@ describe("createOtpForm", () => {
     const onSent = mock();
     const { form, issues, phases } = setup({
       onSent,
-      issue: { channel: "sms", templateId: "otp_signup_kr" },
+      issue: { channel: "alimtalk", templateId: "otp_signup_kr" },
       idempotencyKeyPrefix: "signup",
     });
     form.setPhoneNumber("+82 10 1234 5678");
@@ -217,7 +216,7 @@ describe("createOtpForm", () => {
     expect(issues[0]).toMatchObject({
       phoneNumber: "01012345678",
       purpose: "signup",
-      channel: "sms",
+      channel: "alimtalk",
       templateId: "otp_signup_kr",
     });
     expect(issues[0]?.idempotencyKey).toStartWith("signup");
@@ -734,7 +733,19 @@ describe("createOtpForm", () => {
     stop();
   });
 
-  test("WebOTP fills and verifies the code when supported", async () => {
+  test("WebOTP (deprecated) is off unless webOtp is true", async () => {
+    const get = mock(() => new Promise(() => {}));
+    await withWebOtp(get, async () => {
+      const { form } = setup();
+      form.setPhoneNumber("01012345678");
+      await form.send();
+      await microtasks();
+      expect(get).not.toHaveBeenCalled();
+      form.abort();
+    });
+  });
+
+  test("WebOTP (deprecated, opt-in) fills and verifies the code when supported", async () => {
     let release!: (value: { code: string }) => void;
     const get = () =>
       new Promise((resolve) => {

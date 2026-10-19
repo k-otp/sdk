@@ -9,7 +9,8 @@
  *
  * SSR-safe: creating a controller performs no I/O, starts no timer and does
  * not touch `window`. Timers only run after an action while someone is
- * subscribed; WebOTP is feature-detected when a code was sent.
+ * subscribed; the deprecated WebOTP option is feature-detected when a code
+ * was sent.
  */
 import type { OtpApiError } from "../core/errors";
 import { createIdempotencyKey } from "../core/idempotency";
@@ -89,13 +90,22 @@ export type OtpFormConfig = {
   purpose: string;
   /**
    * Other `issue` fields: `templateId`, `templateVariables`, `metadata`, ...
-   * The code is delivered by KakaoTalk AlimTalk by default, with automatic
-   * SMS fallback.
+   * The code is delivered by KakaoTalk AlimTalk, with automatic SMS
+   * fallback.
    */
   issue?: Omit<OtpFlowSendInput, "phoneNumber" | "purpose"> | undefined;
   /** Verify as soon as every digit is entered. Default `true`. */
   autoSubmit?: boolean | undefined;
-  /** Use WebOTP after a send when the browser supports it. Default `true`. */
+  /**
+   * `true`: listen for the code with WebOTP after a send when the browser
+   * supports it (see `receiveWebOtp`). Default `false` (it was `true` before
+   * 2.1.0).
+   *
+   * @deprecated K-OTP API 2.x no longer adds the WebOTP line to the SMS
+   * fallback, so no code arrives this way. Segmented code inputs keep
+   * `autocomplete="one-time-code"`, which lets the OS suggest the code.
+   * Remove the option.
+   */
   webOtp?: boolean | undefined;
   /** Clear the code after a wrong code (`MISMATCH`). Default `true`. */
   clearCodeOnMismatch?: boolean | undefined;
@@ -612,7 +622,8 @@ export const createOtpForm = (
 
   const startWebOtp = (issueId: string): void => {
     stopWebOtp();
-    if (config.webOtp === false) return;
+    // Opt-in since 2.1.0: the API no longer sends the WebOTP line.
+    if (config.webOtp !== true) return;
     const controller = new AbortController();
     webOtp = controller;
     void receiveWebOtp({ signal: controller.signal, length: codeLength }).then(

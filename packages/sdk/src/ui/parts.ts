@@ -631,7 +631,7 @@ export const createOtpCodeInputHandlers = (
         composed = { index };
         apply(index, element);
       }
-      // The code may have changed while composing (WebOTP, reset, a
+      // The code may have changed while composing (a reset, a
       // controlled parent) without any render after this point.
       if (syncPending) sync();
     },

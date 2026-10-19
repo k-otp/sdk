@@ -13,8 +13,6 @@ from kiota_serialization_json.json_parse_node_factory import JsonParseNodeFactor
 from kiota_serialization_json.json_serialization_writer import JsonSerializationWriter
 from kotp_sdk_generated.k_otp_api_client import KOtpApiClient
 from kotp_sdk_generated.issue.issue_post_request_body import IssuePostRequestBody
-from kotp_sdk_generated.issue.issue_post_request_body_web_otp import IssuePostRequestBody_webOtp
-from kotp_sdk_generated.models.issue_web_otp_options import IssueWebOtpOptions
 from kotp_sdk_generated.verify.verify_post_request_body import VerifyPostRequestBody
 from kotp_sdk_generated.status.status_request_builder import StatusRequestBuilder
 from kotp_sdk_generated.issues.issues_request_builder import IssuesRequestBuilder
@@ -129,29 +127,15 @@ class KotpClient:
         except (asyncio.TimeoutError, httpx.TransportError) as error:
             raise KotpTransportError("The request outcome is unknown") from error
 
-    async def issue(self, input, *, headers=None, origin=None, retry503=False):
+    async def issue(self, input, *, headers=None, retry503=False):
         key = input.get("idempotencyKey", "")
         key = key.strip() if isinstance(key, str) else ""
         if not re.fullmatch(r"[!-~]{1,128}", key):
             raise TypeError("Invalid issue idempotency key before HTTP")
-        request = dict(input)
-        web = request.pop("webOtp", None)
-        body = _model(request, IssuePostRequestBody)
+        body = _model(dict(input), IssuePostRequestBody)
         body.idempotency_key = key
-        if web is not None:
-            wrapper = IssuePostRequestBody_webOtp()
-            if isinstance(web, bool):
-                wrapper.boolean = web
-            else:
-                wrapper.issue_web_otp_options = _model(web, IssueWebOtpOptions)
-            body.web_otp = wrapper
-            if web is False:
-                body.web_otp = None
-                body.additional_data["webOtp"] = False
         config = self._config(headers)
         config.headers.add("Idempotency-Key", key)
-        if origin is not None:
-            config.headers.add("Origin", origin)
         return await self._send(lambda: self._api.issue.post(body, config), retry503=retry503)
 
     async def verify(self, input, *, headers=None):

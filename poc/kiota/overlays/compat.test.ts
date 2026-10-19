@@ -15,10 +15,10 @@ describe("reviewed generation overlay", () => {
     expect(
       (spec.paths as typeof original.paths)["/issue"].post.requestBody.content[
         "application/json"
-      ].schema.properties.webOtp,
+      ].schema.properties.smsFallback,
     ).toEqual(
       original.paths["/issue"].post.requestBody.content["application/json"]
-        .schema.properties.webOtp,
+        .schema.properties.smsFallback,
     );
     expect(
       (spec.paths as typeof original.paths)["/balance"].get.responses["200"]
@@ -99,10 +99,10 @@ describe("reviewed generation overlay", () => {
     expect(
       (spec.paths as typeof original.paths)["/issue"].post.requestBody.content[
         "application/json"
-      ].schema.properties.webOtp,
+      ].schema.properties.smsFallback,
     ).toEqual(
       original.paths["/issue"].post.requestBody.content["application/json"]
-        .schema.properties.webOtp,
+        .schema.properties.smsFallback,
     );
   });
   test("Dart unconstrained optional error data remains allowed through the open object", () => {
