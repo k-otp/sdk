@@ -34,6 +34,10 @@ import type { OtpFormConfig, ReceiveWebOtpOptions } from "../src/ui";
 import type { OtpCodeInputProps as ReactCodeInputProps } from "../src/ui/react";
 import type { OtpCodeInputProps as VueCodeInputProps } from "../src/ui/vue";
 import { errorEnvelope, mockFetch } from "./helpers";
+import { registerSvelteServerPlugin } from "./svelte-server-plugin";
+
+// `@k-otp/sdk/ui/svelte` exports `.svelte` sources: compile them for SSR.
+registerSvelteServerPlugin();
 
 const SUBPATHS = {
   "@k-otp/sdk": () => import("./compat-2.0/core"),
@@ -48,6 +52,7 @@ const SUBPATHS = {
   "@k-otp/sdk/ui": () => import("./compat-2.0/ui"),
   "@k-otp/sdk/ui/react": () => import("./compat-2.0/ui-react"),
   "@k-otp/sdk/ui/vue": () => import("./compat-2.0/ui-vue"),
+  "@k-otp/sdk/ui/svelte": () => import("./compat-2.0/ui-svelte"),
 };
 
 describe("@k-otp/sdk 2.0.0 compatibility", () => {

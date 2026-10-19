@@ -4,7 +4,6 @@
  * request, starts no timer and never touches `window`/`document`.
  */
 import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
-import { plugin } from "bun";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { VERSION as SVELTE_VERSION } from "svelte/compiler";
@@ -12,23 +11,11 @@ import { createSSRApp, h } from "vue";
 import { renderToString as renderVue } from "vue/server-renderer";
 import { createOtpClient } from "../src/core";
 import { issueOutput, json, mockFetch } from "./helpers";
+import { registerSvelteServerPlugin } from "./svelte-server-plugin";
 
 const svelte4 = SVELTE_VERSION.startsWith("4.");
 
-plugin({
-  name: "svelte-server",
-  setup(build) {
-    build.onLoad({ filter: /\.svelte$/ }, async ({ path }) => {
-      const { compile } = await import("svelte/compiler");
-      const options = {
-        filename: path,
-        generate: svelte4 ? "ssr" : "server",
-      } as unknown as Parameters<typeof compile>[1];
-      const { js } = compile(await Bun.file(path).text(), options);
-      return { contents: js.code, loader: "js" };
-    });
-  },
-});
+registerSvelteServerPlugin();
 
 const realSetTimeout = globalThis.setTimeout;
 const timers = mock();

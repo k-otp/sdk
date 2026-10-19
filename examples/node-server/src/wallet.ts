@@ -13,6 +13,7 @@ export type WalletSummary = {
   balance: number;
   /** "organization" (shared) or "app" (legacy per-app wallet). */
   scope: OtpWalletScope;
+  /** Always sent by the current API; optional only for compatibility with APIs older than 1.4.0. */
   walletId?: string;
   /** Debits of THIS app among the latest ledger entries. */
   recentAppDebits: number;
