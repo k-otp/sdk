@@ -1,7 +1,7 @@
 {
   "metadata": {
     "kiotaVersion": "1.35.0+114aa7ee609262d892fd9ceb02b2d9f7ecb84190",
-    "specSha256": "cdcc13356b5e2c7b2ca503b9440e835d4b1a220dc317cdbc8a4157e5a38ba2dd",
+    "specSha256": "135af53e9ac432d22eecaef1cba5abf916534bb746c0fc65724b7350898b49c0",
     "fixtureSha256": "ddf1b7a9dc72dfe19bf078b8db2fc4c0c1f9b193b51162f5c19be4befe405170",
     "sourceRunId": "37515801223",
     "sourceHeadCommit": "ffda3fb092f9b8a0795ccbb759a4fd936ba656b2",
