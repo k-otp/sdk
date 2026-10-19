@@ -6,13 +6,14 @@
  * `minifyContractRouter()` produces): each procedure is a plain object that
  * only carries its HTTP route. There are no runtime schemas or validators, so
  * the browser bundle pays nothing for it; input/output types come from
- * `generated/openapi.ts`, which is generated from the vendored spec.
+ * `generated/openapi.ts`, which is generated from the vendored spec, with the
+ * deprecated `issue` members of `@k-otp/sdk` 2.0.0 kept by `compat.ts`.
  *
  * `test/contract-drift.test.ts` fails when an operation, method, path, path
  * parameter or required field here disagrees with `spec/openapi.json`.
  */
 import type { ContractProcedure, Route, Schema } from "@orpc/contract";
-import type { OpenApiOperations } from "./generated/openapi";
+import type { OpenApiOperations } from "./compat";
 
 type Operations = OpenApiOperations;
 type Part<T> = T extends undefined ? unknown : T;
@@ -173,5 +174,15 @@ export const otpServerContract: OtpServerContract = {
   getTemplate: getTemplateProcedure,
 };
 
+// These named exports take precedence over the generated ones of the same
+// name: they keep the deprecated `channel: "sms"` and `webOtp` members (and the
+// removed WebOTP types) that `@k-otp/sdk` 2.0.0 exported. See `compat.ts`.
+export type {
+  IssueOtpInput,
+  IssueOtpOutput,
+  IssueWebOtpOptions,
+  IssueWebOtpResult,
+  OpenApiOperations,
+} from "./compat";
 export type * from "./generated/openapi";
 export { OPENAPI_VERSION } from "./generated/openapi";

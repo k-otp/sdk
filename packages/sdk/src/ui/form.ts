@@ -9,7 +9,8 @@
  *
  * SSR-safe: creating a controller performs no I/O, starts no timer and does
  * not touch `window`. Timers only run after an action while someone is
- * subscribed.
+ * subscribed; the deprecated WebOTP option is feature-detected when a code
+ * was sent.
  */
 import type { OtpApiError } from "../core/errors";
 import { createIdempotencyKey } from "../core/idempotency";
@@ -49,6 +50,7 @@ import {
   type OtpPhoneNumber,
   parseOtpPhoneNumber,
 } from "./phone";
+import { receiveWebOtp } from "./webotp";
 
 /**
  * - `phone`: entering the number (also after "change number").
@@ -94,6 +96,17 @@ export type OtpFormConfig = {
   issue?: Omit<OtpFlowSendInput, "phoneNumber" | "purpose"> | undefined;
   /** Verify as soon as every digit is entered. Default `true`. */
   autoSubmit?: boolean | undefined;
+  /**
+   * `true`: listen for the code with WebOTP after a send when the browser
+   * supports it (see `receiveWebOtp`). Default `false` (it was `true` before
+   * 2.1.0).
+   *
+   * @deprecated K-OTP API 2.x no longer adds the WebOTP line to the SMS
+   * fallback, so no code arrives this way. Segmented code inputs keep
+   * `autocomplete="one-time-code"`, which lets the OS suggest the code.
+   * Remove the option.
+   */
+  webOtp?: boolean | undefined;
   /** Clear the code after a wrong code (`MISMATCH`). Default `true`. */
   clearCodeOnMismatch?: boolean | undefined;
   /** Accept non-Korean E.164 numbers. Default `false`. */
@@ -225,7 +238,7 @@ export type OtpFormController = {
    */
   reset: () => void;
   /**
-   * Aborts in-flight requests (e.g. on unmount). Their outcome
+   * Aborts in-flight requests and WebOTP (e.g. on unmount). Their outcome
    * is dropped: no `onError` (`ABORTED`), `onSent` or `onVerified`.
    */
   abort: () => void;
@@ -365,6 +378,7 @@ export const createOtpForm = (
   let version = 0;
   let unsubscribeFlow: (() => void) | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let webOtp: AbortController | undefined;
   let lastPhase: OtpFormPhase = "phone";
   let snapshot: OtpFormState | undefined;
   let snapshotKey: readonly unknown[] = [];
@@ -601,6 +615,31 @@ export const createOtpForm = (
     focus = { target, seq: ++focusSeq };
   };
 
+  const stopWebOtp = (): void => {
+    webOtp?.abort();
+    webOtp = undefined;
+  };
+
+  const startWebOtp = (issueId: string): void => {
+    stopWebOtp();
+    // Opt-in since 2.1.0: the API no longer sends the WebOTP line.
+    if (config.webOtp !== true) return;
+    const controller = new AbortController();
+    webOtp = controller;
+    void receiveWebOtp({ signal: controller.signal, length: codeLength }).then(
+      (received) => {
+        if (
+          !received ||
+          controller.signal.aborted ||
+          flow.getState().issueId !== issueId
+        ) {
+          return;
+        }
+        setCode(received);
+      },
+    );
+  };
+
   const send: OtpFormController["send"] = async () => {
     const phone = parsePhone();
     if (!phone.valid || !phone.value) {
@@ -653,6 +692,7 @@ export const createOtpForm = (
         localCooldown = { until: now() + localCooldownMs, phone: phone.value };
       }
       requestFocus("code");
+      startWebOtp(result.data.issueId);
       config.onSent?.(result.data);
     }
     touch();
@@ -679,6 +719,7 @@ export const createOtpForm = (
       errorOperation = "verify";
       config.onError?.(result.error, "verify");
     } else if (result.data.verified) {
+      stopWebOtp();
       requestFocus("message");
       config.onVerified?.(result.data);
     } else if (result.data.reasonCode === "MISMATCH") {
@@ -715,6 +756,7 @@ export const createOtpForm = (
    */
   const clearIssue = (): void => {
     epoch++;
+    stopWebOtp();
     // Keep the flow's pending key only with the input it was created for.
     const pendingKey = flow.getState().idempotencyKey;
     retained =
@@ -781,6 +823,7 @@ export const createOtpForm = (
     },
     abort: () => {
       epoch++;
+      stopWebOtp();
       flow.abort();
     },
     configure: (next) => {

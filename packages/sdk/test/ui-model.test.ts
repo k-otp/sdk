@@ -11,6 +11,7 @@ import {
   formatOtpPhoneInput,
   getOtpCodeInputParts,
   isOtpCodeComplete,
+  isWebOtpSupported,
   maskOtpPhoneNumber,
   OTP_MESSAGES,
   otpCodeFocusIndex,
@@ -20,6 +21,7 @@ import {
   otpSecondsLeft,
   otpSkipMessageKey,
   parseOtpPhoneNumber,
+  receiveWebOtp,
   resolveOtpLocale,
   sanitizeOtpCode,
   watchOtpDocumentLocale,
@@ -482,5 +484,53 @@ describe("locale", () => {
     const stop = watchOtpDocumentLocale((locale) => seen.push(locale));
     stop();
     expect(seen).toEqual([]);
+  });
+});
+
+describe("WebOTP without a browser", () => {
+  test("is unsupported and resolves undefined without throwing", async () => {
+    expect(isWebOtpSupported()).toBe(false);
+    expect(await receiveWebOtp()).toBeUndefined();
+    const controller = new AbortController();
+    controller.abort();
+    expect(await receiveWebOtp({ signal: controller.signal })).toBeUndefined();
+  });
+
+  test("uses navigator.credentials when OTPCredential exists", async () => {
+    const globals = globalThis as Record<string, unknown>;
+    const calls: unknown[] = [];
+    const credentials = {
+      get: async (options: unknown) => {
+        calls.push(options);
+        return { code: "１２３４５６" };
+      },
+    };
+    const saved = {
+      window: globals.window,
+      navigator: Object.getOwnPropertyDescriptor(globalThis, "navigator"),
+    };
+    globals.window = { OTPCredential: class {} };
+    Object.defineProperty(globalThis, "navigator", {
+      value: { credentials },
+      configurable: true,
+    });
+    try {
+      expect(isWebOtpSupported()).toBe(true);
+      const controller = new AbortController();
+      expect(await receiveWebOtp({ signal: controller.signal })).toBe("123456");
+      expect(calls[0]).toEqual({
+        otp: { transport: ["sms"] },
+        signal: controller.signal,
+      });
+      credentials.get = async () => {
+        throw new DOMException("aborted", "AbortError");
+      };
+      expect(await receiveWebOtp()).toBeUndefined();
+    } finally {
+      globals.window = saved.window;
+      if (saved.navigator) {
+        Object.defineProperty(globalThis, "navigator", saved.navigator);
+      }
+    }
   });
 });

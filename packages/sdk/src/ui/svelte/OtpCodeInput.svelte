@@ -1,7 +1,7 @@
 <!--
   Standalone segmented one-time-code input: bind:value, autocomplete
   "one-time-code", inputmode "numeric", paste across segments,
-  Backspace/arrow navigation.
+  Backspace/arrow navigation and the deprecated opt-in WebOTP.
 -->
 <script>
   import { attrs, createOtpCodeInputModel, syncSegments } from "./runtime.js";
@@ -18,6 +18,11 @@
   export let id = undefined;
   /** @type {boolean} */
   export let autoFocus = false;
+  /**
+   * @type {boolean}
+   * @deprecated K-OTP API 2.x no longer sends the WebOTP SMS line.
+   */
+  export let webOtp = false;
   /** @type {string | undefined} */
   export let name = undefined;
   /** @type {import("./runtime.js").OtpCodeInputProps["locale"]} */
@@ -55,7 +60,7 @@
   });
 </script>
 
-<div {...attrs(parts.group)} {...$$restProps} use:group={{ autoFocus, locale }} use:sync={parts.digits.join("")}>
+<div {...attrs(parts.group)} {...$$restProps} use:group={{ autoFocus, webOtp, locale }} use:sync={parts.digits.join("")}>
   {#each parts.segments as segment, index (index)}
     <input
       {...attrs(segment)}

@@ -51,6 +51,7 @@ import {
   type OtpLocaleOption,
   type OtpMessageOverrides,
   type OtpTranslator,
+  receiveWebOtp,
   resolveOtpLocale,
   sanitizeOtpCode,
   watchOtpDocumentLocale,
@@ -190,6 +191,7 @@ const ROOT_PROPS = [
   "purpose",
   "issue",
   "autoSubmit",
+  "webOtp",
   "clearCodeOnMismatch",
   "allowInternational",
   "codeLength",
@@ -202,6 +204,7 @@ const ROOT_PROPS = [
 ];
 const ROOT_BOOLEANS = [
   "autoSubmit",
+  "webOtp",
   "clearCodeOnMismatch",
   "allowInternational",
 ];
@@ -231,6 +234,7 @@ export const OtpFormRoot: DefineSetupFnComponent<
       purpose: props.purpose,
       issue: props.issue,
       autoSubmit: props.autoSubmit,
+      webOtp: props.webOtp,
       clearCodeOnMismatch: props.clearCodeOnMismatch,
       allowInternational: props.allowInternational,
       onSent: (result) => emit("sent", result),
@@ -600,6 +604,15 @@ export type OtpCodeInputProps = {
   id?: string | undefined;
   /** Focus the first empty segment on mount. */
   autoFocus?: boolean | undefined;
+  /**
+   * `true`: fill the code with WebOTP when the browser supports it (see
+   * `receiveWebOtp`). Default `false`.
+   *
+   * @deprecated K-OTP API 2.x no longer adds the WebOTP line to the SMS
+   * fallback, so no code arrives this way; `autocomplete="one-time-code"`
+   * still lets the OS suggest the code. Remove the prop.
+   */
+  webOtp?: boolean | undefined;
   /** Renders a hidden input with this name and the value, for form posts. */
   name?: string | undefined;
   /** `ko` (default), `en`, or `"auto"` (`<html lang>`, after mount). */
@@ -615,7 +628,7 @@ type OtpCodeInputEmits = {
 /**
  * A standalone segmented one-time-code input (`v-model`), with
  * `autocomplete="one-time-code"`, `inputmode="numeric"`, paste across
- * segments, Backspace/arrow navigation.
+ * segments, Backspace/arrow navigation and the deprecated opt-in WebOTP.
  */
 export const OtpCodeInput: DefineSetupFnComponent<
   OtpCodeInputProps,
@@ -652,6 +665,7 @@ export const OtpCodeInput: DefineSetupFnComponent<
         messages: props.messages,
       }),
     );
+    let webOtp: AbortController | undefined;
     onMounted(() => {
       if (props.autoFocus) {
         focusOtpCodeSegment(
@@ -659,7 +673,15 @@ export const OtpCodeInput: DefineSetupFnComponent<
           Math.min(inner.value.length, length() - 1),
         );
       }
+      if (props.webOtp) {
+        webOtp = new AbortController();
+        const { signal } = webOtp;
+        void receiveWebOtp({ signal, length: length() }).then((code) => {
+          if (code && !signal.aborted) change(code);
+        });
+      }
     });
+    onBeforeUnmount(() => webOtp?.abort());
     return () => {
       const parts = getOtpCodeInputParts({
         id: props.id ?? generatedId,
@@ -692,11 +714,12 @@ export const OtpCodeInput: DefineSetupFnComponent<
         "invalid",
         "id",
         "autoFocus",
+        "webOtp",
         "name",
         "locale",
         "messages",
       ],
-      ["readOnly", "invalid", "autoFocus"],
+      ["readOnly", "invalid", "autoFocus", "webOtp"],
     ),
     emits: ["update:modelValue", "complete"],
   },

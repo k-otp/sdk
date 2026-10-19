@@ -139,13 +139,15 @@ key in a browser, no `fetch`) throw a `TypeError`.
 `input`: `phoneNumber`, `purpose`, **`idempotencyKey` (required)**, and optional
 `templateId`, `templateVariables`, `from`, `metadata`, `expiresInSec`,
 `maxAttempts`, `smsFallback`. The code is always delivered by KakaoTalk
-AlimTalk (API 2.0.0+), with automatic SMS fallback when AlimTalk cannot be delivered;
-leave `channel` out (it only accepts `"alimtalk"`, and `"sms"` is refused with
-400 `CHANNEL_NOT_SUPPORTED`). `smsFallback: false` sends by AlimTalk only, at
-the same price. A template without an approved AlimTalk code cannot be issued
-(400 `TEMPLATE_NOT_AVAILABLE`; check `channelSupport` of `listTemplates`).
-`messageType` is deprecated and ignored, and `webOtp` was removed (any value
-but `false` is 400 `WEB_OTP_NOT_SUPPORTED`). `cost` is still accepted but deprecated: the API decides the
+AlimTalk (K-OTP API 2.x), with automatic SMS fallback when AlimTalk cannot be delivered;
+leave `channel` out (the API only accepts `"alimtalk"`; the deprecated `"sms"`
+is refused with 400 `CHANNEL_NOT_SUPPORTED`). `smsFallback: false` sends by
+AlimTalk only, at the same price. A template without an approved AlimTalk code
+cannot be issued (400 `TEMPLATE_NOT_AVAILABLE`; check `channelSupport` of
+`listTemplates`). `messageType` is deprecated and ignored, and the deprecated
+`webOtp` option is refused (any value but `false` is 400
+`WEB_OTP_NOT_SUPPORTED`): the SDK still sends what you pass, so these mistakes
+surface as the API's 400. `cost` is still accepted but deprecated: the API decides the
 charged credit from the delivery channel and message type and ignores it for
 billing.
 Resolves `{ issueId, expiresAt, attemptsRemaining, queuedAt }`.

@@ -444,14 +444,15 @@ describe("key guards", () => {
 
 describe("organization wallet", () => {
   const updatedAt = issueOutput.queuedAt;
-  const baseBalance = {
+  // Exactly what an API older than 1.4.0 sends: no wallet fields at all.
+  const legacyBalance = {
     appId: "app_1",
     balance: 42,
     currency: "CREDIT",
     updatedAt,
   };
   const orgBalance = {
-    ...baseBalance,
+    ...legacyBalance,
     walletId: "org:org_1",
     walletScope: "organization",
     organizationId: "org_1",
@@ -477,30 +478,53 @@ describe("organization wallet", () => {
     expect(balance.currency).toBe("CREDIT");
   });
 
-  test("GetBalanceResult requires the wallet fields (compile-time)", () => {
-    // Checked by `bun run typecheck`; the test body only has to run.
+  test("getBalance still resolves for a response without wallet fields (old API)", async () => {
+    const balance = await clientFor(legacyBalance).getBalance();
+    expect(balance.balance).toBe(42);
+    expect(balance.appId).toBe("app_1");
+    expect(balance.walletId).toBeUndefined();
+    expect(balance.walletScope).toBeUndefined();
+    expect(balance.organizationId).toBeUndefined();
+  });
+
+  test("GetBalanceResult types the wallet fields as optional (compile-time)", () => {
+    // These assertions are checked by `bun run typecheck`; the test body only
+    // has to run. A regression to the strict generated type fails to compile.
+    const legacy: GetBalanceResult = {
+      appId: "app_1",
+      balance: 42,
+      currency: "CREDIT",
+      updatedAt: issueOutput.queuedAt,
+    };
+    const scope: OtpWalletScope | undefined = legacy.walletScope;
+    const walletId: string | undefined = legacy.walletId;
     const organization: GetBalanceResult = {
-      ...baseBalance,
+      ...legacy,
       walletId: "org:org_1",
       walletScope: "organization",
       organizationId: "org_1",
-      promoBalance: 0,
-      promoNextExpiry: null,
     };
-    const scope: OtpWalletScope = organization.walletScope;
-    // @ts-expect-error the wallet fields are always sent by the API
-    const missingWallet: GetBalanceResult = { ...baseBalance };
-    const unknownScope: GetBalanceResult = {
-      ...organization,
-      // @ts-expect-error only the documented scopes are accepted
-      walletScope: "team",
-    };
-    void [scope, missingWallet, unknownScope];
+    const app: GetBalanceResult = { ...legacy, walletScope: "app" };
+    // @ts-expect-error the optional wallet field must not be usable as a bare string
+    const bareScope: string = legacy.walletScope;
+    // @ts-expect-error only the documented scopes are accepted
+    const unknownScope: GetBalanceResult = { ...legacy, walletScope: "team" };
+    // @ts-expect-error appId and the balance stay required
+    const missingBalance: GetBalanceResult = { appId: "app_1" };
+    void [
+      scope,
+      walletId,
+      organization,
+      app,
+      bareScope,
+      unknownScope,
+      missingBalance,
+    ];
   });
 
   test("getBalance keeps a legacy per-app wallet distinguishable", async () => {
     const balance = await clientFor({
-      ...baseBalance,
+      ...legacyBalance,
       walletId: "app:app_1",
       walletScope: "app",
     }).getBalance();
@@ -526,5 +550,13 @@ describe("organization wallet", () => {
     expect(page.items[0]?.appId).toBeUndefined();
     expect(page.items[1]?.appId).toBe("app_1");
     expect(page.items[1]?.balanceAfter).toBe(497);
+  });
+
+  test("a ledger of an old API without appId still resolves", async () => {
+    const page = await clientFor({
+      items: [ledgerEntry(1)],
+    }).listCreditLedger();
+    expect(page.items[0]?.appId).toBeUndefined();
+    expect(page.items[0]?.balanceAfter).toBe(99);
   });
 });

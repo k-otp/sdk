@@ -1,6 +1,14 @@
 /** Server client using the official Kiota request builders and runtimes. */
 export interface RequestOptions {
   headers?: Record<string, string>;
+  /**
+   * `Origin` header of an `issue` request; it only bound `webOtp`.
+   *
+   * @deprecated WebOTP is no longer offered by K-OTP API 2.x, so there is
+   * nothing left to bind. Still sent as the `Origin` header of `issue` when
+   * set; remove it.
+   */
+  origin?: string;
   retry503?: boolean;
 }
 export interface ClientOptions {

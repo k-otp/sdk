@@ -184,6 +184,11 @@ wallet.organizationId; // set when walletScope is "organization"
 - A ledger entry's optional `appId` is its attribution: always the calling app
   for `debit` / `refund`, and on a `credit` / `clawback` only when the purchase
   was attributed to an app.
+- `walletId`, `walletScope`, `promoBalance` and `promoNextExpiry` are always
+  sent by the current API but stay typed optional in `GetBalanceResult` (an
+  API older than 1.4.0 did not send the wallet fields) until the next major
+  version of the SDK; `OtpBalanceOutput` from `@k-otp/sdk/contract` has them
+  required.
 - `PAYMENT_REQUIRED` (402) on `issue` now means the organization wallet is out
   of credit. No new error codes were added.
 - With an `sk_test_` key (API 1.9.0+) the real wallet is never read:
@@ -202,7 +207,8 @@ operation (`perKeyDaily`) and by daily test issue budgets (`perOrgDaily`,
 `testModeDaily`). A test key with a real phone number, or a live key with a
 test number, rejects with `BAD_REQUEST` and `data.code`
 (`getTestNumberErrorCode`). A request for direct SMS (`channel: "sms"`), a
-template without an approved AlimTalk code or a `webOtp` option rejects with
+template without an approved AlimTalk code or a `webOtp` option (the first and
+the last are deprecated in the SDK types) rejects with
 `BAD_REQUEST` and `data.code` `CHANNEL_NOT_SUPPORTED`,
 `TEMPLATE_NOT_AVAILABLE` or `WEB_OTP_NOT_SUPPORTED`
 (`getIssueRequestErrorCode`). See

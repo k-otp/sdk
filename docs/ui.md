@@ -72,7 +72,8 @@ Every form takes the same settings: `purpose` (required), `issue` (other
 `issue` fields: `templateId`, `templateVariables`, `metadata`, ...),
 `codeLength` (6), `resendCooldownMs` (30 s, see [cooldowns](#cooldowns)),
 `idempotencyKeyPrefix`,
-`autoSubmit` (verify once all digits are in, `true`), `clearCodeOnMismatch`
+`autoSubmit` (verify once all digits are in, `true`), `webOtp` (deprecated,
+`false`, see [code autofill](#code-autofill)), `clearCodeOnMismatch`
 (`true`), `allowInternational` (`false`), `defaultPhoneNumber`, `locale`
 (`"ko"` (default), `"en"` or `"auto"`, see [locale](#messages-and-locale)),
 `messages` (overrides) and `id` (root id; part ids derive from it).
@@ -298,6 +299,13 @@ code segment has `autocomplete="one-time-code"`, so iOS/macOS Safari and
 Android keyboards offer a code that arrives by SMS, and a multi-digit autofill
 or paste is spread across the segments.
 
+WebOTP (`navigator.credentials.get({ otp })` on Android Chrome) is
+deprecated: it only fills a code from an SMS that ends with an origin-bound
+`@<host> #<code>` line, and K-OTP API 2.x no longer adds that line. The
+`webOtp` setting of the forms and of `OtpCodeInput`, `isWebOtpSupported()`
+and `receiveWebOtp()` still exist (the form setting now defaults to `false`;
+it was `true` before 2.1.0) and are removed in the next major version.
+
 ## SSR
 
 Importing any UI subpath and rendering the components on the server performs
@@ -425,6 +433,13 @@ Vue는 `<OtpForm purpose="signup" @verified="..." />`, Svelte는
 `autocomplete="one-time-code"` 가 있어 iOS/macOS Safari 와 Android 키보드가
 SMS 로 온 코드를 제안하고, 여러 자리 자동 입력과 붙여넣기는 칸마다 나뉘어
 들어갑니다.
+
+WebOTP(Android Chrome 의 `navigator.credentials.get({ otp })`)는 지원 중단(deprecated)
+되었습니다. SMS 가 `@<도메인> #<인증번호>` 줄로 끝날 때만 자동 입력되는데,
+K-OTP API 2.x 는 이 줄을 더 이상 넣지 않습니다. 폼과 `OtpCodeInput` 의
+`webOtp` 설정, `isWebOtpSupported()`, `receiveWebOtp()` 는 남아 있으며(폼
+설정의 기본값은 이제 `false`, 2.1.0 이전에는 `true`) 다음 메이저 버전에서
+제거됩니다.
 
 ## SSR, Svelte 4/5
 

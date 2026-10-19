@@ -53,6 +53,7 @@ import {
   type OtpMessageOverrides,
   type OtpTranslator,
   otpCodeSegments,
+  receiveWebOtp,
   resolveOtpLocale,
   sanitizeOtpCode,
   watchOtpDocumentLocale,
@@ -183,6 +184,7 @@ export const OtpFormRoot = (rootProps: OtpFormRootProps): ReactElement => {
     purpose,
     issue,
     autoSubmit,
+    webOtp,
     clearCodeOnMismatch,
     allowInternational,
     onSent,
@@ -205,6 +207,7 @@ export const OtpFormRoot = (rootProps: OtpFormRootProps): ReactElement => {
     purpose,
     issue,
     autoSubmit,
+    webOtp,
     clearCodeOnMismatch,
     allowInternational,
     onSent,
@@ -639,6 +642,15 @@ export type OtpCodeInputProps = Omit<
   id?: string | undefined;
   /** Focus the first empty segment on mount. */
   autoFocus?: boolean | undefined;
+  /**
+   * `true`: fill the code with WebOTP when the browser supports it (see
+   * `receiveWebOtp`). Default `false`.
+   *
+   * @deprecated K-OTP API 2.x no longer adds the WebOTP line to the SMS
+   * fallback, so no code arrives this way; `autocomplete="one-time-code"`
+   * still lets the OS suggest the code. Remove the prop.
+   */
+  webOtp?: boolean | undefined;
   /** Renders a hidden input with this name and the value, for form posts. */
   name?: string | undefined;
   /** `ko` (default), `en` or `"auto"` (see `OtpFormRoot`). */
@@ -648,8 +660,9 @@ export type OtpCodeInputProps = Omit<
 
 /**
  * A standalone segmented one-time-code input (`autocomplete="one-time-code"`,
- * `inputmode="numeric"`, paste across segments, Backspace/arrow navigation).
- * Controlled (`value` + `onValueChange`) or uncontrolled.
+ * `inputmode="numeric"`, paste across segments, Backspace/arrow navigation,
+ * deprecated opt-in WebOTP). Controlled (`value` + `onValueChange`) or
+ * uncontrolled.
  */
 export const OtpCodeInput = ({
   value: valueProp,
@@ -661,6 +674,7 @@ export const OtpCodeInput = ({
   invalid,
   id: idProp,
   autoFocus,
+  webOtp,
   name,
   locale,
   messages,
@@ -704,13 +718,16 @@ export const OtpCodeInput = ({
       current.onValueChange?.(next);
       if (isOtpCodeComplete(next, current.length)) current.onComplete?.(next);
     };
-    return createOtpCodeInputHandlers({
-      getValue: () => latest.current.value,
-      getLength: () => latest.current.length,
-      isReadOnly: () => latest.current.readOnly === true,
-      onChange: change,
-      getContainer: () => groupRef.current,
-    });
+    return {
+      change,
+      dom: createOtpCodeInputHandlers({
+        getValue: () => latest.current.value,
+        getLength: () => latest.current.length,
+        isReadOnly: () => latest.current.readOnly === true,
+        onChange: change,
+        getContainer: () => groupRef.current,
+      }),
+    };
   });
   const effectiveLocale = useOtpLocale(locale);
   const t = useMemo(
@@ -736,12 +753,20 @@ export const OtpCodeInput = ({
       );
     }
   }, []);
+  useEffect(() => {
+    if (!webOtp) return;
+    const controller = new AbortController();
+    void receiveWebOtp({ signal: controller.signal, length }).then((code) => {
+      if (code && !controller.signal.aborted) handlers.change(code);
+    });
+    return () => controller.abort();
+  }, [webOtp, length, handlers]);
   return renderSegments({
     group: parts.group,
     segments: parts.segments,
     value,
     length,
-    handlers,
+    handlers: handlers.dom,
     groupRef,
     rest,
     hidden: name ? h("input", { type: "hidden", name, value }) : undefined,

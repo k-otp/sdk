@@ -1,16 +1,22 @@
 ---
-npm/@k-otp/sdk: major
+npm/@k-otp/sdk: minor
 ---
 
-Requires K-OTP API 2.0.0, where delivery is KakaoTalk AlimTalk only, with SMS kept as the automatic fallback. Breaking changes:
+Support K-OTP API 2.x, where codes are delivered by KakaoTalk AlimTalk only (SMS remains the automatic fallback of a failed AlimTalk delivery) and WebOTP is no longer offered. The vendored OpenAPI spec is synced to API 2.0.0. Nothing is removed: code written for 2.0.0 keeps compiling, and options the API no longer accepts are still sent as given, so they fail with the API's clear 400 instead of being dropped silently.
 
-- `channel` of `issue` is now typed `"alimtalk"` (`OtpChannel`) and is the default, so leave it out. An explicit `"sms"` is rejected by the API with 400 `CHANNEL_NOT_SUPPORTED`. `smsFallback` is unchanged, and `listIssues`/`getIssue` can still report `channel: "sms"` after a fallback (new type `OtpDeliveredChannel`).
-- `webOtp` is removed: the `webOtp` request option, `IssueWebOtpOptions` and `IssueWebOtpResult`, and the `webOtp` field of the `issue` result are gone, and the API rejects any value but `false` with 400 `WEB_OTP_NOT_SUPPORTED`. The browser helpers `isWebOtpSupported` and `receiveWebOtp` and the `webOtp` option of `@k-otp/sdk/ui` (`OtpFormConfig`), `OtpForm`/`OtpFormRoot` and `OtpCodeInput` in `/ui/react`, `/ui/vue` and `/ui/svelte` are removed. Segmented code inputs keep `autocomplete="one-time-code"`, so the OS can still suggest a code that arrives by SMS fallback.
-- A template without an approved AlimTalk code cannot be issued: 400 `TEMPLATE_NOT_AVAILABLE`. `channelSupport` of `listTemplates`/`getTemplate` is `["alimtalk"]`, or `[]` for such a template.
-- `messageType` is deprecated and ignored by the API.
-- Removed public symbols (each with its replacement): `isWebOtpSupported`, `receiveWebOtp` and `ReceiveWebOtpOptions` from `@k-otp/sdk/ui` (no replacement: autofill through `autocomplete="one-time-code"` remains); `IssueWebOtpOptions` and `IssueWebOtpResult` (no replacement); the `origin` option of `RequestOptions` in `@k-otp/sdk/kiota` (it only bound `webOtp`: drop it); the type aliases `PaymentRequiredData` and `RateLimitedData` (use `OtpPaymentRequiredData` and `OtpRateLimitedData`).
-- `GetBalanceResult` is now the generated `OtpBalanceOutput`: `walletId`, `walletScope`, `promoBalance` and `promoNextExpiry` are required instead of optional (the API always sends them), so `result.walletScope ?? "app"` fallbacks can go.
+Added:
 
-New: `getIssueRequestErrorCode(error)`, `ISSUE_REQUEST_ERROR_CODES` and the `OtpIssueRequestErrorCode` type (from `@k-otp/sdk`, `@k-otp/sdk/server`) read `CHANNEL_NOT_SUPPORTED`, `TEMPLATE_NOT_AVAILABLE` and `WEB_OTP_NOT_SUPPORTED` from the `data.code` of a 400 (`error.code` stays `BAD_REQUEST`; `OtpBadRequestData` lists them). `createMockTransport()` in `@k-otp/sdk/testing` refuses `channel: "sms"` and `webOtp` like the API and lists the default template as `["alimtalk"]`. If your app has an approved service name in the console, messages read `[K-OTP] <service name> ...`; there is no request field for it and the SDK needs no change. `@k-otp/sdk/kiota` is generated from the API 2.0.0 spec, and the native language SDKs (C#, Java, Kotlin, PHP, Go, Python, Ruby, Dart) move to 0.2.0 with the same changes (they also lose the per-call `origin` request option, which only bound `webOtp`: remove it from `RequestOptions`/issue options) (no `webOtp` handling; see `sdks/README.md`).
+- `getIssueRequestErrorCode(error)`, `ISSUE_REQUEST_ERROR_CODES` and the `OtpIssueRequestErrorCode` type (from `@k-otp/sdk` and `@k-otp/sdk/server`) read the new 400 codes of `issue` from `error.data.code` (`error.code` stays `BAD_REQUEST`; `OtpBadRequestData` lists them): `CHANNEL_NOT_SUPPORTED` (`channel: "sms"`), `TEMPLATE_NOT_AVAILABLE` (a template without an approved AlimTalk code; its `channelSupport` is empty, otherwise it is `["alimtalk"]`) and `WEB_OTP_NOT_SUPPORTED` (`webOtp` other than `false`).
+- `OtpDeliveredChannel`: the channel `listIssues`/`getIssue` report, `"sms"` after the automatic fallback.
+- `OtpPaymentRequiredData` now includes `resetAt` of `TRIAL_DAILY_LIMIT_EXCEEDED`.
+- `createMockTransport()` in `@k-otp/sdk/testing` follows API 2.x: it refuses `channel: "sms"` and `webOtp` with the same 400 codes, lists the default template as `["alimtalk"]`, and reports `channel: "sms"` once the `alimtalk_failover` fallback has delivered.
+- `@k-otp/sdk/kiota` is generated from the API 2.0.0 spec. If your app has an approved service name in the console, messages read `[K-OTP] <service name> ...`; there is no request field for it.
 
-Migration: remove `channel: "sms"` and every `webOtp` option or `receiveWebOtp`/`isWebOtpSupported` call; stop reading `result.webOtp`; replace `<OtpCodeInput webOtp>` and the form `webOtp` setting by nothing (autofill via `one-time-code` stays); check `channelSupport` before issuing with a custom `templateId` and handle `TEMPLATE_NOT_AVAILABLE`; stop sending `messageType`. This version requires API 2.0.0, which `https://api.k-otp.dev/v1` serves.
+Deprecated (removed in the next major version):
+
+- `channel: "sms"` on `issue`: leave `channel` out (`"alimtalk"` is the default). `OtpChannel` still includes `"sms"`.
+- The `webOtp` request option, `IssueWebOtpOptions`, `IssueWebOtpResult` (`@k-otp/sdk/contract`) and the `webOtp` field of the `issue` result, which API 2.x never sends.
+- `isWebOtpSupported`, `receiveWebOtp` and `ReceiveWebOtpOptions` from `@k-otp/sdk/ui`, the `webOtp` setting of `createOtpForm` and of `OtpForm`/`OtpFormRoot`, and the `webOtp` prop of `OtpCodeInput` in `/ui/react`, `/ui/vue` and `/ui/svelte`. They still work as browser helpers, but API 2.x no longer adds the WebOTP line to the SMS, so no code arrives this way. The form setting now defaults to `false` (it was `true`). Code inputs keep `autocomplete="one-time-code"`, so the OS can still suggest a code that arrives by SMS.
+- `messageType` (ignored by the API), the aliases `PaymentRequiredData` and `RateLimitedData` (use `OtpPaymentRequiredData` and `OtpRateLimitedData`), and the `origin` request option of `@k-otp/sdk/kiota` (it only bound `webOtp`).
+
+The native language SDKs (C#, Java, Kotlin, PHP, Go, Python, Ruby, Dart) move to 0.2.0 for API 2.x and drop their per-call `origin` request option; see `sdks/README.md`.

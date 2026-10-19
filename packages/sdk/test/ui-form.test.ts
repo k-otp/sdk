@@ -105,6 +105,31 @@ const microtasks = async (): Promise<void> => {
   for (let i = 0; i < 10; i++) await Promise.resolve();
 };
 
+/** Runs `fn` with WebOTP available; `get` answers credential requests. */
+const withWebOtp = async (
+  get: (options: unknown) => Promise<unknown>,
+  fn: () => Promise<void>,
+): Promise<void> => {
+  const globals = globalThis as Record<string, unknown>;
+  const saved = {
+    window: globals.window,
+    navigator: Object.getOwnPropertyDescriptor(globalThis, "navigator"),
+  };
+  globals.window = { OTPCredential: class {} };
+  Object.defineProperty(globalThis, "navigator", {
+    value: { credentials: { get } },
+    configurable: true,
+  });
+  try {
+    await fn();
+  } finally {
+    globals.window = saved.window;
+    if (saved.navigator) {
+      Object.defineProperty(globalThis, "navigator", saved.navigator);
+    }
+  }
+};
+
 const setup = (options: Partial<OtpFormOptions> = {}) => {
   let clock = 1_000_000;
   const api = scripted();
@@ -609,20 +634,24 @@ describe("createOtpForm", () => {
 
   test("a response that lands after reset() has no side effects", async () => {
     const onSent = mock();
-    const { form, next } = setup({ onSent });
-    const late = deferred(() => issued(9));
-    next.issue.push(late.step);
-    form.setPhoneNumber("01012345678");
-    const sending = form.send();
-    form.reset();
-    late.release();
-    await sending;
-    expect(onSent).not.toHaveBeenCalled();
-    expect(form.getState()).toMatchObject({
-      phase: "phone",
-      issued: false,
-      expiresIn: undefined,
-      resendIn: 0,
+    const get = mock(() => new Promise(() => {}));
+    await withWebOtp(get, async () => {
+      const { form, next } = setup({ onSent, webOtp: true });
+      const late = deferred(() => issued(9));
+      next.issue.push(late.step);
+      form.setPhoneNumber("01012345678");
+      const sending = form.send();
+      form.reset();
+      late.release();
+      await sending;
+      expect(onSent).not.toHaveBeenCalled();
+      expect(get).not.toHaveBeenCalled();
+      expect(form.getState()).toMatchObject({
+        phase: "phone",
+        issued: false,
+        expiresIn: undefined,
+        resendIn: 0,
+      });
     });
   });
 
@@ -702,6 +731,39 @@ describe("createOtpForm", () => {
     form.configure({ allowInternational: true, purpose: "login" });
     expect(listener).toHaveBeenCalledTimes(1);
     stop();
+  });
+
+  test("WebOTP (deprecated) is off unless webOtp is true", async () => {
+    const get = mock(() => new Promise(() => {}));
+    await withWebOtp(get, async () => {
+      const { form } = setup();
+      form.setPhoneNumber("01012345678");
+      await form.send();
+      await microtasks();
+      expect(get).not.toHaveBeenCalled();
+      form.abort();
+    });
+  });
+
+  test("WebOTP (deprecated, opt-in) fills and verifies the code when supported", async () => {
+    let release!: (value: { code: string }) => void;
+    const get = () =>
+      new Promise((resolve) => {
+        release = resolve;
+      });
+    await withWebOtp(get, async () => {
+      const onVerified = mock();
+      const { form, verifies } = setup({ webOtp: true, onVerified });
+      const verifiedOnce = new Promise<void>((resolve) =>
+        onVerified.mockImplementation(() => resolve()),
+      );
+      form.setPhoneNumber("01012345678");
+      await form.send();
+      release({ code: "123456" });
+      await verifiedOnce;
+      expect(verifies[0]?.code).toBe("123456");
+      expect(form.getState().phase).toBe("verified");
+    });
   });
 });
 

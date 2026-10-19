@@ -48,6 +48,7 @@ import {
   type OtpMessageOverrides,
   type OtpTranslator,
   otpCodeSegments,
+  receiveWebOtp,
   sanitizeOtpCode,
   watchOtpDocumentLocale,
 } from "..";
@@ -175,6 +176,7 @@ export const createOtpFormRoot = (initial: OtpFormRootProps): RootContext => {
     purpose: props.purpose,
     issue: props.issue,
     autoSubmit: props.autoSubmit,
+    webOtp: props.webOtp,
     clearCodeOnMismatch: props.clearCodeOnMismatch,
     allowInternational: props.allowInternational,
     onSent: (result) => {
@@ -432,6 +434,15 @@ export type OtpCodeInputProps = {
   id?: string | undefined;
   /** Focus the first empty segment on mount. */
   autoFocus?: boolean | undefined;
+  /**
+   * `true`: fill the code with WebOTP when the browser supports it (see
+   * `receiveWebOtp`). Default `false`.
+   *
+   * @deprecated K-OTP API 2.x no longer adds the WebOTP line to the SMS
+   * fallback, so no code arrives this way; `autocomplete="one-time-code"`
+   * still lets the OS suggest the code. Remove the prop.
+   */
+  webOtp?: boolean | undefined;
   /** Renders a hidden input with this name and the value, for form posts. */
   name?: string | undefined;
   /** `ko` (default), `en`, or `"auto"` (`<html lang>`, after mount). */
@@ -462,12 +473,19 @@ type CodeInputModel = {
   }) => { group: OtpAttrs; segments: OtpAttrs[]; digits: string[] };
   /** The `<html lang>` locale for `locale: "auto"` (after mount). */
   detectedLocale: Readable<OtpLocale>;
-  /** `use:` action on the group: autofocus and `locale: "auto"`. */
+  /**
+   * `use:` action on the group: autofocus, the deprecated WebOTP and
+   * `locale: "auto"`.
+   */
   group: (
     node: HTMLElement,
-    options: { autoFocus: boolean; locale?: unknown },
+    options: { autoFocus: boolean; webOtp: boolean; locale?: unknown },
   ) => {
-    update: (options: { autoFocus: boolean; locale?: unknown }) => void;
+    update: (options: {
+      autoFocus: boolean;
+      webOtp: boolean;
+      locale?: unknown;
+    }) => void;
     destroy: () => void;
   };
 };
@@ -540,6 +558,7 @@ export const createOtpCodeInputModel = (options: {
       if (groupOptions.autoFocus) {
         focusOtpCodeSegment(node, Math.min(current().length, length() - 1));
       }
+      const controller = new AbortController();
       let stopLocale: (() => void) | undefined;
       let watchedLocale: unknown;
       /** Starts or stops following `<html lang>` as `locale` changes. */
@@ -556,9 +575,18 @@ export const createOtpCodeInputModel = (options: {
             : undefined;
       };
       followLocale(groupOptions.locale);
+      if (groupOptions.webOtp) {
+        void receiveWebOtp({
+          signal: controller.signal,
+          length: length(),
+        }).then((code) => {
+          if (code && !controller.signal.aborted) change(code);
+        });
+      }
       return {
         update: (next) => followLocale(next.locale),
         destroy: () => {
+          controller.abort();
           stopLocale?.();
           container = undefined;
         },

@@ -1,12 +1,13 @@
 /**
  * Public request/response types. They are aliases of the types generated from
  * the vendored OpenAPI document (`generated/openapi.ts`), so they cannot drift
- * from the API without the drift test failing.
+ * from the API without the drift test failing. `issue` uses the compatible
+ * types of `compat.ts`, which keep the deprecated members of 2.0.0.
  */
+import type { IssueOtpInput, IssueOtpOutput } from "./compat";
 import type {
   GetIssueStatusOutput,
-  IssueOtpInput,
-  IssueOtpOutput,
+  IssueOtpPaymentErrorData,
   ListOtpCreditLedgerOutput,
   ListOtpIssuesOutput,
   ListTemplatesOutput,
@@ -14,6 +15,7 @@ import type {
   OtpBalanceOutput,
   OtpCreditLedgerItem,
   OtpDashboardIssue,
+  OtpRateLimitErrorData,
   TemplatePublicDetail,
   TemplateSummary,
   VerifyOtpInput,
@@ -27,18 +29,20 @@ import type {
  * field and the `Idempotency-Key` header.
  *
  * The code is always delivered by KakaoTalk AlimTalk, with automatic SMS
- * fallback when AlimTalk cannot be delivered: leave `channel` out (it only
- * accepts `"alimtalk"`). Pass `smsFallback: false` to deliver by AlimTalk
- * only. A template without an approved AlimTalk code cannot be issued.
+ * fallback when AlimTalk cannot be delivered: leave `channel` out (the API
+ * only accepts `"alimtalk"`; the deprecated `"sms"` is refused with 400
+ * `CHANNEL_NOT_SUPPORTED`). Pass `smsFallback: false` to deliver by AlimTalk
+ * only. A template without an approved AlimTalk code cannot be issued. The
+ * deprecated `webOtp` option is refused with 400 `WEB_OTP_NOT_SUPPORTED`.
  */
 export type IssueInput = Omit<IssueOtpInput, "idempotencyKey"> & {
   /** 1-128 visible ASCII characters. Reuse the same key when retrying. */
   idempotencyKey: string;
 };
 /**
- * Result of `issue`. `mode` (API 1.9.0+) is `"test"` for a simulated issue
- * made with a `pk_test_`/`sk_test_` key: no message was sent and no credit
- * was used.
+ * Result of `issue`. `mode` is `"test"` for a simulated issue made with a
+ * `pk_test_`/`sk_test_` key: no message was sent and no credit was used. The
+ * deprecated `webOtp` field is never sent by API 2.x.
  */
 export type IssueResult = IssueOtpOutput;
 export type VerifyInput = VerifyOtpInput;
@@ -46,12 +50,30 @@ export type VerifyResult = VerifyOtpOutput;
 /** Verification failure reason (returned with HTTP 200 and `verified: false`). */
 export type VerifyReasonCode = NonNullable<VerifyOtpOutput["reasonCode"]>;
 /**
- * The `channel` an `issue` request may name: only `"alimtalk"` (KakaoTalk
- * AlimTalk, also the default). Direct SMS is not offered; SMS is only the
- * automatic fallback of a failed AlimTalk delivery (`smsFallback: false` turns
- * it off), and an explicit `"sms"` is refused with 400 `CHANNEL_NOT_SUPPORTED`.
+ * A delivery channel name: `"alimtalk"` (KakaoTalk AlimTalk) or `"sms"`.
+ *
+ * As the `channel` of an `issue` request only `"alimtalk"` (also the default)
+ * is accepted: direct SMS is not offered, SMS is only the automatic fallback
+ * of a failed AlimTalk delivery (`smsFallback: false` turns it off), and the
+ * deprecated `"sms"` is refused with 400 `CHANNEL_NOT_SUPPORTED`. `"sms"` stays
+ * in this type for compatibility and for the channel a delivered issue
+ * reports ({@link OtpDeliveredChannel}).
  */
 export type OtpChannel = NonNullable<IssueOtpInput["channel"]>;
+/**
+ * `data` of a 402 PAYMENT_REQUIRED error from `issue` (the generated wire
+ * type).
+ *
+ * @deprecated Use `OtpPaymentRequiredData`, which also accepts reasons a
+ * newer API version may add.
+ */
+export type PaymentRequiredData = IssueOtpPaymentErrorData;
+/**
+ * `data` of a 429 TOO_MANY_REQUESTS error from `issue`/`verify`.
+ *
+ * @deprecated Use `OtpRateLimitedData`.
+ */
+export type RateLimitedData = OtpRateLimitErrorData;
 /**
  * Channel a delivered issue reports in `listIssues`/`getIssue` (`channel` of
  * {@link OtpIssue}): `"alimtalk"`, or `"sms"` after the automatic SMS fallback
@@ -88,8 +110,23 @@ export type OtpWalletScope = WalletScope;
  * `balance`) and `promoNextExpiry`. A `sk_test_` key gets a fixed simulated
  * balance with `walletScope: "test"` and `mode: "test"`; the real wallet is
  * never read.
+ *
+ * The current API always sends `walletId`, `walletScope`, `promoBalance` and
+ * `promoNextExpiry`, but they stay typed optional, as in 2.0.0 (which also
+ * supported API versions that omitted them), until the next major version.
+ * `OtpBalanceOutput` from `@k-otp/sdk/contract` is the wire type with them
+ * required.
  */
-export type GetBalanceResult = OtpBalanceOutput;
+export type GetBalanceResult = Omit<
+  OtpBalanceOutput,
+  "walletId" | "walletScope" | "promoBalance" | "promoNextExpiry"
+> &
+  Partial<
+    Pick<
+      OtpBalanceOutput,
+      "walletId" | "walletScope" | "promoBalance" | "promoNextExpiry"
+    >
+  >;
 export type ListTemplatesResult = ListTemplatesOutput;
 export type OtpTemplateSummary = TemplateSummary;
 export type GetTemplateInput = OpenApiOperations["getTemplate"]["params"];

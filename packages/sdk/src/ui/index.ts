@@ -1,7 +1,7 @@
 /**
  * `@k-otp/sdk/ui`: the framework-agnostic model behind the OTP UI
  * components: phone parsing/formatting, the segmented code input, the form
- * state machine, the KO/EN message catalog, countdown formatting and
+ * state machine, the KO/EN message catalog, countdown formatting, WebOTP and
  * the shared part attributes. No DOM framework; nothing touches `window` at
  * import time. Covered by SemVer.
  */
@@ -81,3 +81,8 @@ export {
   type OtpPhoneOptions,
   parseOtpPhoneNumber,
 } from "./phone";
+export {
+  isWebOtpSupported,
+  type ReceiveWebOtpOptions,
+  receiveWebOtp,
+} from "./webotp";

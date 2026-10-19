@@ -55,10 +55,13 @@ Version `0.2.0` requires K-OTP API 2.0.0:
   `TEMPLATE_NOT_AVAILABLE`; its `channelSupport` is empty. Templates that can be
   issued report `["alimtalk"]`.
 - `messageType` is deprecated and ignored.
-- The per-call `origin` request option is removed from every client (it only
-  bound `webOtp`): drop it from issue options, or from `RequestOptions` in
-  Java/Kotlin (constructor is now `RequestOptions(headers, retry503)`), C#
-  (`new RequestOptions(headers, retry503)`) and Go.
+- The per-call `origin` request option is removed from every native client
+  (it only bound `webOtp`): drop it from issue options, or from
+  `RequestOptions` in Java/Kotlin (constructor is now
+  `RequestOptions(headers, retry503)`), C# (`new RequestOptions(headers,
+  retry503)`) and Go. TypeScript (`@k-otp/sdk/kiota`) follows the npm
+  package's version, so its `origin` option stays, deprecated, until the next
+  major version of `@k-otp/sdk`.
 
 These codes arrive in the `data` of the API error each client exposes, as
 described in its guide.
