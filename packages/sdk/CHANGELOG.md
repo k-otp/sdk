@@ -1,5 +1,11 @@
 # @k-otp/sdk
 
+## 2.1.1 — 2026-11-12
+
+### Patch changes
+
+- [0d1d592](https://github.com/k-otp/sdk/commit/0d1d5923baa0b83039d5d862e0b23876da8dab55) Fix default HTTP requests failing with `TypeError: Illegal invocation` on Cloudflare Workers by preserving the global receiver of native `fetch`. Core and server clients retain lazy fetch resolution, and custom fetch implementations are used unchanged. The Kiota client also uses Workers-compatible manual redirect handling while continuing to reject redirects without following them. — Thanks @imjlk!
+
 ## 2.1.0 — 2026-10-19
 
 ### Minor changes
