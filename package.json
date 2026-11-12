@@ -51,10 +51,11 @@
     "sync:openapi": "bun run scripts/sync-openapi.ts",
     "check:pack": "bun run scripts/check-pack.ts",
     "size": "bun run scripts/size-report.ts",
-    "check": "bun run typecheck && bun run lint && bun run test && bun run build && bun run check:pack && bun run smoke:dist && bun run size && bun run check:examples",
+    "check": "bun run typecheck && bun run lint && bun run test && bun run build && bun run check:pack && bun run smoke:dist && bun run smoke:workerd && bun run size && bun run check:examples",
     "smoke:dist": "node scripts/smoke-dist.mjs",
     "check:examples": "bun run scripts/check-examples.ts",
-    "e2e:examples": "bun run scripts/e2e-examples.ts"
+    "e2e:examples": "bun run scripts/e2e-examples.ts",
+    "smoke:workerd": "bun run scripts/smoke-workerd.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
@@ -70,6 +71,7 @@
     "tsdown": "catalog:",
     "ttsc": "catalog:",
     "typescript": "catalog:",
-    "vue": "catalog:"
+    "vue": "catalog:",
+    "workerd": "1.20261112.1"
   }
 }

@@ -374,7 +374,13 @@ export const createOtpTransport = <TContract extends AnyContractRouter>(
       }
       const result = await execute({
         signal: controller.signal,
-        context: { apiKey, fetch: fetchImpl, capture },
+        context: {
+          apiKey,
+          // Native fetch requires the global receiver on runtimes such as
+          // workerd, even when invoked as a method of this per-call context.
+          fetch: userFetch ?? fetchImpl.bind(globalThis),
+          capture,
+        },
       });
       // A 2xx with an empty (204), non-JSON or truncated body decodes to
       // `undefined`/`{}`; never report that as a success.
