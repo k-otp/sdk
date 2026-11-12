@@ -140,7 +140,7 @@ export class KotpClient {
     const timeout = options.timeoutMs ?? 10000;
     if (!Number.isFinite(timeout) || timeout <= 0)
       throw new TypeError("timeoutMs must be positive");
-    const transport = options.fetch ?? globalThis.fetch;
+    const transport = options.fetch ?? globalThis.fetch.bind(globalThis);
     const scopedFetch = async (request: string, init: RequestInit) => {
       if (new URL(request).origin !== base.origin)
         throw new TypeError(
@@ -152,12 +152,22 @@ export class KotpClient {
         ? AbortSignal.any([init.signal, AbortSignal.timeout(timeout)])
         : AbortSignal.timeout(timeout);
       try {
-        return await transport(request, {
+        const response = await transport(request, {
           ...init,
           headers,
           signal,
-          redirect: "error",
+          redirect: "manual",
         });
+        // Workers supports manual/follow only. Inspect a manual response so
+        // no runtime follows redirects with the server's credentials.
+        if (
+          response.type === "opaqueredirect" ||
+          (response.status >= 300 && response.status < 400)
+        ) {
+          void response.body?.cancel().catch(() => {});
+          throw new TypeError("Unexpected K-OTP API redirect");
+        }
+        return response;
       } catch (cause) {
         throw new KotpTransportError(cause);
       }
