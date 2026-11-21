@@ -72,8 +72,8 @@ setup-kiota v0.5.0은 commit
 다른 항목이다. [공식 action 입력](https://github.com/microsoft/setup-kiota/blob/v0.5.0/action.yml).
 
 입력은 저장소의 `spec/openapi.json`이며 운영 URL에서 갱신하지 않는다.
-OpenAPI 규격 버전은 **3.1.1**, 서비스 계약 버전은 **2.1.0**,
-SHA-256은 `ece6075cf416ea4d3fecae383e221510f1896fe405a86b64f9c2a034074750ef`다.
+OpenAPI 규격 버전은 **3.1.1**, 서비스 계약 버전은 **2.2.1**,
+SHA-256은 `8f8a01478701abbb41fb33ce158c4d85de3bb9acf5be0f941ad77c2ddb93dcfe`다.
 각 JSON에 commit/run/attempt/spec/fixture/input hash, 실제 도구·OS/architecture,
 action SHA, dependency lock hash, 단계별 상태, 경고·차단 요인·증거 경로를 남긴다.
 

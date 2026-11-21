@@ -70,8 +70,8 @@ in result JSON and logs). The action and CLI are separate pins:
 - setup-kiota v0.5.0: `111eb592b2b3b2602ba9e0d979d4a4509cd59bb5`
 - Release `v1.35.0`, action input `version: v1.35.0`
 - Required full CLI build: `1.35.0+114aa7ee609262d892fd9ceb02b2d9f7ecb84190`
-- OpenAPI `3.1.1`; service contract `2.1.0`
-- Vendored SHA-256: `ece6075cf416ea4d3fecae383e221510f1896fe405a86b64f9c2a034074750ef`
+- OpenAPI `3.1.1`; service contract `2.2.1`
+- Vendored SHA-256: `8f8a01478701abbb41fb33ce158c4d85de3bb9acf5be0f941ad77c2ddb93dcfe`
 
 | Target | Native toolchain | Main Kiota runtime pin |
 | --- | --- | --- |
