@@ -1,5 +1,11 @@
 # @k-otp/sdk
 
+## 2.2.0 — 2026-11-21
+
+### Minor changes
+
+- [0189715](https://github.com/k-otp/sdk/commit/018971593c31bac865771da60ffc23e5c1ff29d6) Targets K-OTP API 2.2.1. `OPENAPI_VERSION` is now `2.2.1`; request and response types are unchanged, so no code changes are needed. API 2.2.1 no longer refunds an issue whose code was verified when the delivery is later reported as failed. — Thanks @imjlk!
+
 ## 2.1.1 — 2026-11-12
 
 ### Patch changes
