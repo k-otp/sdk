@@ -77,6 +77,23 @@ const apiError = (
     throw new OtpApiError({ code, status, message: code, retryAfterMs });
   }) as Step;
 
+/** Rejects with an API error carrying `data` (and a request id). */
+const apiErrorWith = (
+  code: OtpApiError["code"],
+  status: number,
+  data: unknown,
+  extra: { retryAfterMs?: number; requestId?: string } = {},
+) =>
+  (() => {
+    throw new OtpApiError({
+      code,
+      status,
+      message: "server text",
+      data,
+      ...extra,
+    });
+  }) as Step;
+
 /** Hangs until the request is aborted, then rejects like the SDK does. */
 const hang = ((_input: unknown, options: { signal?: AbortSignal }) =>
   new Promise((_, reject) => {
@@ -425,6 +442,221 @@ describe("createOtpForm", () => {
       expect(parts.codeSegments[0]?.readonly).toBe(true);
     },
   );
+
+  test("PHONE_NUMBER_NOT_MOBILE is a phone field error, not a form message", async () => {
+    const onError = mock();
+    const { form, next, issues } = setup({ onError });
+    next.issue.push(
+      apiErrorWith(
+        "BAD_REQUEST",
+        400,
+        { code: "PHONE_NUMBER_NOT_MOBILE" },
+        { requestId: "req_landline" },
+      ),
+    );
+    // Accepted by the local check (e.g. a number it cannot tell apart).
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    expect(onError).toHaveBeenCalledTimes(1);
+    const state = form.getState();
+    expect(state).toMatchObject({
+      phase: "phone",
+      phoneError: "phone.error.not-mobile",
+      message: undefined,
+      retryPending: false,
+      focus: { target: "phone" },
+      errorOperation: "send",
+      errorDetail: {
+        code: "BAD_REQUEST",
+        status: 400,
+        reason: "PHONE_NUMBER_NOT_MOBILE",
+        operation: "send",
+        target: "phone",
+        key: "phone.error.not-mobile",
+        configuration: false,
+        ambiguous: false,
+        requestId: "req_landline",
+      },
+    });
+    const parts = getOtpFormParts(state, {
+      id: "f",
+      t: createOtpTranslator({ locale: "en" }),
+    });
+    expect(parts.phoneInput).toMatchObject({
+      "aria-invalid": "true",
+      "aria-describedby": "f-phone-description f-phone-error",
+      "data-invalid": "",
+    });
+    expect(parts.text.phoneError).toBe("Enter a mobile number (010-...).");
+    expect(parts.text.message).toBeUndefined();
+    expect(parts.message["data-state"]).toBe("idle");
+    // Editing the number clears the field error; the error itself stays
+    // until the next action.
+    form.setPhoneNumber("010-9876-5432");
+    expect(form.getState()).toMatchObject({
+      phoneError: undefined,
+      message: undefined,
+      errorDetail: { reason: "PHONE_NUMBER_NOT_MOBILE" },
+    });
+    form.setPhoneNumber("01012345678");
+    expect(form.getState().phoneError).toBe("phone.error.not-mobile");
+    form.setPhoneNumber("01098765432");
+    await form.send();
+    // A definitive 400: the next send is a new attempt with a new key.
+    expect(issues[1]?.idempotencyKey).not.toBe(issues[0]?.idempotencyKey);
+    expect(form.getState()).toMatchObject({
+      phase: "code",
+      phoneError: undefined,
+      errorDetail: undefined,
+    });
+  });
+
+  test("test-number errors show on the phone field in plain words", async () => {
+    const { form, next } = setup();
+    next.issue.push(
+      apiErrorWith("BAD_REQUEST", 400, { code: "TEST_NUMBER_IN_LIVE_MODE" }),
+    );
+    form.setPhoneNumber("01000000000");
+    await form.send();
+    const state = form.getState();
+    expect(state.phoneError).toBe("error.TEST_NUMBER_IN_LIVE_MODE");
+    expect(
+      getOtpFormParts(state, { id: "f", t: createOtpTranslator() }).text
+        .phoneError,
+    ).toBe(
+      "인증번호를 받을 수 없는 번호입니다. 본인의 휴대폰 번호를 입력해 주세요.",
+    );
+  });
+
+  test("a phone error on a resend (number locked) is a form message", async () => {
+    const { form, next, tick } = setup();
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    tick(30_000);
+    next.issue.push(
+      apiErrorWith("BAD_REQUEST", 400, { code: "PHONE_NUMBER_NOT_MOBILE" }),
+    );
+    await form.send();
+    expect(form.getState()).toMatchObject({
+      phoneLocked: true,
+      phoneError: undefined,
+      errorDetail: { target: "form", key: "phone.error.not-mobile" },
+      message: { key: "phone.error.not-mobile", tone: "error" },
+    });
+  });
+
+  test("integration errors: neutral message, diagnosable detail", async () => {
+    const onError = mock();
+    const { form, next } = setup({ onError });
+    next.issue.push(
+      apiErrorWith(
+        "BAD_REQUEST",
+        400,
+        { code: "TEMPLATE_NOT_AVAILABLE" },
+        { requestId: "req_tpl" },
+      ),
+    );
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    expect(form.getState()).toMatchObject({
+      phoneError: undefined,
+      message: { key: "error.unavailable", tone: "error" },
+      errorDetail: {
+        reason: "TEMPLATE_NOT_AVAILABLE",
+        target: "form",
+        configuration: true,
+        requestId: "req_tpl",
+      },
+    });
+    expect(onError.mock.calls[0]?.[0]).toMatchObject({
+      code: "BAD_REQUEST",
+      data: { code: "TEMPLATE_NOT_AVAILABLE" },
+    });
+    expect(
+      getOtpFormParts(form.getState(), {
+        id: "f",
+        t: createOtpTranslator({ locale: "en" }),
+      }).text.message,
+    ).toBe("Verification is not available right now. Please contact support.");
+  });
+
+  test("402 trial daily limit and 429 per-phone limit get their own messages", async () => {
+    const { form, next, tick } = setup();
+    next.issue.push(
+      apiErrorWith("PAYMENT_REQUIRED", 402, {
+        code: "TRIAL_DAILY_LIMIT_EXCEEDED",
+        resetAt: "2026-01-02T00:00:00+09:00",
+      }),
+    );
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    expect(form.getState()).toMatchObject({
+      message: {
+        key: "error.limit.daily",
+        params: { resetAt: "2026-01-02T00:00:00+09:00" },
+        tone: "error",
+      },
+      errorDetail: {
+        configuration: true,
+        reason: "TRIAL_DAILY_LIMIT_EXCEEDED",
+      },
+      retryPending: false,
+    });
+    next.issue.push(
+      apiErrorWith(
+        "TOO_MANY_REQUESTS",
+        429,
+        { limit: "perPhone", policy: "key", retryAfterMs: 20_000 },
+        { retryAfterMs: 20_000 },
+      ),
+    );
+    await form.send();
+    expect(form.getState()).toMatchObject({
+      resendIn: 20,
+      message: { key: "error.limit.perPhone", tone: "error" },
+      errorDetail: {
+        reason: "perPhone",
+        retryAfterMs: 20_000,
+        retryable: true,
+        target: "form",
+      },
+    });
+    tick(20_000);
+    // Shown while the wait runs, not after it.
+    expect(form.getState().message).toBeUndefined();
+    expect(form.getState().errorDetail?.reason).toBe("perPhone");
+  });
+
+  test("a 400 on verify is a code field error until the code changes", async () => {
+    const { form, next, verifies } = setup();
+    form.setPhoneNumber("01012345678");
+    await form.send();
+    next.verify.push(apiErrorWith("BAD_REQUEST", 400, undefined));
+    form.setCode("123456");
+    await Bun.sleep(0);
+    expect(verifies).toHaveLength(1);
+    let state = form.getState();
+    expect(state).toMatchObject({
+      phase: "code",
+      codeError: "code.error.invalid",
+      focus: { target: "code" },
+      errorDetail: { target: "code", operation: "verify" },
+    });
+    const parts = getOtpFormParts(state, {
+      id: "f",
+      t: createOtpTranslator({ locale: "en" }),
+    });
+    expect(parts.codeInput["aria-describedby"]).toBe(
+      "f-code-description f-code-error f-countdown",
+    );
+    expect(parts.text.codeError).toBe("Check the code and enter it again.");
+    expect(parts.text.message).toBeUndefined();
+    form.setCode("12345");
+    state = form.getState();
+    expect(state.codeError).toBeUndefined();
+    // The usual status comes back once the field no longer shows the error.
+    expect(state.message?.key).toBe("status.sent");
+  });
 
   test("local expiry, anchored on the server's issue duration", async () => {
     const { form, tick } = setup();

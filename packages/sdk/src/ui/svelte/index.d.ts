@@ -11,6 +11,8 @@ export { default as OtpFormVerifyButton } from "./OtpFormVerifyButton.svelte";
 export type {
   OtpCodeInputEvents,
   OtpCodeInputProps,
+  OtpErrorDetail,
+  OtpFormErrorTarget,
   OtpFormPhase,
   OtpFormPhoneFieldSlotProps,
   OtpFormRootEvents,

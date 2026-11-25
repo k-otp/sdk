@@ -596,6 +596,8 @@ export const createOtpCodeInputModel = (options: {
 };
 
 export type {
+  OtpErrorDetail,
+  OtpFormErrorTarget,
   OtpFormPhase,
   OtpFormState,
   OtpLocale,

@@ -149,8 +149,9 @@ const canonicalDigits = (phoneNumber: string): string => {
  * Recognizes a test phone number in any spelling (`010-0000-0001`,
  * `+82 10 0000 0001`, `+44 7700 900001`, `+1 415 555 0101`) and returns its
  * scenario, or `undefined` for any other number. A test key rejects every
- * other number (400 `TEST_NUMBER_REQUIRED`); a live key rejects test numbers
- * (400 `TEST_NUMBER_IN_LIVE_MODE`).
+ * other number (400 `TEST_NUMBER_REQUIRED`, or `PHONE_NUMBER_NOT_MOBILE` for
+ * a Korean landline, which every key gets first); a live key rejects test
+ * numbers (400 `TEST_NUMBER_IN_LIVE_MODE`).
  */
 export const matchTestPhoneNumber = (
   phoneNumber: string,

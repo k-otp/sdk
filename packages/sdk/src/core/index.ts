@@ -5,6 +5,7 @@ export {
 } from "./client";
 export {
   getIssueRequestErrorCode,
+  getOtpErrorReason,
   ISSUE_REQUEST_ERROR_CODES,
   isAmbiguousIssueError,
   isOtpApiError,

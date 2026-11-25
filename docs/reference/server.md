@@ -210,8 +210,11 @@ test number, rejects with `BAD_REQUEST` and `data.code`
 template without an approved AlimTalk code or a `webOtp` option (the first and
 the last are deprecated in the SDK types) rejects with
 `BAD_REQUEST` and `data.code` `CHANNEL_NOT_SUPPORTED`,
-`TEMPLATE_NOT_AVAILABLE` or `WEB_OTP_NOT_SUPPORTED`
-(`getIssueRequestErrorCode`). See
+`TEMPLATE_NOT_AVAILABLE` or `WEB_OTP_NOT_SUPPORTED`, and from API 2.3.0 a
+Korean landline number with `PHONE_NUMBER_NOT_MOBILE`
+(`getIssueRequestErrorCode`). `getOtpErrorReason(error)` returns the
+specific reason of any error (`data.code` of a 4xx, `data.limit` of a 429).
+See
 [errors and retries](../errors-and-retries.md).
 
 ## Runtime notes

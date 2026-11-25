@@ -62,7 +62,7 @@ valid (the matching error is then shown); they never reject for API errors.
 | --- | --- |
 | `phase` | `phone`, `sending`, `code`, `verifying`, `verified`, `failed` |
 | `phoneNumber`, `phone` | the input as displayed, and its parse (`phone.value` is sent) |
-| `phoneError`, `codeError` | message keys of validation errors (after a send/verify attempt) |
+| `phoneError`, `codeError` | message keys of the field errors: validation errors (after a send/verify attempt), or an API error about the number (`PHONE_NUMBER_NOT_MOBILE`, test-number codes) or the code (a 400 on verify) while the field still holds the rejected value |
 | `phoneLocked`, `issued`, `sentTo` | the number is locked because a code was sent to it (masked as `sentTo`) |
 | `code`, `codeLength`, `codeComplete` | |
 | `canSend`, `canVerify` | an action would start a request now |
@@ -71,6 +71,7 @@ valid (the matching error is then shown); they never reject for API errors.
 | `resendIn`, `retryIn` | seconds until send / verify may run again (local cooldown and server `retryAfterMs`) |
 | `expiresIn`, `expired` | seconds left on the current code, anchored on the server's `expiresAt - queuedAt` |
 | `attemptsRemaining`, `verified`, `reasonCode`, `error`, `errorOperation`, `retryPending`, `isLoading` | |
+| `errorDetail` | `OtpErrorDetail` of `error` (set exactly when `error` is): `{ code, status, reason, operation, target, key, params, configuration, ambiguous, retryable, retryAfterMs, requestId }`; `target` is `"phone"`, `"code"` or `"form"` (a phone error on a resend, while the number is locked, targets the form) |
 | `message` | `{ key, params, tone }` for the live region |
 | `focus` | `{ target: "phone" \| "code" \| "message", seq }`: apply when `seq` changes |
 | `flow` | the underlying `OtpFlowState` |
@@ -103,10 +104,25 @@ valid (the matching error is then shown); they never reject for API errors.
   or none -> `"ko"`, other languages -> `"en"`) and
   `watchOtpDocumentLocale(onChange)` (for `locale: "auto"`, after mount),
   `formatOtpMessage(template, params)`.
-- `otpErrorMessageKey(error, operation?)`, `otpReasonMessageKey(reason)`,
+- `otpErrorMessageKey(error, operation?)` (the `key` of
+  `describeOtpError`), `otpReasonMessageKey(reason)`,
   `otpSkipMessageKey(skip)`, `otpPhoneErrorMessageKey(error)`.
+- `describeOtpError(error, operation?): OtpErrorDetail`: the message key,
+  `params` and `target` (`OtpFormErrorTarget`: `"phone"`, `"code"` or
+  `"form"`) for an `OtpApiError`, with the API's `reason`
+  (`getOtpErrorReason`), `configuration` (the integration has to fix it:
+  401, 403, 402, `CHANNEL_NOT_SUPPORTED`, `TEMPLATE_NOT_AVAILABLE`,
+  `WEB_OTP_NOT_SUPPORTED`), `ambiguous` (a send that may have gone out),
+  `retryable`, `retryAfterMs` and `requestId`. Reason-specific keys:
+  `phone.error.not-mobile`, `error.TEST_NUMBER_REQUIRED`,
+  `error.TEST_NUMBER_IN_LIVE_MODE`, `code.error.invalid`,
+  `error.unavailable`, `error.limit.perPhone`, `error.limit.perKey`,
+  `error.limit.daily` (also the 402 `TRIAL_DAILY_LIMIT_EXCEEDED`, with
+  `{resetAt}`); any other reason falls back to `error.<code>`.
 - Types: `OtpLocale`, `OtpMessageKey`, `OtpMessageOverrides`,
-  `OtpTranslator`.
+  `OtpTranslator`, `OtpErrorDetail`, `OtpFormErrorTarget`,
+  `OtpDescribableError` (`OtpErrorDetail` and `OtpFormErrorTarget` are also
+  exported by `/ui/react`, `/ui/vue` and `/ui/svelte`).
 
 ### Countdown and WebOTP
 

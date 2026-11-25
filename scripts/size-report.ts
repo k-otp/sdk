@@ -46,7 +46,9 @@ const src = path.join(root, "packages/sdk/src");
 
 /** Budgets in bytes (min+gzip). Raise deliberately, with a reason. */
 const BUDGETS = {
-  core: 13.5 * 1024,
+  // Raised from 13.5 kB for getOtpErrorReason and the bounded server text
+  // of OtpApiError (no HTML page as message or data).
+  core: 14 * 1024,
   headless: 4 * 1024,
   // Includes the headless flow (KOtp.createOtpFlow).
   iife: 14.5 * 1024,
@@ -58,16 +60,18 @@ const BUDGETS = {
   // The UI model (phone, code input, form state machine, both KO/EN
   // catalogs, part attributes, locale detection), headless flow
   // included. Raised from 11 kB for the per-number cooldown, retained
-  // idempotency keys and locale: "auto".
-  ui: 12 * 1024,
+  // idempotency keys and locale: "auto", then to 12.5 kB for the
+  // reason-specific error messages (both catalogs) and errorDetail.
+  ui: 12.5 * 1024,
   // A UI components subpath's own code.
   uiAdapter: 4 * 1024,
   // Everything an app ships for the UI components of one framework (core,
   // headless, hooks, UI model, components; framework external). Raised
   // from 23 kB for the single-tab-stop/IME handling, the local cooldown and
   // the request epoch of the form, then to 25 kB for locale: "auto" and the
-  // uncontrolled segments.
-  uiAdapterWithAll: 25 * 1024,
+  // uncontrolled segments, then to 26 kB for the reason-specific error
+  // messages and errorDetail.
+  uiAdapterWithAll: 26 * 1024,
   // The `.svelte` sources (uncompiled; the app compiles them).
   uiSvelteSources: 4 * 1024,
   theme: 4 * 1024,

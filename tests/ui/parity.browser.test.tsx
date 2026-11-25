@@ -10,7 +10,13 @@ import { OtpForm as VueOtpForm } from "@k-otp/sdk/ui/vue";
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { createApp, h } from "vue";
 import { segment } from "./dom";
-import { createMockApi, flush, type MockApi, rateLimited } from "./mock-api";
+import {
+  badRequest,
+  createMockApi,
+  flush,
+  type MockApi,
+  rateLimited,
+} from "./mock-api";
 import { mountSvelte } from "./svelte-mount";
 
 type Mounted = { destroy: () => void };
@@ -208,6 +214,20 @@ const scenarios: Record<
       waitUntilIdle("send-button"),
       click("send-button"),
       click("edit-phone"),
+    ],
+  },
+  "API errors: a landline on the phone field, a template error as a message": {
+    setup: (api) => {
+      api.next.issue.push(badRequest("PHONE_NUMBER_NOT_MOBILE"));
+      api.next.issue.push(badRequest("TEMPLATE_NOT_AVAILABLE"));
+    },
+    steps: [
+      typePhone("010-1234-5678"),
+      click("send-button"),
+      typePhone("010-1234-567"),
+      typePhone("010-1234-5679"),
+      click("send-button"),
+      click("send-button"),
     ],
   },
   "429 on verify, then max attempts": {

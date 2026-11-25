@@ -33,6 +33,20 @@ export const rateLimited =
       { "retry-after": String(Math.ceil(retryAfterMs / 1000)) },
     );
 
+/** A 400 of `issue` naming its cause in `data.code` (and `message`). */
+export const badRequest =
+  (code: string): Reply =>
+  () =>
+    errorEnvelope(
+      400,
+      "BAD_REQUEST",
+      `${code}: rejected`,
+      { code },
+      {
+        "x-request-id": "req_mock",
+      },
+    );
+
 export const unavailable =
   (retryAfterSeconds?: number): Reply =>
   () =>

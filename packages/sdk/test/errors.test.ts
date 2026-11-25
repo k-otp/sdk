@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
   createOtpClient,
   getIssueRequestErrorCode,
+  getOtpErrorReason,
+  getTestNumberErrorCode,
   ISSUE_REQUEST_ERROR_CODES,
   isOtpApiError,
   normalizeOtpApiError,
@@ -97,6 +99,59 @@ describe("HTTP error envelope mapping", () => {
     expect(error.code).toBe("SERVICE_UNAVAILABLE");
     expect(error.status).toBe(502);
     expect(error.requestId).toBe("8a1b2c3d4e-ICN");
+    // The HTML page is never surfaced as the message or the data.
+    expect(error.message).toBe("K-OTP API request failed with HTTP 502");
+    expect(error.data).toBeUndefined();
+  });
+
+  test("a plain-text gateway body is kept as data, never as the message", async () => {
+    const error = await verify(
+      () =>
+        new Response("  upstream\nconnect error  ", {
+          status: 503,
+          headers: { "content-type": "text/plain" },
+        }),
+    );
+    expect(error.code).toBe("SERVICE_UNAVAILABLE");
+    expect(error.message).toBe("K-OTP API request failed with HTTP 503");
+    expect(error.data).toBe("upstream connect error");
+  });
+
+  test("an HTML or overly long envelope message is not surfaced as is", async () => {
+    const html = await verify(() =>
+      json(502, {
+        code: "SERVICE_UNAVAILABLE",
+        message: "<!DOCTYPE html><html><body><h1>502</h1></body></html>",
+      }),
+    );
+    expect(html.code).toBe("SERVICE_UNAVAILABLE");
+    expect(html.message).toBe("K-OTP API request failed with HTTP 502");
+    const long = await verify(() =>
+      errorEnvelope(500, "INTERNAL_SERVER_ERROR", `x\n${"y".repeat(1000)}`),
+    );
+    expect(long.message).toHaveLength(300);
+    expect(long.message.startsWith("x y")).toBe(true);
+    expect(long.message.endsWith("\u2026")).toBe(true);
+    const plain = await verify(() =>
+      errorEnvelope(400, "BAD_REQUEST", "code must be 6 digits (a < b)"),
+    );
+    expect(plain.message).toBe("code must be 6 digits (a < b)");
+    const blank = await verify(() => errorEnvelope(400, "BAD_REQUEST", "  "));
+    expect(blank.message).toBe("K-OTP API request failed with HTTP 400");
+  });
+
+  test("an empty error body maps by status and keeps the request id", async () => {
+    const error = await verify(
+      () =>
+        new Response(null, {
+          status: 500,
+          headers: { "x-request-id": "req_empty" },
+        }),
+    );
+    expect(error.code).toBe("INTERNAL_SERVER_ERROR");
+    expect(error.message).toBe("K-OTP API request failed with HTTP 500");
+    expect(error.requestId).toBe("req_empty");
+    expect(error.data).toBeUndefined();
   });
 
   test("malformed JSON error bodies still map by status", async () => {
@@ -329,6 +384,7 @@ describe("OtpApiError", () => {
       "CHANNEL_NOT_SUPPORTED",
       "TEMPLATE_NOT_AVAILABLE",
       "WEB_OTP_NOT_SUPPORTED",
+      "PHONE_NUMBER_NOT_MOBILE",
     ]);
     for (const code of ISSUE_REQUEST_ERROR_CODES) {
       const { fetch } = mockFetch(() =>
@@ -357,5 +413,78 @@ describe("OtpApiError", () => {
     ).toBeUndefined();
     expect(getIssueRequestErrorCode(new Error("x"))).toBeUndefined();
     expect(getIssueRequestErrorCode(undefined)).toBeUndefined();
+  });
+
+  test("PHONE_NUMBER_NOT_MOBILE (API 2.3.0): a landline number", async () => {
+    const { fetch } = mockFetch(() =>
+      errorEnvelope(
+        400,
+        "BAD_REQUEST",
+        "PHONE_NUMBER_NOT_MOBILE: phoneNumber is not a mobile number",
+        { code: "PHONE_NUMBER_NOT_MOBILE" },
+        { "x-request-id": "req_landline" },
+      ),
+    );
+    const client = createOtpClient({ apiKey: "pk_live_x", fetch });
+    const error = await client
+      .issue({
+        phoneNumber: "0212345678",
+        purpose: "signup",
+        idempotencyKey: "k1",
+      })
+      .then(
+        () => {
+          throw new Error("expected rejection");
+        },
+        (reason: unknown) => reason as OtpApiError,
+      );
+    expect(error.code).toBe("BAD_REQUEST");
+    expect(error.retryable).toBe(false);
+    expect(error.requestId).toBe("req_landline");
+    expect(getIssueRequestErrorCode(error)).toBe("PHONE_NUMBER_NOT_MOBILE");
+    expect(getTestNumberErrorCode(error)).toBeUndefined();
+    expect(getOtpErrorReason(error)).toBe("PHONE_NUMBER_NOT_MOBILE");
+  });
+
+  test("getOtpErrorReason: data.code of a 4xx, data.limit of a 429", () => {
+    const error = (status: number, data: unknown) =>
+      new OtpApiError({
+        code: otpErrorCodeFromStatus(status),
+        status,
+        message: "x",
+        data,
+      });
+    expect(
+      getOtpErrorReason(error(400, { code: "TEST_NUMBER_REQUIRED" })),
+    ).toBe("TEST_NUMBER_REQUIRED");
+    expect(
+      getOtpErrorReason(
+        error(402, {
+          code: "TRIAL_DAILY_LIMIT_EXCEEDED",
+          resetAt: "2026-01-02T00:00:00+09:00",
+        }),
+      ),
+    ).toBe("TRIAL_DAILY_LIMIT_EXCEEDED");
+    expect(
+      getOtpErrorReason(
+        error(429, { limit: "perPhone", policy: "key", retryAfterMs: 1 }),
+      ),
+    ).toBe("perPhone");
+    // A reason a newer API adds is reported as is.
+    expect(getOtpErrorReason(error(400, { code: "SOMETHING_NEW" }))).toBe(
+      "SOMETHING_NEW",
+    );
+    // Not an identifier, not a 4xx, or no data: no reason.
+    expect(
+      getOtpErrorReason(error(400, { code: "<b>not an id</b>" })),
+    ).toBeUndefined();
+    expect(getOtpErrorReason(error(400, { code: "x".repeat(65) }))).toBe(
+      undefined,
+    );
+    expect(getOtpErrorReason(error(429, { code: "perPhone" }))).toBeUndefined();
+    expect(getOtpErrorReason(error(503, { code: "X" }))).toBeUndefined();
+    expect(getOtpErrorReason(error(400, "BAD"))).toBeUndefined();
+    expect(getOtpErrorReason(error(400, undefined))).toBeUndefined();
+    expect(getOtpErrorReason(undefined)).toBeUndefined();
   });
 });

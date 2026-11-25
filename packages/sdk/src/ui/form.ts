@@ -36,10 +36,10 @@ import {
   sanitizeOtpCode,
 } from "./code";
 import { otpSecondsLeft } from "./countdown";
+import { describeOtpError, type OtpErrorDetail } from "./errors";
 import {
   type OtpMessageKey,
   type OtpMessageParams,
-  otpErrorMessageKey,
   otpPhoneErrorMessageKey,
   otpReasonMessageKey,
   otpSkipMessageKey,
@@ -146,14 +146,23 @@ export type OtpFormState = {
   readonly phoneNumber: string;
   /** Parsed phone input (`phone.value` is what gets sent). */
   readonly phone: OtpPhoneNumber;
-  /** Phone validation message, shown once a send was attempted. */
+  /**
+   * Message key of the phone field error: a validation error (shown once a
+   * send was attempted), or an API error about the number (a landline, a
+   * test-mode number mismatch, see `errorDetail`) while the input still
+   * holds the number that was rejected.
+   */
   readonly phoneError: OtpMessageKey | undefined;
   /** Phone input is locked because a code was sent to it. */
   readonly phoneLocked: boolean;
   readonly code: string;
   readonly codeLength: number;
   readonly codeComplete: boolean;
-  /** Code validation message, shown once a verify was attempted. */
+  /**
+   * Message key of the code field error: a validation error (shown once a
+   * verify was attempted), or an API error about the code while the input
+   * still holds the code that was rejected.
+   */
   readonly codeError: OtpMessageKey | undefined;
   /** A code was sent for the current number (the code step is shown). */
   readonly issued: boolean;
@@ -183,6 +192,16 @@ export type OtpFormState = {
   readonly reasonCode: VerifyReasonCode | undefined;
   readonly error: OtpApiError | undefined;
   readonly errorOperation: OtpFormOperation | undefined;
+  /**
+   * What the form shows for `error` and why (set exactly when `error` is):
+   * the API's specific `reason`, the field it `target`s (`phone`, `code`, or
+   * `form` for the status message), the message `key` and `params`, whether
+   * the integration rather than the user has to fix it (`configuration`),
+   * `retryAfterMs` and `requestId`. For custom UIs and logging; the
+   * built-in parts already render it through `phoneError`, `codeError` and
+   * `message`.
+   */
+  readonly errorDetail: OtpErrorDetail | undefined;
   /** The last send failed ambiguously; sending again retries the same key. */
   readonly retryPending: boolean;
   readonly isLoading: boolean;
@@ -372,6 +391,8 @@ export const createOtpForm = (
   let errorOperation: OtpFormOperation | undefined;
   /** Phone of the latest send attempt (the code was sent to it if issued). */
   let attemptPhone: OtpPhoneNumber | undefined;
+  /** Code of the latest verify attempt (an API error about it follows it). */
+  let attemptCode: string | undefined;
   let expiresAt: number | undefined;
   let focus: OtpFormState["focus"];
   let focusSeq = 0;
@@ -419,18 +440,21 @@ export const createOtpForm = (
     phase: OtpFormPhase,
     expired: boolean,
     waits: { send: number; verify: number },
+    detail: OtpErrorDetail | undefined,
+    fieldError: boolean,
   ): OtpFormMessage | undefined => {
     // A wait-and-retry error (429, 503 with Retry-After) is shown while the
     // wait runs, not after it.
     const waitOver =
       f.error?.retryAfterMs !== undefined &&
       waits[errorOperation ?? "send"] === 0;
-    if (f.error && !waitOver) {
-      return {
-        key: otpErrorMessageKey(f.error, errorOperation),
-        params: {},
-        tone: "error",
-      };
+    if (detail && !waitOver) {
+      // An error about the number or the code is shown on its field (once
+      // the user edits the field, the usual status comes back).
+      if (detail.target === "form") {
+        return { key: detail.key, params: detail.params, tone: "error" };
+      }
+      if (fieldError) return undefined;
     }
     if (f.reasonCode && phase !== "verifying" && phase !== "sending") {
       return {
@@ -476,6 +500,22 @@ export const createOtpForm = (
       ? maskOtpPhoneNumber(attemptPhone.input, { allowInternational: true })
       : undefined;
 
+  /**
+   * The error detail of the flow's error. An error about the number targets
+   * the form instead while the number is locked (a resend).
+   */
+  const describe = (
+    error: OtpApiError | undefined,
+    operation: OtpFormOperation | undefined,
+    issued: boolean,
+  ): OtpErrorDetail | undefined => {
+    if (!error) return undefined;
+    const detail = describeOtpError(error, operation);
+    return detail.target === "phone" && issued
+      ? { ...detail, target: "form" }
+      : detail;
+  };
+
   const build = (f: OtpFlowState): OtpFormState => {
     const phone = parsePhone();
     const expiresIn = expiresInSeconds(f);
@@ -492,20 +532,36 @@ export const createOtpForm = (
       busy || resendIn > 0 || phase === "verified" || !f.canSend;
     const verifyDisabled =
       !issued || busy || retryIn > 0 || !f.canVerify || phase !== "code";
+    const operation = f.error ? errorOperation : undefined;
+    const errorDetail = describe(f.error, operation, issued);
+    // An API error about a field is shown while the field still holds the
+    // value that was rejected.
+    const apiPhoneError =
+      errorDetail?.target === "phone" &&
+      phone.value !== undefined &&
+      phone.value === attemptPhone?.value
+        ? errorDetail.key
+        : undefined;
+    const apiCodeError =
+      errorDetail?.target === "code" && code === attemptCode
+        ? errorDetail.key
+        : undefined;
+    const phoneError =
+      showPhoneError && !phone.valid && phone.error
+        ? otpPhoneErrorMessageKey(phone.error)
+        : apiPhoneError;
+    const codeError =
+      showCodeError && !codeComplete ? "code.error.incomplete" : apiCodeError;
     return {
       phase,
       phoneNumber,
       phone,
-      phoneError:
-        showPhoneError && !phone.valid && phone.error
-          ? otpPhoneErrorMessageKey(phone.error)
-          : undefined,
+      phoneError,
       phoneLocked: issued || phase === "sending",
       code,
       codeLength,
       codeComplete,
-      codeError:
-        showCodeError && !codeComplete ? "code.error.incomplete" : undefined,
+      codeError,
       issued,
       sentTo: sentTo(f),
       canSend: !sendDisabled && phone.valid,
@@ -520,13 +576,18 @@ export const createOtpForm = (
       verified: f.verified,
       reasonCode: f.reasonCode,
       error: f.error,
-      errorOperation: f.error ? errorOperation : undefined,
+      errorOperation: operation,
+      errorDetail,
       retryPending: f.idempotencyKey !== undefined,
       isLoading: busy,
-      message: deriveMessage(f, phase, expired, {
-        send: resendIn,
-        verify: retryIn,
-      }),
+      message: deriveMessage(
+        f,
+        phase,
+        expired,
+        { send: resendIn, verify: retryIn },
+        errorDetail,
+        apiPhoneError !== undefined || apiCodeError !== undefined,
+      ),
       focus,
       flow: f,
     };
@@ -683,6 +744,12 @@ export const createOtpForm = (
       lastSkip = { reason: result.skipped, operation: "send" };
     } else if (result.error) {
       errorOperation = "send";
+      if (
+        describe(result.error, "send", flow.getState().issueId !== undefined)
+          ?.target === "phone"
+      ) {
+        requestFocus("phone");
+      }
       config.onError?.(result.error, "send");
     } else {
       showCodeError = false;
@@ -708,6 +775,7 @@ export const createOtpForm = (
     }
     lastSkip = undefined;
     const started = epoch;
+    const submitted = code;
     const promise = flow.verify(code);
     touch();
     const result = await promise;
@@ -717,6 +785,10 @@ export const createOtpForm = (
       lastSkip = { reason: result.skipped, operation: "verify" };
     } else if (result.error) {
       errorOperation = "verify";
+      attemptCode = submitted;
+      if (describe(result.error, "verify", true)?.target === "code") {
+        requestFocus("code");
+      }
       config.onError?.(result.error, "verify");
     } else if (result.data.verified) {
       stopWebOtp();
@@ -765,6 +837,7 @@ export const createOtpForm = (
         : undefined;
     flow.reset();
     attemptPhone = undefined;
+    attemptCode = undefined;
     expiresAt = undefined;
     code = "";
     showCodeError = false;

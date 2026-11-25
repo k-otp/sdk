@@ -5,6 +5,7 @@ import {
   applyOtpCodeKey,
   applyOtpCodePaste,
   createOtpTranslator,
+  describeOtpError,
   detectOtpDocumentLocale,
   formatOtpCountdown,
   formatOtpMessage,
@@ -417,6 +418,174 @@ describe("messages", () => {
     expect(otpErrorMessageKey(error("FORBIDDEN"), "send")).toBe(
       "error.FORBIDDEN",
     );
+  });
+
+  test("describeOtpError: specific API reasons get specific messages and targets", () => {
+    const error = (
+      code: (typeof OTP_API_ERROR_CODES)[number],
+      status: number,
+      data?: unknown,
+      extra: { requestId?: string; retryAfterMs?: number } = {},
+    ) =>
+      new OtpApiError({ code, status, message: "server text", data, ...extra });
+    type Expected = { key: string; target: string; configuration: boolean };
+    const cases: [OtpApiError, "send" | "verify", Expected][] = [];
+    const expectCase = (
+      input: OtpApiError,
+      operation: "send" | "verify",
+      key: string,
+      target: string,
+      configuration = false,
+    ) => cases.push([input, operation, { key, target, configuration }]);
+    const badRequest = (code?: string) =>
+      error("BAD_REQUEST", 400, code === undefined ? undefined : { code });
+    const rateLimited = (limit: string) =>
+      error("TOO_MANY_REQUESTS", 429, { limit, policy: "key" });
+    expectCase(
+      badRequest("PHONE_NUMBER_NOT_MOBILE"),
+      "send",
+      "phone.error.not-mobile",
+      "phone",
+    );
+    for (const code of ["TEST_NUMBER_REQUIRED", "TEST_NUMBER_IN_LIVE_MODE"]) {
+      expectCase(badRequest(code), "send", `error.${code}`, "phone");
+    }
+    for (const code of [
+      "CHANNEL_NOT_SUPPORTED",
+      "TEMPLATE_NOT_AVAILABLE",
+      "WEB_OTP_NOT_SUPPORTED",
+    ]) {
+      expectCase(badRequest(code), "send", "error.unavailable", "form", true);
+    }
+    // A reason this version does not know: the message of the HTTP code.
+    expectCase(
+      badRequest("SOMETHING_NEW"),
+      "send",
+      "error.BAD_REQUEST",
+      "form",
+    );
+    expectCase(badRequest(), "send", "error.BAD_REQUEST", "form");
+    expectCase(badRequest(), "verify", "code.error.invalid", "code");
+    for (const code of [
+      "INSUFFICIENT_CREDIT",
+      "OVERDRAFT_LIMIT_EXCEEDED",
+      "SOMETHING_NEW",
+    ]) {
+      expectCase(
+        error("PAYMENT_REQUIRED", 402, { code }),
+        "send",
+        "error.PAYMENT_REQUIRED",
+        "form",
+        true,
+      );
+    }
+    expectCase(rateLimited("perPhone"), "send", "error.limit.perPhone", "form");
+    expectCase(rateLimited("perIp"), "send", "error.TOO_MANY_REQUESTS", "form");
+    expectCase(rateLimited("perKey"), "verify", "error.limit.perKey", "form");
+    for (const limit of ["perKeyDaily", "perOrgDaily", "testModeDaily"]) {
+      expectCase(rateLimited(limit), "send", "error.limit.daily", "form");
+    }
+    expectCase(
+      rateLimited("perNew"),
+      "send",
+      "error.TOO_MANY_REQUESTS",
+      "form",
+    );
+    expectCase(
+      error("UNAUTHORIZED", 401),
+      "send",
+      "error.UNAUTHORIZED",
+      "form",
+      true,
+    );
+    expectCase(
+      error("FORBIDDEN", 403),
+      "verify",
+      "error.FORBIDDEN",
+      "form",
+      true,
+    );
+    for (const [input, operation, expected] of cases) {
+      expect(describeOtpError(input, operation)).toMatchObject({
+        ...expected,
+        ambiguous: false,
+      });
+      expect(otpErrorMessageKey(input, operation)).toBe(expected.key as never);
+    }
+    // The daily trial limit passes its reset time to the message.
+    const trial = describeOtpError(
+      error(
+        "PAYMENT_REQUIRED",
+        402,
+        {
+          code: "TRIAL_DAILY_LIMIT_EXCEEDED",
+          resetAt: "2026-01-02T00:00:00+09:00",
+        },
+        { requestId: "req_1" },
+      ),
+      "send",
+    );
+    expect(trial).toEqual({
+      code: "PAYMENT_REQUIRED",
+      status: 402,
+      reason: "TRIAL_DAILY_LIMIT_EXCEEDED",
+      operation: "send",
+      target: "form",
+      key: "error.limit.daily",
+      params: { resetAt: "2026-01-02T00:00:00+09:00" },
+      configuration: true,
+      ambiguous: false,
+      retryable: false,
+      retryAfterMs: undefined,
+      requestId: "req_1",
+    });
+    const limited = describeOtpError(
+      error(
+        "TOO_MANY_REQUESTS",
+        429,
+        { limit: "perPhone", policy: "key", retryAfterMs: 1500 },
+        { retryAfterMs: 1500, requestId: "req_2" },
+      ),
+      "send",
+    );
+    expect(limited).toMatchObject({
+      reason: "perPhone",
+      retryable: true,
+      retryAfterMs: 1500,
+      requestId: "req_2",
+    });
+    // An ambiguous send stays "trying again is safe", whatever its data.
+    expect(
+      describeOtpError(
+        error("SERVICE_UNAVAILABLE", 503, { code: "X" }),
+        "send",
+      ),
+    ).toMatchObject({
+      key: "error.sendUncertain",
+      target: "form",
+      ambiguous: true,
+      reason: undefined,
+    });
+  });
+
+  test("end-user messages carry no integration jargon", () => {
+    const jargon =
+      /\b(?:api|key|keys|origin|template|channel|alimtalk|webotp|idempotency|credit|wallet|http)\b|[A-Z]{3,}_[A-Z]/i;
+    for (const [key, text] of Object.entries(OTP_MESSAGES.en)) {
+      expect({ key, jargon: jargon.test(text) }).toEqual({
+        key,
+        jargon: false,
+      });
+    }
+    for (const [key, text] of Object.entries(OTP_MESSAGES.ko)) {
+      expect({
+        key,
+        jargon: /api|키|템플릿|알림톡|크레딧|잔액/i.test(text),
+      }).toEqual({
+        key,
+        jargon: false,
+      });
+    }
   });
 
   test("translator: locale, interpolation and overrides", () => {

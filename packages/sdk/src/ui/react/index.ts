@@ -9,6 +9,8 @@
  * ```
  */
 export type {
+  OtpErrorDetail,
+  OtpFormErrorTarget,
   OtpFormPhase,
   OtpFormState,
   OtpLocale,

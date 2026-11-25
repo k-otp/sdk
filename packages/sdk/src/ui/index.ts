@@ -18,6 +18,12 @@ export {
 } from "./code";
 export { formatOtpCountdown, otpSecondsLeft } from "./countdown";
 export {
+  describeOtpError,
+  type OtpDescribableError,
+  type OtpErrorDetail,
+  type OtpFormErrorTarget,
+} from "./errors";
+export {
   createOtpForm,
   type OtpFormActionResult,
   type OtpFormConfig,

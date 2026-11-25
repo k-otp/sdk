@@ -181,12 +181,14 @@ Every rejection from `issue`/`verify` is an `OtpApiError`:
 class OtpApiError extends Error {
   code: OtpApiErrorCode;   // see below
   status: number;          // HTTP status, 0 when no response was received
+  message: string;         // server message (bounded, never an HTML page) or a client message; for logs
   requestId?: string;      // X-Request-Id (else request-id / cf-ray), when readable
   data?: unknown;          // e.g. { code: "INSUFFICIENT_CREDIT" } for 402,
                            // { limit, policy, retryAfterMs } for 429,
                            // { code: "TEST_NUMBER_REQUIRED" } for some 400s
                            // (also CHANNEL_NOT_SUPPORTED, TEMPLATE_NOT_AVAILABLE,
-                           // WEB_OTP_NOT_SUPPORTED: getIssueRequestErrorCode)
+                           // WEB_OTP_NOT_SUPPORTED, PHONE_NUMBER_NOT_MOBILE:
+                           // getIssueRequestErrorCode)
   retryAfterMs?: number;   // data.retryAfterMs, else Retry-After (429, some 503s)
   retryable: boolean;      // TOO_MANY_REQUESTS, INTERNAL_SERVER_ERROR, SERVICE_UNAVAILABLE, TIMEOUT, NETWORK_ERROR
 }
@@ -201,8 +203,16 @@ SDK (the ESM and CommonJS builds loaded side by side, the CDN bundle and an
 npm install): every `OtpApiError` carries a shared `Symbol.for` brand, which
 `instanceof` and `isOtpApiError(error)` check.
 
+`getOtpErrorReason(error)` returns the specific reason of any error:
+`data.code` of a 4xx (`PHONE_NUMBER_NOT_MOBILE`, `TEST_NUMBER_REQUIRED`,
+`INSUFFICIENT_CREDIT`, `TRIAL_DAILY_LIMIT_EXCEEDED`, ...) or `data.limit` of
+a 429 (`perPhone`, ...), also for reasons a newer API adds, else
+`undefined`. Show end users your own text per reason and `code`, never
+`error.message` (the UI components do this; see
+[UI errors](../../docs/ui.md#errors)).
+
 A 400 from `issue` can carry `data.code` (also the first token of `message`)
-for a request the API no longer accepts. `getIssueRequestErrorCode(error)`
+for a request the API cannot serve. `getIssueRequestErrorCode(error)`
 returns it, and `ISSUE_REQUEST_ERROR_CODES` lists the values:
 
 | `data.code` | Cause |
@@ -210,6 +220,7 @@ returns it, and `ISSUE_REQUEST_ERROR_CODES` lists the values:
 | `CHANNEL_NOT_SUPPORTED` | `channel: "sms"`. Only `"alimtalk"` (the default) is accepted. |
 | `TEMPLATE_NOT_AVAILABLE` | The template has no approved AlimTalk code (its `channelSupport` is empty). |
 | `WEB_OTP_NOT_SUPPORTED` | `webOtp` was set to anything but `false`. |
+| `PHONE_NUMBER_NOT_MOBILE` | API 2.3.0+: `phoneNumber` is a Korean landline (area code `02`, `031`-`033`, `041`-`044`, `051`-`055`, `061`-`064`), which can receive neither KakaoTalk nor SMS; test keys get it too. Ask for a mobile number. |
 
 ### Test mode
 
@@ -327,8 +338,12 @@ import "@k-otp/sdk/ui/theme.css"; // optional
 A phone field (Korean mobiles canonicalized before sending), send/resend with
 the cooldown, a segmented code input (paste, `one-time-code` autofill,
 keyboard navigation), verify, an expiry countdown and a live status
-message, in Korean or English. Headless parts (`OtpForm.Root`,
-`OtpForm.PhoneField`, ...) expose `data-*` state and render props / slots.
+message, in Korean or English. API errors get a specific, end-user-safe
+message on the field they concern (a landline number under the phone
+input), and the snapshot's `errorDetail` carries the API's reason,
+`requestId` and `retryAfterMs` for custom UIs and logs. Headless parts
+(`OtpForm.Root`, `OtpForm.PhoneField`, ...) expose `data-*` state and render
+props / slots.
 Guide: [UI components](../../docs/ui.md); API:
 [reference](../../docs/reference/ui.md). The Svelte components are shipped as
 `.svelte` sources (the `svelte` export condition) that your Svelte 4 or 5

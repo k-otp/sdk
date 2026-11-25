@@ -14,7 +14,13 @@ import { StrictMode, useState } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { part, segment, segments, sentPhone } from "./dom";
-import { createMockApi, flush, MOCK_CODE, rateLimited } from "./mock-api";
+import {
+  badRequest,
+  createMockApi,
+  flush,
+  MOCK_CODE,
+  rateLimited,
+} from "./mock-api";
 
 afterEach(cleanup);
 
@@ -70,6 +76,43 @@ describe("<OtpForm /> preset (React)", () => {
     );
     expect(document.activeElement).toBe(input);
     expect(api.calls).toHaveLength(0);
+  });
+
+  test("an API landline rejection is shown under the phone input, wired with ARIA", async () => {
+    const api = createMockApi();
+    api.next.issue.push(badRequest("PHONE_NUMBER_NOT_MOBILE"));
+    const onError = mock();
+    render(
+      <OtpForm
+        client={api.client}
+        purpose="signup"
+        locale="en"
+        onError={onError}
+      />,
+    );
+    typePhone("010-1234-5678");
+    await sendCode();
+    expect(api.calls).toHaveLength(1);
+    const input = screen.getByLabelText("Phone number");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(part("phone-error").textContent).toBe(
+      "Enter a mobile number (010-...).",
+    );
+    expect(input.getAttribute("aria-describedby")).toContain(
+      part("phone-error").id,
+    );
+    expect(document.activeElement).toBe(input);
+    // Not repeated as a form-level message.
+    expect(part("message").hasAttribute("data-empty")).toBe(true);
+    // Diagnosable: the request id and the API's reason reach onError.
+    expect(onError.mock.calls[0]?.[0]).toMatchObject({
+      code: "BAD_REQUEST",
+      requestId: "req_mock",
+      data: { code: "PHONE_NUMBER_NOT_MOBILE" },
+    });
+    typePhone("010-1234-5679");
+    expect(document.querySelector('[data-k-otp="phone-error"]')).toBeNull();
+    expect(input.hasAttribute("aria-invalid")).toBe(false);
   });
 
   test("full flow: send (canonical number), focus moves to the code, wrong code, verify", async () => {
@@ -195,8 +238,9 @@ describe("<OtpForm /> preset (React)", () => {
     typePhone("010-1234-5678");
     await sendCode();
     expect(part("root").getAttribute("data-state")).toBe("phone");
+    // The mock answers with `limit: "perKey"`: busy, not the user's fault.
     expect(part("message").textContent).toBe(
-      "Too many attempts. Please wait and try again.",
+      "Verification is busy right now. Please try again shortly.",
     );
     // No code reached this number yet: "send", not "resend".
     expect(part("send-button").textContent).toBe("Send code in 0:05");

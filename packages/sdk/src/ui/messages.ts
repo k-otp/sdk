@@ -1,16 +1,13 @@
 /**
  * Message catalog of the OTP UI (Korean and English): labels, button copy,
- * status lines, and one message per SDK error code, verify reason code and
- * flow skip reason. Override any entry with `messages` and pick the language
- * with `locale`.
+ * status lines, one message per SDK error code, verify reason code and flow
+ * skip reason, and messages for the specific API reasons an end user can act
+ * on (see `describeOtpError`). Override any entry with `messages` and pick
+ * the language with `locale`.
  */
-import {
-  isAmbiguousIssueError,
-  type OtpApiError,
-  type OtpApiErrorCode,
-} from "../core/errors";
 import type { VerifyReasonCode } from "../core/types";
 import type { OtpFlowSkipReason } from "../headless";
+import { describeOtpError, type OtpDescribableError } from "./errors";
 import type { OtpPhoneErrorCode } from "./phone";
 
 export type OtpLocale = "ko" | "en";
@@ -79,6 +76,7 @@ const en = {
   "code.description": "Enter the {length}-digit code we sent you.",
   "code.segment": "Digit {index} of {length}",
   "code.error.incomplete": "Enter all {length} digits.",
+  "code.error.invalid": "Check the code and enter it again.",
   "send.idle": "Send code",
   "send.sending": "Sending...",
   "send.resend": "Resend code",
@@ -124,6 +122,18 @@ const en = {
   "error.NETWORK_ERROR": "Check your connection and try again.",
   "error.ABORTED": "The request was cancelled.",
   "error.UNKNOWN": "Something went wrong. Please try again.",
+  "error.TEST_NUMBER_REQUIRED":
+    "This is a test environment. Enter a test phone number.",
+  "error.TEST_NUMBER_IN_LIVE_MODE":
+    "This number cannot receive codes. Enter your mobile number.",
+  "error.unavailable":
+    "Verification is not available right now. Please contact support.",
+  "error.limit.perPhone":
+    "Too many codes were requested for this number. Please try again later.",
+  "error.limit.perKey":
+    "Verification is busy right now. Please try again shortly.",
+  "error.limit.daily":
+    "No more verification codes can be sent today. Please try again later.",
 } as const;
 
 /** Every message key of the catalog. */
@@ -144,6 +154,7 @@ const ko: OtpMessageCatalog = {
     "카카오톡 또는 문자로 받은 {length}자리 인증번호를 입력해 주세요.",
   "code.segment": "{length}자리 중 {index}번째 숫자",
   "code.error.incomplete": "인증번호 {length}자리를 모두 입력해 주세요.",
+  "code.error.invalid": "인증번호를 확인하고 다시 입력해 주세요.",
   "send.idle": "인증번호 받기",
   "send.sending": "보내는 중...",
   "send.resend": "인증번호 다시 받기",
@@ -193,6 +204,17 @@ const ko: OtpMessageCatalog = {
   "error.NETWORK_ERROR": "네트워크 연결을 확인하고 다시 시도해 주세요.",
   "error.ABORTED": "요청이 취소되었습니다.",
   "error.UNKNOWN": "알 수 없는 오류가 발생했습니다. 다시 시도해 주세요.",
+  "error.TEST_NUMBER_REQUIRED":
+    "테스트 환경입니다. 테스트용 휴대폰 번호를 입력해 주세요.",
+  "error.TEST_NUMBER_IN_LIVE_MODE":
+    "인증번호를 받을 수 없는 번호입니다. 본인의 휴대폰 번호를 입력해 주세요.",
+  "error.unavailable":
+    "지금은 인증을 진행할 수 없습니다. 고객센터에 문의해 주세요.",
+  "error.limit.perPhone":
+    "이 번호로 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+  "error.limit.perKey": "인증 요청이 많습니다. 잠시 후 다시 시도해 주세요.",
+  "error.limit.daily":
+    "오늘은 더 이상 인증번호를 보낼 수 없습니다. 나중에 다시 시도해 주세요.",
 };
 
 /** The built-in catalogs. */
@@ -265,24 +287,18 @@ export const otpPhoneErrorMessageKey = (
 ): OtpMessageKey => `phone.error.${error}`;
 
 /**
- * Message key of an SDK error. With `operation: "send"`, an ambiguous
- * failure (timeout, network, 5xx, abort) maps to `error.sendUncertain`: the
- * code may have been sent, and retrying reuses the same idempotency key.
+ * Message key of an SDK error (the `key` of {@link describeOtpError}): the
+ * API's specific reason when the catalog has a message for it (a landline
+ * number, a test-mode number, a daily send limit, the rate limit that
+ * applied, ...), else one message per `error.code`. With `operation:
+ * "send"`, an ambiguous failure (timeout, network, 5xx, abort) maps to
+ * `error.sendUncertain`: the code may have been sent, and retrying reuses
+ * the same idempotency key.
  */
 export const otpErrorMessageKey = (
-  error: Pick<OtpApiError, "code" | "retryable"> &
-    Partial<Pick<OtpApiError, "status">>,
+  error: OtpDescribableError,
   operation?: "send" | "verify",
-): OtpMessageKey => {
-  if (
-    operation === "send" &&
-    error.code !== "TOO_MANY_REQUESTS" &&
-    isAmbiguousIssueError(error)
-  ) {
-    return "error.sendUncertain";
-  }
-  return `error.${error.code satisfies OtpApiErrorCode}`;
-};
+): OtpMessageKey => describeOtpError(error, operation).key;
 
 /** Message key of a `verified: false` reason code. */
 export const otpReasonMessageKey = (reason: VerifyReasonCode): OtpMessageKey =>
