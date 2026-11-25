@@ -58,23 +58,28 @@ export const badRequestDataCode = <T extends string>(
 };
 
 /**
- * `data.code` values of a 400 BAD_REQUEST `issue` error about an option the
- * API no longer offers (the same code is the first token of `message`):
+ * `data.code` values of a 400 BAD_REQUEST `issue` error about a request the
+ * API cannot serve (the same code is the first token of `message`):
  *
  * - `CHANNEL_NOT_SUPPORTED`: `channel` was `"sms"`. Only `"alimtalk"` (the
  *   default) is accepted; SMS is only the automatic fallback.
  * - `TEMPLATE_NOT_AVAILABLE`: the template has no approved AlimTalk code
  *   (`channelSupport` of `listTemplates`/`getTemplate` is empty for it).
  * - `WEB_OTP_NOT_SUPPORTED`: `webOtp` was set to anything but `false`.
+ * - `PHONE_NUMBER_NOT_MOBILE` (API 2.3.0+): `phoneNumber` is a Korean
+ *   landline (an area-code number such as `02-...` or `031-...`), which can
+ *   receive neither KakaoTalk nor SMS. Ask the user for a mobile number.
  */
 export const ISSUE_REQUEST_ERROR_CODES: readonly [
   "CHANNEL_NOT_SUPPORTED",
   "TEMPLATE_NOT_AVAILABLE",
   "WEB_OTP_NOT_SUPPORTED",
+  "PHONE_NUMBER_NOT_MOBILE",
 ] = [
   "CHANNEL_NOT_SUPPORTED",
   "TEMPLATE_NOT_AVAILABLE",
   "WEB_OTP_NOT_SUPPORTED",
+  "PHONE_NUMBER_NOT_MOBILE",
 ];
 
 export type OtpIssueRequestErrorCode =
@@ -89,6 +94,9 @@ export type OtpIssueRequestErrorCode =
  * if (getIssueRequestErrorCode(error) === "TEMPLATE_NOT_AVAILABLE") {
  *   // pick another template (see `channelSupport` of `listTemplates`)
  * }
+ * if (getIssueRequestErrorCode(error) === "PHONE_NUMBER_NOT_MOBILE") {
+ *   // ask the user for a mobile number (a landline cannot receive codes)
+ * }
  * ```
  */
 export const getIssueRequestErrorCode = (
@@ -102,8 +110,10 @@ export const getIssueRequestErrorCode = (
  * key with a real phone number) or `TEST_NUMBER_IN_LIVE_MODE` (a live key
  * with a test phone number); see `getTestNumberErrorCode`. From API 2.0.0 it
  * is also `CHANNEL_NOT_SUPPORTED`, `TEMPLATE_NOT_AVAILABLE` or
- * `WEB_OTP_NOT_SUPPORTED`; see `getIssueRequestErrorCode`. Other 400 errors
- * have no `data`.
+ * `WEB_OTP_NOT_SUPPORTED`, and from API 2.3.0 `PHONE_NUMBER_NOT_MOBILE` (a
+ * Korean landline number); see `getIssueRequestErrorCode`. Other 400 errors
+ * have no `data`. A newer API version may add codes: treat an unknown one
+ * like a plain `BAD_REQUEST`.
  */
 export type OtpBadRequestData = {
   code:
@@ -253,6 +263,44 @@ export const isOtpApiError = (value: unknown): value is OtpApiError =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
+/** A machine-readable reason: an identifier, never free text. */
+const REASON_PATTERN = /^[a-z][\w.-]{0,63}$/i;
+
+/**
+ * The specific reason of an API error, when the API names one: `data.code`
+ * of a 4xx error (400 `PHONE_NUMBER_NOT_MOBILE`, `TEST_NUMBER_REQUIRED`,
+ * `TEMPLATE_NOT_AVAILABLE`, ...; 402 `INSUFFICIENT_CREDIT`,
+ * `TRIAL_DAILY_LIMIT_EXCEEDED`, ...) or `data.limit` of a 429 (`perPhone`,
+ * `perKey`, ...). `undefined` for every other error.
+ *
+ * Reasons a newer API version adds are returned as they are, so log them
+ * and fall back to `error.code` for anything you do not handle. Only
+ * identifier-like values (letters, digits, `_`, `.`, `-`; at most 64
+ * characters) count as a reason.
+ *
+ * ```ts
+ * switch (getOtpErrorReason(error)) {
+ *   case "PHONE_NUMBER_NOT_MOBILE": // ask for a mobile number
+ *   case "perPhone": // too many codes to this number: wait error.retryAfterMs
+ * }
+ * ```
+ */
+export const getOtpErrorReason = (
+  error: OtpApiError | unknown,
+): string | undefined => {
+  const { status, data } = isRecord(error) ? error : {};
+  const reason =
+    isRecord(data) &&
+    typeof status === "number" &&
+    status >= 400 &&
+    status < 500
+      ? data[status === 429 ? "limit" : "code"]
+      : undefined;
+  return typeof reason === "string" && REASON_PATTERN.test(reason)
+    ? reason
+    : undefined;
+};
+
 const isKnownCode = (value: unknown): value is OtpApiErrorCode =>
   typeof value === "string" &&
   (OTP_API_ERROR_CODES as readonly string[]).includes(value);
@@ -351,12 +399,35 @@ const resolveRetryAfterMs = (
   return undefined;
 };
 
+/** Longest server text kept in `message` (or a plain-text `data`). */
+const MAX_SERVER_TEXT_LENGTH = 300;
+
+/** Looks like markup: an HTML error page or a fragment of one. */
+const MARKUP = /<\/?[a-z!][^>]*>/i;
+
+/**
+ * Server-provided text that is safe to keep: whitespace collapsed, at most
+ * {@link MAX_SERVER_TEXT_LENGTH} characters, `undefined` when it is empty or
+ * markup (an HTML error page of a gateway or proxy).
+ */
+const serverText = (value: unknown): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what is stripped.
+  const text = value.replace(/[\s\0-\x1f\x7f]+/g, " ").trim();
+  if (!text || MARKUP.test(text)) return undefined;
+  return text.length > MAX_SERVER_TEXT_LENGTH
+    ? `${text.slice(0, MAX_SERVER_TEXT_LENGTH - 1)}\u2026`
+    : text;
+};
+
 /**
  * Builds an {@link OtpApiError} from an HTTP error response.
  *
  * `body` is the decoded body: normally the API envelope
  * `{ defined, code, status, message, data? }`, but gateways can return HTML or
- * plain text, which falls back to status-based mapping.
+ * plain text, which falls back to status-based mapping. Server text is
+ * bounded: an HTML page never becomes `message` or `data`, and a long
+ * `message` is cut to 300 characters.
  */
 export const otpErrorFromResponse = (
   status: number,
@@ -368,12 +439,13 @@ export const otpErrorFromResponse = (
     ? envelope.code
     : otpErrorCodeFromStatus(status);
   const message =
-    typeof envelope?.message === "string" && envelope.message
-      ? envelope.message
-      : `K-OTP API request failed with HTTP ${status}`;
+    serverText(envelope?.message) ??
+    `K-OTP API request failed with HTTP ${status}`;
   let data: unknown;
   if (envelope) data = envelope.data;
-  else if (typeof body === "string" && body) data = body;
+  // A plain-text body (e.g. from a proxy) is kept as `data`, never an HTML
+  // error page.
+  else data = serverText(body);
   return new OtpApiError({
     code,
     status,

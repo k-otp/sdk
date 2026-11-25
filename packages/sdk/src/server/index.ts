@@ -11,6 +11,7 @@ export {
   type GetTemplateInput,
   type GetTemplateResult,
   getIssueRequestErrorCode,
+  getOtpErrorReason,
   getTestNumberErrorCode,
   ISSUE_REQUEST_ERROR_CODES,
   type IssueInput,

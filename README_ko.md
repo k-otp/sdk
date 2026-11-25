@@ -118,7 +118,9 @@ await otp.verify({ issueId, code: TEST_OTP_CODE }); // verified: true
   `resendCooldownMs`로 재발송 쿨다운을 관리하고, `verify`가 429를 받으면 별도의 검증 쿨다운
   (`verifyCooldownRemainingMs`, 그동안 `canVerify: false`)을 적용합니다.
 - 그 밖의 실패는 모두 `OtpApiError`(`code`, `status`, `requestId`, `data`, `retryAfterMs`,
-  `retryable`)로 정규화됩니다. 잔액 부족은 `PAYMENT_REQUIRED`(402, `data.code`)입니다.
+  `retryable`)로 정규화됩니다. 잔액 부족은 `PAYMENT_REQUIRED`(402, `data.code`)입니다. API 가 알려 준
+  구체적 사유(유선 번호 `PHONE_NUMBER_NOT_MOBILE`, 429 의 `perPhone` 등)는 `getOtpErrorReason(error)`로
+  읽고, UI 컴포넌트는 이를 해당 입력란의 최종 사용자용 문구로 보여 줍니다.
 - 크레딧은 조직 단위 지갑 하나를 조직의 모든 앱이 함께 씁니다(API 1.4.0). `getBalance()`는 조직 전체 잔액을
   돌려주며 `walletId`, `walletScope`(`organization`), `organizationId`가 함께 옵니다. `appId`는 호출한 앱입니다.
   `listCreditLedger`는 지갑의 `credit`/`clawback`과 **호출한 앱의** `debit`/`refund`만 돌려주므로, 다른 앱의

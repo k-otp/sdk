@@ -188,7 +188,9 @@ mock.reset();  // between tests
 - Not simulated: `Origin` checks, rate limits and daily budgets (scenario
   `06` still answers 429), template variables (any `templateId` is accepted;
   `listTemplates` returns only the default template `otp_default_kr`, and
-  `TEMPLATE_NOT_AVAILABLE` never occurs).
+  `TEMPLATE_NOT_AVAILABLE` never occurs), and landline numbers (test keys
+  only accept test numbers, so `PHONE_NUMBER_NOT_MOBILE` never occurs; any
+  other number gets `TEST_NUMBER_REQUIRED`).
 - The scenario table, test number ranges and timings mirror the API's test
   mode and are updated together with it: an SDK release that matches a new
   API contract version also updates the mock.

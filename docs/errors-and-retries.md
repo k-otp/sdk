@@ -8,16 +8,16 @@ All SDK methods reject with `OtpApiError`:
 | --- | --- |
 | `code` | Normalized code (table below). |
 | `status` | HTTP status, or `0` when no HTTP response was received (timeout, network, abort, opaque redirect). |
-| `message` | Server message, or a descriptive client message. |
-| `requestId` | `X-Request-Id` response header (sent on every API response, exposed to allowed browser origins), else `request-id` / `cf-ray`. Include it in support requests. |
-| `data` | Error payload. For some 400s: `{ code: "TEST_NUMBER_REQUIRED" \| "TEST_NUMBER_IN_LIVE_MODE" \| "CHANNEL_NOT_SUPPORTED" \| "TEMPLATE_NOT_AVAILABLE" \| "WEB_OTP_NOT_SUPPORTED" }` (`OtpBadRequestData`). For 402: `{ code: "INSUFFICIENT_CREDIT" \| "OVERDRAFT_LIMIT_EXCEEDED" \| "TRIAL_DAILY_LIMIT_EXCEEDED", resetAt? }`. For 429: `{ limit: "perKey" \| "perIp" \| "perPhone" \| "perKeyDaily" \| "perOrgDaily" \| "testModeDaily", policy: "key" \| "platform", retryAfterMs }` (`OtpRateLimitedData`). |
+| `message` | Server message (whitespace collapsed, at most 300 characters; an HTML error page of a gateway or proxy is never used), or a descriptive client message. Meant for logs, not for end users: show your own text per `code` and reason (the UI components do). |
+| `requestId` | `X-Request-Id` response header (sent on every API response, exposed to allowed browser origins), else `request-id` / `cf-ray`. Captured for every HTTP response, including error pages, empty bodies and malformed success bodies. Include it in support requests. |
+| `data` | Error payload. For some 400s: `{ code: "TEST_NUMBER_REQUIRED" \| "TEST_NUMBER_IN_LIVE_MODE" \| "CHANNEL_NOT_SUPPORTED" \| "TEMPLATE_NOT_AVAILABLE" \| "WEB_OTP_NOT_SUPPORTED" \| "PHONE_NUMBER_NOT_MOBILE" }` (`OtpBadRequestData`). For 402: `{ code: "INSUFFICIENT_CREDIT" \| "OVERDRAFT_LIMIT_EXCEEDED" \| "TRIAL_DAILY_LIMIT_EXCEEDED", resetAt? }`. For 429: `{ limit: "perKey" \| "perIp" \| "perPhone" \| "perKeyDaily" \| "perOrgDaily" \| "testModeDaily", policy: "key" \| "platform", retryAfterMs }` (`OtpRateLimitedData`). A plain-text body without the API envelope (from a proxy) is kept here as a bounded string; an HTML page is dropped. |
 | `retryAfterMs` | Wait before retrying, in ms: the body's `data.retryAfterMs` (exact), else the `Retry-After` header (seconds or HTTP date), else `data.retryAfter` (seconds). Set on every 429 and on 503 when the server sends a wait. |
 | `retryable` | `true` for the codes marked below. |
 | `cause` | The underlying error (e.g. the fetch `TypeError`). |
 
 | Code | HTTP | Retryable | Typical cause |
 | --- | --- | --- | --- |
-| `BAD_REQUEST` | 400 | no | Invalid input, missing/invalid idempotency key (also raised client-side before any request), header/body key mismatch. A test key with a real number (`data.code: "TEST_NUMBER_REQUIRED"`) or a live key with a test number (`"TEST_NUMBER_IN_LIVE_MODE"`); see [test mode](./test-mode.md#errors-specific-to-test-mode). `channel: "sms"` (`"CHANNEL_NOT_SUPPORTED"`), a template without an approved AlimTalk code (`"TEMPLATE_NOT_AVAILABLE"`) or a `webOtp` other than `false` (`"WEB_OTP_NOT_SUPPORTED"`); read it with `getIssueRequestErrorCode(error)`. |
+| `BAD_REQUEST` | 400 | no | Invalid input, missing/invalid idempotency key (also raised client-side before any request), header/body key mismatch. A test key with a real number (`data.code: "TEST_NUMBER_REQUIRED"`) or a live key with a test number (`"TEST_NUMBER_IN_LIVE_MODE"`); see [test mode](./test-mode.md#errors-specific-to-test-mode). `channel: "sms"` (`"CHANNEL_NOT_SUPPORTED"`), a template without an approved AlimTalk code (`"TEMPLATE_NOT_AVAILABLE"`), a `webOtp` other than `false` (`"WEB_OTP_NOT_SUPPORTED"`) or, from API 2.3.0, a Korean landline `phoneNumber` such as `02-...` or `031-...` that can receive neither KakaoTalk nor SMS (`"PHONE_NUMBER_NOT_MOBILE"`); read it with `getIssueRequestErrorCode(error)`. |
 | `UNAUTHORIZED` | 401 | no | Missing, malformed, revoked or unknown key. |
 | `PAYMENT_REQUIRED` | 402 | no | Not enough credit in your wallet (`data.code`; from API 1.4.0 the wallet is shared by every app of your organization). Top up, then issue again. |
 | `FORBIDDEN` | 403 | no | Missing scope, `pk_` key on a server-only operation, or `Origin` not in the key's allowlist. |
@@ -30,6 +30,37 @@ All SDK methods reject with `OtpApiError`:
 | `NETWORK_ERROR` | 0 | yes | DNS/TLS/connection failure, or a CORS rejection in browsers, most often a `pk_` key used from an origin that is not in its `allowedOrigins` (see below). |
 | `ABORTED` | 0 | no | Your `AbortSignal` fired. |
 | `UNKNOWN` | any | no | Anything else: an unexpected status, a redirect (3xx, never followed), or a success response that is empty, not JSON or lacks the documented fields. For `issue` this outcome is **ambiguous** when `status` is `0` or 2xx/3xx; see [ambiguous outcomes](#ambiguous-issue-outcomes). |
+
+### The specific reason
+
+`error.code` is the HTTP-level category; the API names the specific cause
+in `data`. `getOtpErrorReason(error)` returns it for any error: `data.code`
+of a 4xx (`PHONE_NUMBER_NOT_MOBILE`, `TEST_NUMBER_REQUIRED`,
+`TEMPLATE_NOT_AVAILABLE`, `INSUFFICIENT_CREDIT`,
+`TRIAL_DAILY_LIMIT_EXCEEDED`, ...) or `data.limit` of a 429 (`perPhone`,
+`perIp`, `perKey`, ...), else `undefined`. A reason a newer API version adds
+is returned as is (only identifier-like values count), so handle the ones
+you know and fall back to `error.code`:
+
+```ts
+import { getOtpErrorReason, isOtpApiError } from "@k-otp/sdk";
+
+if (isOtpApiError(error)) {
+  switch (getOtpErrorReason(error)) {
+    case "PHONE_NUMBER_NOT_MOBILE":
+      return showPhoneError("Enter a mobile number (010-...).");
+    case "perPhone":
+      return showError("Too many codes to this number. Try again later.");
+    default:
+      log(error.code, getOtpErrorReason(error), error.requestId);
+      return showError(messageFor(error.code));
+  }
+}
+```
+
+The UI components already do this (see
+[UI: errors](./ui.md#errors)), and `describeOtpError` in `@k-otp/sdk/ui`
+returns the same mapping for a custom UI.
 
 Configuration mistakes (missing `apiKey`, a key without the `sk_` prefix in
 `@k-otp/sdk/server`, an `sk_` key in a browser, no `fetch`, a `baseUrl` that is

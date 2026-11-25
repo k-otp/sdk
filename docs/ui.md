@@ -273,9 +273,63 @@ function:
 
 Every SDK error code (`error.TOO_MANY_REQUESTS`, ...), verify reason
 (`reason.EXPIRED`, ...) and flow skip reason (`skip.cooldown`, ...) has a
-message; an ambiguous send failure (timeout, network, 5xx, or an unreadable or redirected response) shows
+message, and so do the specific API reasons an end user can act on (see
+[errors](#errors)); an ambiguous send failure (timeout, network, 5xx, or an unreadable or redirected response) shows
 `error.sendUncertain` ("trying again is safe": the same idempotency key is
 reused). The full catalog is `OTP_MESSAGES` in `@k-otp/sdk/ui`.
+
+## Errors
+
+The form never shows the server's `error.message`: every API error is
+mapped to a catalog message, by the API's specific reason
+(`getOtpErrorReason`: `data.code`, or `data.limit` of a 429) when the
+catalog has one, else by `error.code`. The message goes where it belongs:
+
+| API error | Message key | Shown |
+| --- | --- | --- |
+| 400 `PHONE_NUMBER_NOT_MOBILE` (a landline, API 2.3.0+) | `phone.error.not-mobile` | under the phone input |
+| 400 `TEST_NUMBER_REQUIRED` / `TEST_NUMBER_IN_LIVE_MODE` | `error.TEST_NUMBER_REQUIRED` / `error.TEST_NUMBER_IN_LIVE_MODE` | under the phone input |
+| 400 on `verify` (a malformed code) | `code.error.invalid` | under the code input |
+| 400 `CHANNEL_NOT_SUPPORTED`, `TEMPLATE_NOT_AVAILABLE`, `WEB_OTP_NOT_SUPPORTED` | `error.unavailable` | message |
+| 401 / 403 (key, allowed origins) | `error.UNAUTHORIZED` / `error.FORBIDDEN` | message |
+| 402 `TRIAL_DAILY_LIMIT_EXCEEDED` (daily free-trial limit) | `error.limit.daily` (`{resetAt}` available) | message |
+| 402 other reasons | `error.PAYMENT_REQUIRED` | message |
+| 429 `perPhone` / `perKey` | `error.limit.perPhone` / `error.limit.perKey` | message, while the wait runs |
+| 429 `perKeyDaily`, `perOrgDaily`, `testModeDaily` | `error.limit.daily` | message, while the wait runs |
+| 429 `perIp` or no `limit` | `error.TOO_MANY_REQUESTS` | message, while the wait runs |
+| timeout, network, 5xx, unreadable response on send | `error.sendUncertain` | message |
+| anything else, or a reason this SDK version does not know | `error.<code>` | message |
+
+A field error is wired like a validation error (`aria-invalid`,
+`aria-describedby`, focus moves to the field) and disappears as soon as the
+user edits the field. Errors the integration has to fix (key, allowed
+origins, wallet, template, request options) get neutral wording for end
+users; diagnose them from `onError(error, operation)` or the snapshot's
+`errorDetail`:
+
+```ts
+// state.errorDetail, set whenever state.error is
+{
+  code: "BAD_REQUEST",            // error.code
+  status: 400,
+  reason: "TEMPLATE_NOT_AVAILABLE", // data.code or the 429 data.limit, also unknown ones
+  operation: "send",
+  target: "form",                 // "phone" | "code" | "form"
+  key: "error.unavailable",       // message key shown, with `params`
+  params: {},
+  configuration: true,            // the site has to fix it, not the user
+  ambiguous: false,               // a send that may have gone out (same key on retry)
+  retryable: false,
+  retryAfterMs: undefined,
+  requestId: "...",               // for support requests
+}
+```
+
+Custom UIs read the same fields from the context/slot `state`
+(`state.phoneError`, `state.codeError`, `state.message`,
+`state.errorDetail`), and `describeOtpError(error, operation)` returns the
+same mapping for an error from your own `issue`/`verify` calls. Override
+any of these messages with `messages`.
 
 ## Phone numbers
 
@@ -407,6 +461,21 @@ Vue는 `<OtpForm purpose="signup" @verified="..." />`, Svelte는
   메시지, 번호 변경 후 번호 입력.
 - 카운트다운은 `role="timer"`, `aria-live="off"`, 메시지는 polite 라이브
   리전입니다.
+
+## 오류
+
+폼은 서버의 `error.message` 를 그대로 보여 주지 않고, API 가 알려 준 구체적
+사유(`getOtpErrorReason`: `data.code`, 429 는 `data.limit`)에 맞는 문구를,
+없으면 `error.code` 별 문구를 보여 줍니다. 유선 번호
+(`PHONE_NUMBER_NOT_MOBILE`, API 2.3.0+)와 테스트 번호 오류는 번호 입력 아래에,
+`verify` 의 400 은 인증번호 입력 아래에 표시되고(`aria-invalid`,
+`aria-describedby`, 포커스 이동), 입력을 고치면 사라집니다. 같은 번호로 너무
+많이 요청한 경우(`perPhone`), 오늘의 발송 한도(`TRIAL_DAILY_LIMIT_EXCEEDED`,
+테스트 키의 일일 한도) 등도 각각의 문구가 있습니다. 키, 허용 출처, 잔액, 템플릿처럼 사이트가 고쳐야
+하는 오류는 사용자에게 중립적인 문구만 보여 주고, `onError` 나 상태의
+`errorDetail`(`reason`, `target`, `configuration`, `requestId`,
+`retryAfterMs` 등)로 진단합니다. 직접 만든 UI 는 `describeOtpError(error,
+operation)` 로 같은 매핑을 얻을 수 있습니다.
 
 ## 테마
 

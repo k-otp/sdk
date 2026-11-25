@@ -46,6 +46,7 @@ export const isTestKey: Stub = serverOnly("isTestKey");
 export const getIssueRequestErrorCode: Stub = serverOnly(
   "getIssueRequestErrorCode",
 );
+export const getOtpErrorReason: Stub = serverOnly("getOtpErrorReason");
 export const getTestNumberErrorCode: Stub = serverOnly(
   "getTestNumberErrorCode",
 );

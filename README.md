@@ -105,7 +105,8 @@ import "@k-otp/sdk/ui/theme.css"; // optional default theme
 
 Korean mobile numbers are canonicalized before sending (`+82 10-...` ->
 `010...`), the code input handles paste, autofill (`one-time-code`)
-and keyboard navigation, focus follows the flow, and every part exposes
+and keyboard navigation, focus follows the flow, API errors get specific,
+end-user-safe messages on the field they concern, and every part exposes
 `data-*` state for your own styles or a full headless composition
 (`OtpForm.Root`, `OtpForm.PhoneField`, ...). See the
 [UI guide](./docs/ui.md).
