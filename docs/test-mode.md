@@ -105,6 +105,13 @@ in `error.data.code` (type `OtpBadRequestData`) and is the first token of
 | `TEST_NUMBER_REQUIRED` | A test key with a real phone number. Nothing is sent in test mode. |
 | `TEST_NUMBER_IN_LIVE_MODE` | A live key with a test phone number. |
 
+A Korean landline (area codes `02`, `031`-`033`, `041`-`044`, `051`-`055`,
+`061`-`064`, in any spelling such as `+82 2-...`) is checked before test
+mode: from API 2.3.0 it gets 400 `PHONE_NUMBER_NOT_MOBILE` with a test key
+too, not `TEST_NUMBER_REQUIRED` (see `getIssueRequestErrorCode`). Other
+numbers that are not mobiles, such as `070` or `1588`, are not landlines in
+this sense and get `TEST_NUMBER_REQUIRED` with a test key.
+
 ```ts
 import { getTestNumberErrorCode } from "@k-otp/sdk";
 
@@ -188,9 +195,10 @@ mock.reset();  // between tests
 - Not simulated: `Origin` checks, rate limits and daily budgets (scenario
   `06` still answers 429), template variables (any `templateId` is accepted;
   `listTemplates` returns only the default template `otp_default_kr`, and
-  `TEMPLATE_NOT_AVAILABLE` never occurs), and landline numbers (test keys
-  only accept test numbers, so `PHONE_NUMBER_NOT_MOBILE` never occurs; any
-  other number gets `TEST_NUMBER_REQUIRED`).
+  `TEMPLATE_NOT_AVAILABLE` never occurs).
+- Like the API (2.3.0+), a Korean landline gets 400
+  `PHONE_NUMBER_NOT_MOBILE` before the test-mode routing, with a test or a
+  live key.
 - The scenario table, test number ranges and timings mirror the API's test
   mode and are updated together with it: an SDK release that matches a new
   API contract version also updates the mock.
@@ -208,8 +216,9 @@ render(<OtpProvider client={client}><Screen /></OtpProvider>);
 ## Before going live
 
 - Swap the `pk_test_`/`sk_test_` keys for live keys in production
-  configuration. A test key in production fails fast: real numbers get
-  `TEST_NUMBER_REQUIRED`.
+  configuration. A test key in production fails fast: real mobile numbers
+  get `TEST_NUMBER_REQUIRED` (landlines get `PHONE_NUMBER_NOT_MOBILE` with
+  any key).
 - Keep test numbers out of production data: live keys reject them with
   `TEST_NUMBER_IN_LIVE_MODE`.
 - The simulator cannot reproduce every live failure (quota, provider

@@ -67,8 +67,10 @@ export const badRequestDataCode = <T extends string>(
  *   (`channelSupport` of `listTemplates`/`getTemplate` is empty for it).
  * - `WEB_OTP_NOT_SUPPORTED`: `webOtp` was set to anything but `false`.
  * - `PHONE_NUMBER_NOT_MOBILE` (API 2.3.0+): `phoneNumber` is a Korean
- *   landline (an area-code number such as `02-...` or `031-...`), which can
- *   receive neither KakaoTalk nor SMS. Ask the user for a mobile number.
+ *   landline (area code `02`, `031`-`033`, `041`-`044`, `051`-`055` or
+ *   `061`-`064`, also as `+82`), which can receive neither KakaoTalk nor
+ *   SMS. Checked before the test-mode routing, so test keys get it too. Ask
+ *   the user for a mobile number.
  */
 export const ISSUE_REQUEST_ERROR_CODES: readonly [
   "CHANNEL_NOT_SUPPORTED",

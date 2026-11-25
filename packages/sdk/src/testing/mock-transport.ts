@@ -191,6 +191,31 @@ const fail = (
 const badRequest = (message: string, data?: unknown): never =>
   fail(400, "BAD_REQUEST", message, data);
 
+/** A Korean area code (`02`, `031`-`033`, `041`-`044`, `051`-`055`, `061`-`064`) + 7-8 digits. */
+const KR_LANDLINE = /^0(?:2|3[1-3]|4[1-4]|5[1-5]|6[1-4])\d{7,8}$/;
+
+/**
+ * Whether `phoneNumber` is a Korean landline in any spelling (`02-123-4567`,
+ * `+82 2-123-4567`, `82 31 1234 5678`, `0082 2 ...`), like the API's shared
+ * request validation (API 2.3.0+). Other numbers (`070`, `050x`, `080`,
+ * `15xx`/`16xx`/`18xx`, foreign numbers) are not landlines here.
+ */
+const isKoreanLandline = (phoneNumber: string): boolean => {
+  const text = phoneNumber.normalize("NFKC").trim();
+  let digits = text.replace(/\D/g, "");
+  if (text.startsWith("+")) {
+    if (!digits.startsWith("82")) return false;
+    digits = digits.slice(2);
+  } else if (digits.startsWith("0082")) {
+    digits = digits.slice(4);
+  } else if (digits.startsWith("82")) {
+    digits = digits.slice(2);
+  } else {
+    return KR_LANDLINE.test(digits);
+  }
+  return KR_LANDLINE.test(`0${digits.replace(/^0/, "")}`);
+};
+
 /** Whole-number field in `[min, max]`, or the default when omitted. */
 const integerField = (
   body: Json,
@@ -407,7 +432,9 @@ const nextKstMidnight = (nowMs: number): string => {
  * ```
  *
  * It follows the API's test mode: only test phone numbers are accepted (400
- * `TEST_NUMBER_REQUIRED` otherwise), the last two digits pick the scenario
+ * `TEST_NUMBER_REQUIRED` otherwise; a Korean landline such as `02-...` or
+ * `031-...` gets 400 `PHONE_NUMBER_NOT_MOBILE` first, with any key), the
+ * last two digits pick the scenario
  * (`TEST_PHONE_NUMBERS`), every created issue verifies with `000000` (except
  * `mismatch`), delivery follows {@link TEST_MODE_TIMINGS} on the mock clock,
  * idempotency keys replay (409 for a different payload), a new issue for the
@@ -478,6 +505,14 @@ export const createMockTransport = (
     if (!/\d/.test(phoneNumber) || phoneNumber.length > 32) {
       return badRequest(
         "phoneNumber must be at most 32 characters with at least one digit",
+      );
+    }
+    // Shared request validation: before the test-mode routing, for test and
+    // live keys alike.
+    if (isKoreanLandline(phoneNumber)) {
+      return badRequest(
+        "PHONE_NUMBER_NOT_MOBILE: phoneNumber is a Korean landline number, which cannot receive KakaoTalk or SMS; use a mobile number",
+        { code: "PHONE_NUMBER_NOT_MOBILE" },
       );
     }
     const purpose = typeof body.purpose === "string" ? body.purpose.trim() : "";

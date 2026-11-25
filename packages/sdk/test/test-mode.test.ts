@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   createOtpClient,
   getIssueRequestErrorCode,
+  getOtpErrorReason,
   getTestNumberErrorCode,
   isOtpApiError,
   isTestKey,
@@ -22,6 +23,7 @@ import {
   TEST_MODE_SIMULATED_BALANCE,
   TEST_MODE_TIMINGS,
 } from "../src/testing";
+import { describeOtpError } from "../src/ui";
 
 const START = Date.parse("2026-10-11T00:00:00.000Z");
 
@@ -334,6 +336,72 @@ describe("createMockTransport", () => {
       }),
     );
     expect(notSimulated.code).toBe("UNAUTHORIZED");
+  });
+
+  test("a Korean landline gets PHONE_NUMBER_NOT_MOBILE before the test-mode routing", async () => {
+    const { client, mock } = setup();
+    const live = createOtpClient({ apiKey: "pk_live_unit", fetch: mock.fetch });
+    let key = 0;
+    for (const phoneNumber of [
+      "02-123-4567",
+      "0212345678",
+      "031-123-4567",
+      "033-1234-5678",
+      "041-123-4567",
+      "055-123-4567",
+      "064-123-4567",
+      "+82 2-123-4567",
+      "+82 02-1234-5678",
+      "82 31 123 4567",
+      "0082 51 1234 5678",
+    ]) {
+      for (const otp of [client, live]) {
+        const error = await rejection(
+          otp.issue({
+            phoneNumber,
+            purpose: "login",
+            idempotencyKey: `landline-${++key}`,
+          }),
+        );
+        expect({ phoneNumber, reason: getOtpErrorReason(error) }).toEqual({
+          phoneNumber,
+          reason: "PHONE_NUMBER_NOT_MOBILE",
+        });
+        expect(error.code).toBe("BAD_REQUEST");
+        expect(error.message.startsWith("PHONE_NUMBER_NOT_MOBILE:")).toBe(true);
+        expect(getIssueRequestErrorCode(error)).toBe("PHONE_NUMBER_NOT_MOBILE");
+        expect(getTestNumberErrorCode(error)).toBeUndefined();
+        // The UI shows it under the phone input.
+        expect(describeOtpError(error, "send")).toMatchObject({
+          target: "phone",
+          key: "phone.error.not-mobile",
+        });
+      }
+    }
+    // Not area-code landlines: still routed by test mode like any real number.
+    for (const phoneNumber of [
+      "070-1234-5678",
+      "0505-123-4567",
+      "080-123-4567",
+      "1588-1234",
+      "1644-1234",
+      "1800-1234",
+      "+44 20 7946 0958",
+      "02-123",
+    ]) {
+      const error = await rejection(
+        client.issue({
+          phoneNumber,
+          purpose: "login",
+          idempotencyKey: `other-${++key}`,
+        }),
+      );
+      expect({ phoneNumber, reason: getOtpErrorReason(error) }).toEqual({
+        phoneNumber,
+        reason: "TEST_NUMBER_REQUIRED",
+      });
+    }
+    expect(mock.issues()).toHaveLength(0);
   });
 
   test("idempotency replay, conflict and replacement", async () => {

@@ -6,7 +6,8 @@ Clearer error states: specific API reasons now reach end users and custom UIs, a
 
 Added:
 
-- `PHONE_NUMBER_NOT_MOBILE` in `ISSUE_REQUEST_ERROR_CODES`, `OtpIssueRequestErrorCode` and `OtpBadRequestData`: from K-OTP API 2.3.0, `issue` rejects a Korean landline number (`02-...`, `031-...`), which can receive neither KakaoTalk nor SMS, with 400 `BAD_REQUEST` and this `data.code` (`getIssueRequestErrorCode(error)` returns it).
+- `PHONE_NUMBER_NOT_MOBILE` in `ISSUE_REQUEST_ERROR_CODES`, `OtpIssueRequestErrorCode` and `OtpBadRequestData`: from K-OTP API 2.3.0, `issue` rejects a Korean landline number (area code `02`, `031`-`033`, `041`-`044`, `051`-`055` or `061`-`064`, also spelled with `+82`), which can receive neither KakaoTalk nor SMS, with 400 `BAD_REQUEST` and this `data.code` (`getIssueRequestErrorCode(error)` returns it). The check runs before test mode, so test keys get it too.
+- `createMockTransport()` in `@k-otp/sdk/testing` simulates it: a Korean landline gets 400 `PHONE_NUMBER_NOT_MOBILE` with a test or live key, before the test-number check (it used to get `TEST_NUMBER_REQUIRED`).
 - `getOtpErrorReason(error)` (from `@k-otp/sdk` and `@k-otp/sdk/server`): the API's specific reason of any error, `data.code` of a 4xx or `data.limit` of a 429, including reasons a newer API version adds.
 - `@k-otp/sdk/ui`: `describeOtpError(error, operation?)` with the `OtpErrorDetail`, `OtpFormErrorTarget` and `OtpDescribableError` types, mapping an error to a message key, `params`, the field it targets (`"phone"`, `"code"` or `"form"`), the API `reason`, `configuration` (the integration, not the user, has to fix it), `ambiguous`, `retryable`, `retryAfterMs` and `requestId`. `OtpErrorDetail` and `OtpFormErrorTarget` are also exported from `/ui/react`, `/ui/vue` and `/ui/svelte`.
 - `OtpFormState.errorDetail`: that description of `state.error`, available to custom UIs through the form context and slot props of every framework.
