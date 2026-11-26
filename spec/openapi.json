@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "k-otp API",
-    "version": "2.3.0",
+    "version": "2.3.1",
     "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Test mode.** `pk_test_`/`sk_test_` keys use the same security schemes; the prefix selects test mode. Test keys never send a message and never use\ncredits: they only accept test phone numbers, simulate delivery from a fixed scenario table (see `POST /issue`), and their data never mixes with live data.\nResponses of issue, verify, status, issues and balance carry `mode` (`live` or `test`).\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`.\n\n**Rate limits.** `POST /issue` and `POST /verify` enforce the API key's rate-limit policy, a platform default for `pk_` keys and a platform ceiling.\nAn exceeded limit returns 429 `TOO_MANY_REQUESTS` with a `Retry-After` header (seconds) and `data.retryAfterMs`.\n\n**Request id.** Every response carries `X-Request-Id` (also exposed to allowed browser origins via CORS).\nA request `X-Request-Id` matching `^[A-Za-z0-9._:-]{8,128}$` is echoed; otherwise the API generates one.\nQuote it when contacting support."
   },
   "servers": [
@@ -46,7 +46,7 @@
         "properties": {
           "phoneNumber": {
             "type": "string",
-            "description": "Recipient mobile number (at most 32 characters after trimming, with at least\none digit). Handled in canonical form: a Korean mobile number in any spelling\n(`010-1234-5678`, `+82 10 1234 5678`) is `01012345678`; other numbers are\ntheir digits only (`+1 415-555-2671` is `14155552671`). A Korean landline\nnumber (`02-…`, `031-…` and other area codes, also as `+82 2 …`) is refused\nwith 400 `PHONE_NUMBER_NOT_MOBILE` (in `data.code`): it can receive neither\nKakaoTalk nor SMS. Stored only as a hash and never returned by any endpoint.",
+            "description": "Recipient mobile number (at most 32 characters after trimming, with at least\none digit). Handled in canonical form: a Korean mobile number in any spelling\n(`010-1234-5678`, `+82 10 1234 5678`) is `01012345678`; other numbers are\ntheir digits only (`+1 415-555-2671` is `14155552671`). A Korean number in\nthe landline ranges (`02-…`, `031-…` and every other `03x`-`06x` number\nexcept personal `050x`, also as `+82 2 …`) is refused\nwith 400 `PHONE_NUMBER_NOT_MOBILE` (in `data.code`): it can receive neither\nKakaoTalk nor SMS. Stored only as a hash and never returned by any endpoint.",
             "example": "01012345678"
           },
           "purpose": {
@@ -1274,7 +1274,7 @@
                 "properties": {
                   "phoneNumber": {
                     "type": "string",
-                    "description": "Recipient mobile number (at most 32 characters after trimming, with at least\none digit). Handled in canonical form: a Korean mobile number in any spelling\n(`010-1234-5678`, `+82 10 1234 5678`) is `01012345678`; other numbers are\ntheir digits only (`+1 415-555-2671` is `14155552671`). A Korean landline\nnumber (`02-…`, `031-…` and other area codes, also as `+82 2 …`) is refused\nwith 400 `PHONE_NUMBER_NOT_MOBILE` (in `data.code`): it can receive neither\nKakaoTalk nor SMS. Stored only as a hash and never returned by any endpoint.",
+                    "description": "Recipient mobile number (at most 32 characters after trimming, with at least\none digit). Handled in canonical form: a Korean mobile number in any spelling\n(`010-1234-5678`, `+82 10 1234 5678`) is `01012345678`; other numbers are\ntheir digits only (`+1 415-555-2671` is `14155552671`). A Korean number in\nthe landline ranges (`02-…`, `031-…` and every other `03x`-`06x` number\nexcept personal `050x`, also as `+82 2 …`) is refused\nwith 400 `PHONE_NUMBER_NOT_MOBILE` (in `data.code`): it can receive neither\nKakaoTalk nor SMS. Stored only as a hash and never returned by any endpoint.",
                     "example": "01012345678"
                   },
                   "purpose": {
@@ -1400,7 +1400,7 @@
             }
           },
           "400": {
-            "description": "BAD_REQUEST: `TEST_NUMBER_REQUIRED` (a test key with a real number) or `TEST_NUMBER_IN_LIVE_MODE` (a live key with a test number), as the first token of `message` and in `data.code`; invalid payload, missing/blank idempotency key, header/body key mismatch, a `phoneNumber` without digits, `PHONE_NUMBER_NOT_MOBILE` (a Korean landline number such as `02-…` or `031-…`, which can receive neither KakaoTalk nor SMS; as the first token of `message` and in `data.code`), unknown template or template variables, `expiresInSec`/`maxAttempts`/`cost` out of range (`cost` is still range-checked though it no longer affects billing), `CHANNEL_NOT_SUPPORTED` (`channel: \"sms\"`), `TEMPLATE_NOT_AVAILABLE` (a template without an approved AlimTalk code) or `WEB_OTP_NOT_SUPPORTED` (`webOtp`), each as the first token of `message` and in `data.code`.",
+            "description": "BAD_REQUEST: `TEST_NUMBER_REQUIRED` (a test key with a real number) or `TEST_NUMBER_IN_LIVE_MODE` (a live key with a test number), as the first token of `message` and in `data.code`; invalid payload, missing/blank idempotency key, header/body key mismatch, a `phoneNumber` without digits, `PHONE_NUMBER_NOT_MOBILE` (a Korean number in the landline ranges, such as `02-…`, `031-…` or any other `03x`-`06x` number except personal `050x` numbers, which can receive neither KakaoTalk nor SMS; as the first token of `message` and in `data.code`), unknown template or template variables, `expiresInSec`/`maxAttempts`/`cost` out of range (`cost` is still range-checked though it no longer affects billing), `CHANNEL_NOT_SUPPORTED` (`channel: \"sms\"`), `TEMPLATE_NOT_AVAILABLE` (a template without an approved AlimTalk code) or `WEB_OTP_NOT_SUPPORTED` (`webOtp`), each as the first token of `message` and in `data.code`.",
             "content": {
               "application/json": {
                 "schema": {
