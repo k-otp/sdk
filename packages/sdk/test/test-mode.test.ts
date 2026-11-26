@@ -354,6 +354,10 @@ describe("createMockTransport", () => {
       "+82 02-1234-5678",
       "82 31 123 4567",
       "0082 51 1234 5678",
+      // API 2.3.1: unassigned area codes and premium-rate numbers are in the landline ranges too.
+      "039-123-4567",
+      "+82 39 123 4567",
+      "060-123-4567",
     ]) {
       for (const otp of [client, live]) {
         const error = await rejection(

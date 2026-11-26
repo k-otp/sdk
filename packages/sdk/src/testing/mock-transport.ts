@@ -191,13 +191,18 @@ const fail = (
 const badRequest = (message: string, data?: unknown): never =>
   fail(400, "BAD_REQUEST", message, data);
 
-/** A Korean area code (`02`, `031`-`033`, `041`-`044`, `051`-`055`, `061`-`064`) + 7-8 digits. */
-const KR_LANDLINE = /^0(?:2|3[1-3]|4[1-4]|5[1-5]|6[1-4])\d{7,8}$/;
+/**
+ * A Korean number in the landline ranges: `02`, or `03x`, `04x`, `05x` (except personal `050x`) or
+ * `06x`, + 7-8 digits. Besides the area codes these ranges hold only unassigned codes (`039`)
+ * and premium-rate `060` numbers, none of which can receive codes (API 2.3.1+).
+ */
+const KR_LANDLINE = /^0(?:2|3\d|4\d|5[1-9]|6\d)\d{7,8}$/;
 
 /**
  * Whether `phoneNumber` is a Korean landline in any spelling (`02-123-4567`,
  * `+82 2-123-4567`, `82 31 1234 5678`, `0082 2 ...`), like the API's shared
- * request validation (API 2.3.0+). Other numbers (`070`, `050x`, `080`,
+ * request validation (API 2.3.1+: every landline-range number, including unassigned area codes
+ * such as `039` and premium-rate `060`). Other numbers (`070`, `050x`, `080`,
  * `15xx`/`16xx`/`18xx`, foreign numbers) are not landlines here.
  */
 const isKoreanLandline = (phoneNumber: string): boolean => {

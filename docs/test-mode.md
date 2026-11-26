@@ -106,7 +106,9 @@ in `error.data.code` (type `OtpBadRequestData`) and is the first token of
 | `TEST_NUMBER_IN_LIVE_MODE` | A live key with a test phone number. |
 
 A Korean landline (area codes `02`, `031`-`033`, `041`-`044`, `051`-`055`,
-`061`-`064`, in any spelling such as `+82 2-...`) is checked before test
+`061`-`064`, in any spelling such as `+82 2-...`; from API 2.3.1 any
+`02`-`06x` number except `050x`, including unassigned codes such as `039`
+and premium-rate `060`) is checked before test
 mode: from API 2.3.0 it gets 400 `PHONE_NUMBER_NOT_MOBILE` with a test key
 too, not `TEST_NUMBER_REQUIRED` (see `getIssueRequestErrorCode`). Other
 numbers that are not mobiles, such as `070` or `1588`, are not landlines in
@@ -196,7 +198,7 @@ mock.reset();  // between tests
   `06` still answers 429), template variables (any `templateId` is accepted;
   `listTemplates` returns only the default template `otp_default_kr`, and
   `TEMPLATE_NOT_AVAILABLE` never occurs).
-- Like the API (2.3.0+), a Korean landline gets 400
+- Like the API (2.3.1+: any `02`-`06x` number except `050x`), a Korean landline gets 400
   `PHONE_NUMBER_NOT_MOBILE` before the test-mode routing, with a test or a
   live key.
 - The scenario table, test number ranges and timings mirror the API's test

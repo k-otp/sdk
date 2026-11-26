@@ -220,7 +220,7 @@ returns it, and `ISSUE_REQUEST_ERROR_CODES` lists the values:
 | `CHANNEL_NOT_SUPPORTED` | `channel: "sms"`. Only `"alimtalk"` (the default) is accepted. |
 | `TEMPLATE_NOT_AVAILABLE` | The template has no approved AlimTalk code (its `channelSupport` is empty). |
 | `WEB_OTP_NOT_SUPPORTED` | `webOtp` was set to anything but `false`. |
-| `PHONE_NUMBER_NOT_MOBILE` | API 2.3.0+: `phoneNumber` is a Korean landline (area code `02`, `031`-`033`, `041`-`044`, `051`-`055`, `061`-`064`), which can receive neither KakaoTalk nor SMS; test keys get it too. Ask for a mobile number. |
+| `PHONE_NUMBER_NOT_MOBILE` | API 2.3.0+: `phoneNumber` is a Korean landline (area code `02`, `031`-`033`, `041`-`044`, `051`-`055`, `061`-`064`; from API 2.3.1 any `02`-`06x` number except `050x`, including unassigned codes and `060`), which can receive neither KakaoTalk nor SMS; test keys get it too. Ask for a mobile number. |
 
 ### Test mode
 
