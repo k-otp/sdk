@@ -68,8 +68,9 @@ export const badRequestDataCode = <T extends string>(
  * - `WEB_OTP_NOT_SUPPORTED`: `webOtp` was set to anything but `false`.
  * - `PHONE_NUMBER_NOT_MOBILE` (API 2.3.0+): `phoneNumber` is a Korean
  *   landline (area code `02`, `031`-`033`, `041`-`044`, `051`-`055` or
- *   `061`-`064`, also as `+82`), which can receive neither KakaoTalk nor
- *   SMS. Checked before the test-mode routing, so test keys get it too. Ask
+ *   `061`-`064`, also as `+82`; from API 2.3.1 any `02`-`06x` number except
+ *   `050x`, which adds unassigned codes such as `039` and premium-rate `060`),
+ *   which can receive neither KakaoTalk nor SMS. Checked before the test-mode routing, so test keys get it too. Ask
  *   the user for a mobile number.
  */
 export const ISSUE_REQUEST_ERROR_CODES: readonly [
