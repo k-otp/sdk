@@ -1,5 +1,12 @@
 # @k-otp/sdk
 
+## 2.3.1 — 2026-11-26
+
+### Patch changes
+
+- [e627724](https://github.com/k-otp/sdk/commit/e627724d07d97d4d77b50c34606b5bfbd70767dc) `createMockTransport()` in `@k-otp/sdk/testing` now treats every Korean landline-range number like K-OTP API 2.3.1: besides the area codes, unassigned codes (such as `039-…`) and premium-rate `060-…` numbers get 400 `PHONE_NUMBER_NOT_MOBILE` before the test-mode routing. Personal `050x`, `070`, `080` and representative numbers are unchanged. The OTP form already rejected these numbers before sending. — Thanks @imjlk!
+- [d6395ec](https://github.com/k-otp/sdk/commit/d6395ec0e0ebaecb01ebf66a845f31e269d4dfd9) Targets K-OTP API 2.3.1. `OPENAPI_VERSION` is now `2.3.1`; request and response shapes are unchanged. API 2.3.1 also refuses Korean numbers in the landline ranges that are not real area codes (unassigned codes such as `039-…` and premium-rate `060-…`) with 400 `PHONE_NUMBER_NOT_MOBILE`; personal `050x`, `070`, `080`, representative and foreign numbers are accepted as before. — Thanks @imjlk!
+
 ## 2.3.0 — 2026-11-25
 
 ### Minor changes
