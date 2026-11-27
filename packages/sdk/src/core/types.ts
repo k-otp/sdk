@@ -97,10 +97,11 @@ export type ListCreditLedgerResult = ListOtpCreditLedgerOutput;
 export type CreditLedgerEntry = OtpCreditLedgerItem;
 /**
  * Which wallet a balance or ledger belongs to (1.4.0+): `"organization"` is the
- * credit wallet shared by every app of the organization, `"app"` the legacy
- * per-app wallet that only exists until the API's contract step, and `"test"`
- * (1.9.0+) the fixed simulated wallet a `sk_test_` key sees instead of the
- * real one (`walletId: "test:<appId>"`; its balance never changes).
+ * credit wallet shared by every app of the organization, and `"test"` (1.9.0+)
+ * the fixed simulated wallet a `sk_test_` key sees instead of the real one
+ * (`walletId: "test:<appId>"`; its balance never changes). `"app"`, the former
+ * per-app wallet, is deprecated: API 2.4.0 no longer returns it, and the value
+ * stays in the type only so existing code keeps compiling.
  */
 export type OtpWalletScope = WalletScope;
 /**
