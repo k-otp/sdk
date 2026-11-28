@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "k-otp API",
-    "version": "2.3.1",
+    "version": "2.4.0",
     "description": "OTP issue, verify, status, dashboard history, wallet balance/ledger, and template API.\n\nAll operations are also exposed as oRPC procedures under `/v1/rpc/otp/*` (used by the official SDKs).\n\n**Authentication.** Send `Authorization: Bearer <key>`. `pk_` public keys are for browsers and only work on\n`POST /issue` and `POST /verify` with an exact-match `Origin`; `sk_` secret keys are server-side only.\nSee the `publicKey` / `secretKey` security schemes and each operation's `x-required-scopes`.\n\n**Test mode.** `pk_test_`/`sk_test_` keys use the same security schemes; the prefix selects test mode. Test keys never send a message and never use\ncredits: they only accept test phone numbers, simulate delivery from a fixed scenario table (see `POST /issue`), and their data never mixes with live data.\nResponses of issue, verify, status, issues and balance carry `mode` (`live` or `test`).\n\n**Errors.** Non-2xx responses use the envelope `{ defined, code, status, message, data? }`.\n\n**Rate limits.** `POST /issue` and `POST /verify` enforce the API key's rate-limit policy, a platform default for `pk_` keys and a platform ceiling.\nAn exceeded limit returns 429 `TOO_MANY_REQUESTS` with a `Retry-After` header (seconds) and `data.retryAfterMs`.\n\n**Request id.** Every response carries `X-Request-Id` (also exposed to allowed browser origins via CORS).\nA request `X-Request-Id` matching `^[A-Za-z0-9._:-]{8,128}$` is echoed; otherwise the API generates one.\nQuote it when contacting support."
   },
   "servers": [
@@ -949,11 +949,11 @@
           },
           "walletId": {
             "type": "string",
-            "description": "`org:<organizationId>` for the organization wallet; `app:<appId>` for a legacy\nper-app wallet; `test:<appId>` for the simulated wallet of a test-mode key."
+            "description": "`org:<organizationId>` for the organization wallet; `test:<appId>` for the\nsimulated wallet of a test-mode key. (`app:<appId>` ids of the former\nper-app wallet are no longer returned.)"
           },
           "walletScope": {
             "$ref": "#/components/schemas/WalletScope",
-            "description": "`organization` when the balance is shared by every app of the organization;\n`test` for the simulated wallet of a test-mode key."
+            "description": "`organization` when the balance is shared by every app of the organization;\n`test` for the simulated wallet of a test-mode key. `app` is deprecated and\nno longer returned."
           },
           "organizationId": {
             "type": "string",
@@ -974,7 +974,7 @@
           "promoBalance": {
             "type": "integer",
             "minimum": 0,
-            "description": "Unused, unexpired promotional (free) credits included in `balance`.\nPurchased credits are roughly `balance - promoBalance`. Computed from the\npromotional lot summary, which can lag recent sends by about 10 minutes;\nnever more than `balance`. Always `0` for a legacy per-app wallet."
+            "description": "Unused, unexpired promotional (free) credits included in `balance`.\nPurchased credits are roughly `balance - promoBalance`. Computed from the\npromotional lot summary, which can lag recent sends by about 10 minutes;\nnever more than `balance`."
           },
           "promoNextExpiry": {
             "oneOf": [
@@ -1023,7 +1023,7 @@
             "const": "test"
           }
         ],
-        "description": "`organization`: the organization credit wallet (`org:<organizationId>`) shared\nby every app of the organization. `app`: the legacy per-app wallet, which is\nbeing retired. `test`: the simulated wallet of a test-mode key (`GET /v1/balance` only)."
+        "description": "`organization`: the organization credit wallet (`org:<organizationId>`) shared\nby every app of the organization. `test`: the simulated wallet of a test-mode\nkey (`GET /v1/balance` only). `app`: deprecated and no longer returned (the\nformer per-app wallet, now retired); kept so existing clients still parse."
       },
       "PromoExpiry": {
         "type": "object",
@@ -1913,7 +1913,7 @@
             }
           },
           "503": {
-            "description": "SERVICE_UNAVAILABLE: introspection or a downstream dependency is unavailable, the rate limiter is unavailable for a `pk_` key (fail-closed, `Retry-After` set), or an earlier attempt with this idempotency key is still being resolved. Retry later with the same key. Test scenario `09` returns the same 503 with `Retry-After`.",
+            "description": "SERVICE_UNAVAILABLE: introspection or a downstream dependency is unavailable, the rate limiter is unavailable for a `pk_` key (fail-closed, `Retry-After` set), or an earlier attempt with this idempotency key is still being resolved. Retry later with the same key. Test scenario `09` returns the same 503 with `Retry-After`. `message: wallet_unresolved` means the API key's app is not linked to an organization, so it has no credit wallet; retrying does not help, contact support.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5441,7 +5441,7 @@
             }
           },
           "503": {
-            "description": "SERVICE_UNAVAILABLE: credential introspection or a downstream dependency is temporarily unavailable. Retry with backoff.",
+            "description": "SERVICE_UNAVAILABLE: credential introspection or a downstream dependency is temporarily unavailable. Retry with backoff. `message: wallet_unresolved` means the API key's app is not linked to an organization, so it has no credit wallet; retrying does not help, contact support.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5525,7 +5525,7 @@
       "get": {
         "operationId": "otp.balance",
         "summary": "Get wallet balance",
-        "description": "Returns the current balance of the credit wallet the authenticated app spends from: the organization wallet shared by every app of the organization (`walletScope: organization`), or a legacy per-app wallet (`walletScope: app`). `balance` is a credit quantity (not money) and `currency` is `CREDIT`. Reading the balance never affects OTP issue status.\n\n**Test mode.** A `sk_test_` key never reads the real wallet: it gets a fixed simulated balance (`walletScope: test`, `walletId: test:<appId>`, `balance: 1000000`, `promoBalance: 0`, `promoNextExpiry: null`, `mode: test`) that test issues never reduce. Scenarios `07`/`08` of `POST /issue` simulate the insufficient-credit paths.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
+        "description": "Returns the current balance of the credit wallet the authenticated app spends from: the organization wallet shared by every app of the organization (`walletScope: organization`). The `app` value of `walletScope` (the former per-app wallet) is deprecated and no longer returned. `balance` is a credit quantity (not money) and `currency` is `CREDIT`. Reading the balance never affects OTP issue status.\n\n**Test mode.** A `sk_test_` key never reads the real wallet: it gets a fixed simulated balance (`walletScope: test`, `walletId: test:<appId>`, `balance: 1000000`, `promoBalance: 0`, `promoNextExpiry: null`, `mode: test`) that test issues never reduce. Scenarios `07`/`08` of `POST /issue` simulate the insufficient-credit paths.\n\nRequires an `sk_` secret key; `pk_` public keys are rejected with 403.",
         "tags": [
           "otp"
         ],
@@ -5544,11 +5544,11 @@
                     },
                     "walletId": {
                       "type": "string",
-                      "description": "`org:<organizationId>` for the organization wallet; `app:<appId>` for a legacy\nper-app wallet; `test:<appId>` for the simulated wallet of a test-mode key."
+                      "description": "`org:<organizationId>` for the organization wallet; `test:<appId>` for the\nsimulated wallet of a test-mode key. (`app:<appId>` ids of the former\nper-app wallet are no longer returned.)"
                     },
                     "walletScope": {
                       "$ref": "#/components/schemas/WalletScope",
-                      "description": "`organization` when the balance is shared by every app of the organization;\n`test` for the simulated wallet of a test-mode key."
+                      "description": "`organization` when the balance is shared by every app of the organization;\n`test` for the simulated wallet of a test-mode key. `app` is deprecated and\nno longer returned."
                     },
                     "organizationId": {
                       "type": "string",
@@ -5569,7 +5569,7 @@
                     "promoBalance": {
                       "type": "integer",
                       "minimum": 0,
-                      "description": "Unused, unexpired promotional (free) credits included in `balance`.\nPurchased credits are roughly `balance - promoBalance`. Computed from the\npromotional lot summary, which can lag recent sends by about 10 minutes;\nnever more than `balance`. Always `0` for a legacy per-app wallet."
+                      "description": "Unused, unexpired promotional (free) credits included in `balance`.\nPurchased credits are roughly `balance - promoBalance`. Computed from the\npromotional lot summary, which can lag recent sends by about 10 minutes;\nnever more than `balance`."
                     },
                     "promoNextExpiry": {
                       "oneOf": [
@@ -6059,7 +6059,7 @@
             }
           },
           "503": {
-            "description": "SERVICE_UNAVAILABLE: credential introspection or a downstream dependency is temporarily unavailable. Retry with backoff.",
+            "description": "SERVICE_UNAVAILABLE: credential introspection or a downstream dependency is temporarily unavailable. Retry with backoff. `message: wallet_unresolved` means the API key's app is not linked to an organization, so it has no credit wallet; retrying does not help, contact support.",
             "content": {
               "application/json": {
                 "schema": {
